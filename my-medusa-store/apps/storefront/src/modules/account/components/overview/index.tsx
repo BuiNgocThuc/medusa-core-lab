@@ -4,13 +4,15 @@ import ChevronDown from "@modules/common/icons/chevron-down"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { convertToLocale } from "@lib/util/money"
 import { HttpTypes } from "@medusajs/types"
+import { LoyaltyProfile } from "@lib/data/loyalty"
 
 type OverviewProps = {
   customer: HttpTypes.StoreCustomer | null
   orders: HttpTypes.StoreOrder[] | null
+  loyaltyProfile: LoyaltyProfile | null
 }
 
-const Overview = ({ customer, orders }: OverviewProps) => {
+const Overview = ({ customer, orders, loyaltyProfile }: OverviewProps) => {
   return (
     <div data-testid="overview-page-wrapper">
       <div className="hidden small:block">
@@ -60,6 +62,18 @@ const Overview = ({ customer, orders }: OverviewProps) => {
                   </span>
                   <span className="uppercase text-base-regular text-ui-fg-subtle">
                     Saved
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-y-4">
+                <h3 className="text-large-semi">Membership</h3>
+                <div className="flex items-end gap-x-2">
+                  <span className="text-3xl-semi leading-none capitalize" data-testid="customer-tier">
+                    {loyaltyProfile?.tier ?? "Bronze"}
+                  </span>
+                  <span className="uppercase text-base-regular text-ui-fg-subtle" data-testid="loyalty-points-balance">
+                    {loyaltyProfile?.loyalty_points ?? 0} Points
                   </span>
                 </div>
               </div>

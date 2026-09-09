@@ -4,13 +4,16 @@ import EmptyCartMessage from "../components/empty-cart-message"
 import SignInPrompt from "../components/sign-in-prompt"
 import Divider from "@modules/common/components/divider"
 import { HttpTypes } from "@medusajs/types"
+import { LoyaltyProfile } from "@lib/data/loyalty"
 
 const CartTemplate = ({
   cart,
   customer,
+  loyaltyProfile,
 }: {
   cart: HttpTypes.StoreCart | null
   customer: HttpTypes.StoreCustomer | null
+  loyaltyProfile: LoyaltyProfile | null
 }) => {
   return (
     <div className="py-12">
@@ -31,7 +34,7 @@ const CartTemplate = ({
                 {cart && cart.region && (
                   <>
                     <div className="bg-white py-6">
-                      <Summary cart={cart} />
+                      <Summary cart={cart} loyaltyProfile={loyaltyProfile} />
                     </div>
                   </>
                 )}

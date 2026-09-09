@@ -6,10 +6,13 @@ import CartTotals from "@modules/common/components/cart-totals"
 import Divider from "@modules/common/components/divider"
 import DiscountCode from "@modules/checkout/components/discount-code"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import LoyaltyPoints from "@modules/loyalty/components/loyalty-points"
 import { HttpTypes } from "@medusajs/types"
+import { LoyaltyProfile } from "@lib/data/loyalty"
 
 type SummaryProps = {
   cart: HttpTypes.StoreCart
+  loyaltyProfile: LoyaltyProfile | null
 }
 
 function getCheckoutStep(cart: HttpTypes.StoreCart) {
@@ -22,7 +25,7 @@ function getCheckoutStep(cart: HttpTypes.StoreCart) {
   }
 }
 
-const Summary = ({ cart }: SummaryProps) => {
+const Summary = ({ cart, loyaltyProfile }: SummaryProps) => {
   const step = getCheckoutStep(cart)
 
   return (
@@ -31,6 +34,8 @@ const Summary = ({ cart }: SummaryProps) => {
         Summary
       </Heading>
       <DiscountCode cart={cart} />
+      <Divider />
+      <LoyaltyPoints profile={loyaltyProfile} />
       <Divider />
       <CartTotals totals={cart} />
       <LocalizedClientLink

@@ -14,6 +14,14 @@ type DiscountCodeProps = {
   cart: HttpTypes.StoreCart
 }
 
+const getPromotionLabel = (code?: string) => {
+  if (code === "WELCOME10") return "First-order discount"
+  if (code === "TIER_SILVER") return "Silver tier"
+  if (code === "TIER_GOLD") return "Gold tier"
+  if (code?.startsWith("LOYALTY-")) return "Loyalty reward"
+  return code
+}
+
 const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
   const [isOpen, setIsOpen] = React.useState(false)
   const [errorMessage, setErrorMessage] = React.useState("")
@@ -118,7 +126,7 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
                         <Badge
                           color={promotion.is_automatic ? "green" : "grey"}
                         >
-                          {promotion.code}
+                          {getPromotionLabel(promotion.code)}
                         </Badge>{" "}
                         (
                         {promotion.application_method?.value !== undefined &&
