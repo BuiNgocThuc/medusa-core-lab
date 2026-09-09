@@ -28,6 +28,22 @@ Nếu một service chưa khởi động được, xem log bằng:
 docker compose logs postgres redis
 ```
 
+### Reset database local (khi cần seed lại từ đầu)
+
+> Lưu ý: các lệnh dưới đây xoá toàn bộ dữ liệu local trong database `medusa_core_lab_db`. Dừng backend trước khi thực hiện.
+
+Từ thư mục root của repository, drop database cũ rồi tạo lại database mới:
+
+```bash
+docker exec -it medusa_core_lab_postgres \
+  psql -U admin -d postgres -c "DROP DATABASE IF EXISTS medusa_core_lab_db;"
+
+docker exec -it medusa_core_lab_postgres \
+  psql -U admin -d postgres -c "CREATE DATABASE medusa_core_lab_db OWNER admin;"
+```
+
+Sau đó tiếp tục từ bước migrate và seed ở dưới.
+
 ## 2. Cấu hình backend
 
 Từ thư mục `my-medusa-store`, tạo file môi trường:
