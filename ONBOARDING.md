@@ -35,11 +35,9 @@ docker compose logs postgres redis
 Từ thư mục root của repository, drop database cũ rồi tạo lại database mới:
 
 ```bash
-docker exec -it medusa_core_lab_postgres \
-  psql -U admin -d postgres -c "DROP DATABASE IF EXISTS medusa_core_lab_db;"
+docker exec -it medusa_core_lab_postgres psql -U admin -d postgres -c "DROP DATABASE IF EXISTS medusa_core_lab_db;"
 
-docker exec -it medusa_core_lab_postgres \
-  psql -U admin -d postgres -c "CREATE DATABASE medusa_core_lab_db OWNER admin;"
+docker exec -it medusa_core_lab_postgres psql -U admin -d postgres -c "CREATE DATABASE medusa_core_lab_db OWNER admin;"
 ```
 
 Sau đó tiếp tục từ bước migrate và seed ở dưới.
