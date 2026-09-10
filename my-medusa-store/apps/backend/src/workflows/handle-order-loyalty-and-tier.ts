@@ -1,13 +1,9 @@
 import { createStep, createWorkflow, StepResponse, WorkflowResponse } from "@medusajs/framework/workflows-sdk"
 import {
   ContainerRegistrationKeys,
-  MedusaError,
   Modules,
 } from "@medusajs/framework/utils"
 import {
-  CUSTOMER_TIERS,
-  type CustomerTier,
-  getCustomerTier,
   LOYALTY_EARN_SPEND,
   LOYALTY_PROMOTION_PREFIX,
 } from "../constants"
@@ -20,7 +16,6 @@ type HandleOrderInput = {
 type HandleOrderResult = {
   skipped: boolean
   customer_id?: string
-  tier?: CustomerTier
   earned_points?: number
   balance?: number
 }
@@ -32,8 +27,6 @@ const handleOrderLoyaltyAndTierStep = createStep<
 >(
   "handle-order-loyalty-and-tier",
   async ({ order_id }: HandleOrderInput, { container }) => {
-    const orderModule = container.resolve(Modules.ORDER) as any
-    const customerModule = container.resolve(Modules.CUSTOMER) as any
     const promotionModule = container.resolve(Modules.PROMOTION) as any
     const loyaltyModule = container.resolve(LOYALTY_MODULE) as any
     const query = container.resolve(ContainerRegistrationKeys.QUERY) as any
@@ -85,33 +78,6 @@ const handleOrderLoyaltyAndTierStep = createStep<
       }
     }
 
-    const customerOrders = await orderModule.listOrders({
-      customer_id: order.customer_id,
-    })
-    const totalSpend = customerOrders.reduce(
-      (sum: number, customerOrder: { total?: number }) =>
-        sum + (customerOrder.total ?? 0),
-      0
-    )
-    const tier = getCustomerTier(totalSpend)
-    const groups = await customerModule.listCustomerGroups({
-      name: Object.values(CUSTOMER_TIERS).map((item) => item.name),
-    })
-    const tierGroup = groups.find(
-      (group: { name: string }) => group.name === CUSTOMER_TIERS[tier].name
-    )
-
-    if (!tierGroup) {
-      throw new MedusaError(
-        MedusaError.Types.UNEXPECTED_STATE,
-        "Customer tiers have not been initialized. Run setup-promotions.ts first."
-      )
-    }
-
-    await customerModule.updateCustomers(order.customer_id, {
-      group_ids: [tierGroup.id],
-    })
-
     const eligibleAmount = Math.max(
       0,
       (order.subtotal ?? 0) - (order.discount_total ?? 0)
@@ -139,7 +105,6 @@ const handleOrderLoyaltyAndTierStep = createStep<
     return new StepResponse({
       skipped: false,
       customer_id: order.customer_id,
-      tier,
       earned_points: earnedPoints,
       balance: loyaltyAccount.balance,
     })

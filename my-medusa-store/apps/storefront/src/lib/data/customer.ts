@@ -4,6 +4,7 @@ import { sdk } from "@lib/config"
 import medusaError from "@lib/util/medusa-error"
 import { HttpTypes } from "@medusajs/types"
 import { FetchError } from "@medusajs/js-sdk"
+import type { CustomerNextTier } from "types/tier"
 import { revalidateTag } from "next/cache"
 import { redirect } from "next/navigation"
 import {
@@ -18,6 +19,7 @@ import {
   setAuthToken,
   setPendingCustomer,
 } from "./cookies"
+import { getRegion } from "./regions"
 
 export type CustomerAuthState =
   | { state: "error"; error: string }
@@ -67,6 +69,29 @@ export const retrieveCustomer =
       .then(({ customer }) => customer)
       .catch(() => null)
   }
+
+export const retrieveCustomerNextTier = async (
+  countryCode: string
+): Promise<CustomerNextTier | null> => {
+  const authHeaders = await getAuthHeaders()
+  const region = await getRegion(countryCode)
+
+  if (!region) return null
+  if (!authHeaders) return null
+
+  const headers = { ...authHeaders }
+  const next = { ...(await getCacheOptions("customers")) }
+
+  return await sdk.client
+    .fetch<CustomerNextTier>("/store/customers/me/next-tier", {
+      method: "GET",
+      headers,
+      next,
+      query: { region_id: region.id },
+    })
+    .then((data) => data)
+    .catch(() => null)
+}
 
 export const updateCustomer = async (body: HttpTypes.StoreUpdateCustomer) => {
   const headers = {

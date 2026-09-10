@@ -22,6 +22,12 @@ module.exports = defineConfig({
     {
       resolve: "./src/modules/loyalty",
     },
+    {
+      resolve: "./src/modules/tier",
+    },
+    {
+      resolve: "@medusajs/index",
+    },
     // --- STORAGE: Dùng Cloudflare R2 để lưu ảnh sản phẩm ---- Bỏ vào modules[]
     ...(process.env.S3_BUCKET
         ? [
@@ -51,5 +57,4 @@ module.exports = defineConfig({
         : []),
   ]
 })
-
 

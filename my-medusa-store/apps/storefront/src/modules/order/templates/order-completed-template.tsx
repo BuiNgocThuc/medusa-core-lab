@@ -9,13 +9,17 @@ import OrderDetails from "@modules/order/components/order-details"
 import ShippingDetails from "@modules/order/components/shipping-details"
 import PaymentDetails from "@modules/order/components/payment-details"
 import { HttpTypes } from "@medusajs/types"
+import CustomerTier from "@modules/common/customer-tier"
+import type { CustomerNextTier } from "types/tier"
 
 type OrderCompletedTemplateProps = {
   order: HttpTypes.StoreOrder
+  tierData: CustomerNextTier | null
 }
 
 export default async function OrderCompletedTemplate({
   order,
+  tierData,
 }: OrderCompletedTemplateProps) {
   const cookies = await nextCookies()
 
@@ -37,6 +41,7 @@ export default async function OrderCompletedTemplate({
             <span>Your order was placed successfully.</span>
           </Heading>
           <OrderDetails order={order} />
+          <CustomerTier tierData={tierData} />
           <Heading level="h2" className="flex flex-row text-3xl-regular">
             Summary
           </Heading>
