@@ -1,50 +1,43 @@
 import { createWorkflow, when, WorkflowResponse } from "@medusajs/framework/workflows-sdk"
 import { PromotionActions } from "@medusajs/framework/utils"
-import {
-  updateCartPromotionsStep,
-  useQueryGraphStep,
-} from "@medusajs/medusa/core-flows"
+import { updateCartPromotionsStep, useQueryGraphStep } from "@medusajs/medusa/core-flows"
 import { FIRST_PURCHASE_PROMOTION_CODE } from "../constants"
 
-type ApplyFirstPurchasePromoInput = {
-  cart_id: string
-}
+type WorkflowInput = { cart_id: string }
 
 export const applyFirstPurchasePromoWorkflow = createWorkflow(
   "apply-first-purchase-promo",
-  (input: ApplyFirstPurchasePromoInput) => {
+  (input: WorkflowInput) => {
     const { data: carts } = useQueryGraphStep({
       entity: "cart",
       fields: ["promotions.*", "customer.*", "customer.orders.*"],
       filters: { id: input.cart_id },
     })
-
     const { data: promotions } = useQueryGraphStep({
       entity: "promotion",
-      fields: ["id", "code"],
+      fields: ["code"],
       filters: { code: FIRST_PURCHASE_PROMOTION_CODE },
-    }).config({ name: "retrieve-first-purchase-promotion" })
+    }).config({ name: "retrieve-promotions" })
 
-    when({ carts, promotions }, (data) => {
-      const cart = data.carts[0]
-      const promotion = data.promotions[0]
-
-      return Boolean(
-        cart &&
-          promotion &&
-          cart.customer &&
-          cart.customer.has_account &&
-          cart.customer.orders?.length === 0 &&
-          !cart.promotions?.some((item) => item?.id === promotion.id)
-      )
-    }).then(() => {
+    when({ carts, promotions }, (data) =>
+      data.promotions.length > 0 &&
+      !data.carts[0].promotions?.some((promo) => promo?.id === data.promotions[0].id) &&
+      data.carts[0].customer !== null &&
+      data.carts[0].customer.orders?.length === 0
+    ).then(() => {
       updateCartPromotionsStep({
         id: carts[0].id,
-        promo_codes: [FIRST_PURCHASE_PROMOTION_CODE],
+        promo_codes: [promotions[0].code!],
         action: PromotionActions.ADD,
       })
     })
 
-    return new WorkflowResponse(carts[0])
+    const { data: updatedCarts } = useQueryGraphStep({
+      entity: "cart",
+      fields: ["*", "promotions.*"],
+      filters: { id: input.cart_id },
+    }).config({ name: "retrieve-updated-cart" })
+
+    return new WorkflowResponse(updatedCarts[0])
   }
 )

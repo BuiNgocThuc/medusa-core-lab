@@ -1,10 +1,7 @@
-import type { SubscriberArgs, SubscriberConfig } from "@medusajs/framework"
+import { SubscriberArgs, type SubscriberConfig } from "@medusajs/framework"
 import { applyFirstPurchasePromoWorkflow } from "../workflows/apply-first-purchase-promo"
 
-export default async function applyFirstPurchase({
-  event: { data },
-  container,
-}: SubscriberArgs<{ id: string }>) {
+export default async function cartCreatedHandler({ event: { data }, container }: SubscriberArgs<{ id: string }>) {
   await applyFirstPurchasePromoWorkflow(container).run({
     input: { cart_id: data.id },
   })
