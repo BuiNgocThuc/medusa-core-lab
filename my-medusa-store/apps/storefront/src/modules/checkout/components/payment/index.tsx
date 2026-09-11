@@ -1,7 +1,8 @@
 "use client"
 import { RadioGroup } from "@headlessui/react"
-import { isStripeLike, paymentInfoMap } from "@lib/constants"
+import { isBankTransfer, isStripeLike, paymentInfoMap } from "@lib/constants"
 import { initiatePaymentSession } from "@lib/data/cart"
+import { convertToLocale } from "@lib/util/money"
 import { CheckCircleSolid, CreditCard } from "@medusajs/icons"
 import ErrorMessage from "@modules/checkout/components/error-message"
 import PaymentContainer, {
@@ -19,6 +20,17 @@ import { HttpTypes } from "@medusajs/types"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useCallback, useEffect, useState } from "react"
 
+type BankTransferSessionData = {
+  payment_reference?: string
+  bank_name?: string
+  bank_account_number?: string
+  bank_account_name?: string
+  amount?: number
+  currency_code?: string
+  expires_at?: string
+  instructions?: string
+}
+
 const Payment = ({
   cart,
   availablePaymentMethods,
@@ -27,7 +39,9 @@ const Payment = ({
   availablePaymentMethods: { id: string }[]
 }) => {
   const activeSession = cart.payment_collection?.payment_sessions?.find(
-    (paymentSession) => paymentSession.status === "pending"
+    (paymentSession) =>
+      paymentSession.status === "pending" ||
+      paymentSession.status === "pending_authorization"
   )
 
   const [isLoading, setIsLoading] = useState(false)
@@ -46,10 +60,17 @@ const Payment = ({
   const setPaymentMethod = async (method: string) => {
     setError(null)
     setSelectedPaymentMethod(method)
-    if (isStripeLike(method)) {
+    if (
+      (isStripeLike(method) || isBankTransfer(method)) &&
+      activeSession?.provider_id !== method
+    ) {
       await initiatePaymentSession(cart, {
         provider_id: method,
       })
+
+      if (isBankTransfer(method)) {
+        router.refresh()
+      }
     }
   }
 
@@ -161,7 +182,17 @@ const Payment = ({
                         paymentInfoMap={paymentInfoMap}
                         paymentProviderId={paymentMethod.id}
                         selectedPaymentOptionId={selectedPaymentMethod}
-                      />
+                      >
+                        {isBankTransfer(paymentMethod.id) &&
+                          selectedPaymentMethod === paymentMethod.id &&
+                          activeSession?.provider_id === paymentMethod.id && (
+                            <BankTransferDetails
+                              data={
+                                activeSession.data as BankTransferSessionData
+                              }
+                            />
+                          )}
+                      </PaymentContainer>
                     )}
                   </div>
                 ))}
@@ -233,7 +264,13 @@ const Payment = ({
                       <CreditCard />
                     )}
                   </Container>
-                  <Text>Another step will appear</Text>
+                  <Text>
+                    {isBankTransfer(activeSession.provider_id)
+                      ? (
+                          activeSession.data as BankTransferSessionData
+                        )?.payment_reference
+                      : "Another step will appear"}
+                  </Text>
                 </div>
               </div>
             </div>
@@ -253,6 +290,64 @@ const Payment = ({
         </div>
       </div>
       <Divider className="mt-8" />
+    </div>
+  )
+}
+
+const BankTransferDetails = ({ data }: { data?: BankTransferSessionData }) => {
+  if (!data?.payment_reference) {
+    return null
+  }
+
+  const amount =
+    typeof data.amount === "number" && data.currency_code
+      ? convertToLocale({
+          amount: data.amount,
+          currency_code: data.currency_code,
+        })
+      : undefined
+  const expiresAt = data.expires_at
+    ? new Intl.DateTimeFormat("en-US", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(new Date(data.expires_at))
+    : undefined
+
+  return (
+    <div className="grid grid-cols-1 small:grid-cols-2 gap-3 rounded-rounded border border-ui-border-base bg-ui-bg-subtle p-4">
+      <BankTransferRow label="Amount" value={amount} />
+      <BankTransferRow label="Reference" value={data.payment_reference} strong />
+      <BankTransferRow label="Bank" value={data.bank_name} />
+      <BankTransferRow label="Account number" value={data.bank_account_number} />
+      <BankTransferRow label="Account name" value={data.bank_account_name} />
+      <BankTransferRow label="Expires" value={expiresAt} />
+    </div>
+  )
+}
+
+const BankTransferRow = ({
+  label,
+  value,
+  strong = false,
+}: {
+  label: string
+  value?: string
+  strong?: boolean
+}) => {
+  if (!value) {
+    return null
+  }
+
+  return (
+    <div>
+      <Text className="txt-small text-ui-fg-muted">{label}</Text>
+      <Text
+        className={clx("txt-medium text-ui-fg-base break-words", {
+          "txt-medium-plus": strong,
+        })}
+      >
+        {value}
+      </Text>
     </div>
   )
 }

@@ -57,7 +57,7 @@ export async function seedStoreAndRegion(container: MedusaContainer) {
           name: "Vietnam",
           currency_code: "vnd",
           countries: COUNTRIES,
-          payment_providers: ["pp_system_default"],
+          payment_providers: ["pp_system_default", "pp_bank-transfer_default"],
         },
       ],
     },

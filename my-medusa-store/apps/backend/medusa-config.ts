@@ -1,5 +1,7 @@
 import { loadEnv, defineConfig } from '@medusajs/framework/utils'
 
+import { BANK_TRANSFER_PAYMENT_MODULE } from "./src/modules/bank-transfer-payment"
+
 loadEnv(process.env.NODE_ENV || 'development', process.cwd())
 
 const REDIS_URL = process.env.REDIS_URL;
@@ -18,7 +20,41 @@ module.exports = defineConfig({
     }
   },
 
+  admin: {
+    disable: process.env.MEDUSA_ADMIN_DISABLED === "true",
+  },
+
   modules: [
+    {
+      resolve: "./src/modules/bank-transfer-payment",
+    },
+    {
+      resolve: "@medusajs/medusa/payment",
+      dependencies: [BANK_TRANSFER_PAYMENT_MODULE],
+      options: {
+        providers: [
+          {
+            resolve: "./src/modules/bank-transfer",
+            id: "default",
+            options: {
+              providerId: "pp_bank-transfer_default",
+              bankName: process.env.BANK_TRANSFER_BANK_NAME || "Demo Bank",
+              accountNumber:
+                process.env.BANK_TRANSFER_ACCOUNT_NUMBER || "0000000000",
+              accountName:
+                process.env.BANK_TRANSFER_ACCOUNT_NAME ||
+                "MEDUSA DEMO MERCHANT",
+              referencePrefix:
+                process.env.BANK_TRANSFER_REFERENCE_PREFIX || "PAY",
+              paymentExpiryMinutes: Number(
+                process.env.BANK_TRANSFER_EXPIRY_MINUTES || 30
+              ),
+              webhookSecret: process.env.BANK_TRANSFER_WEBHOOK_SECRET,
+            },
+          },
+        ],
+      },
+    },
     // --- STORAGE: Dùng Cloudflare R2 để lưu ảnh sản phẩm ---- Bỏ vào modules[]
     ...(process.env.S3_BUCKET
         ? [
@@ -48,5 +84,3 @@ module.exports = defineConfig({
         : []),
   ]
 })
-
-
