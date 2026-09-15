@@ -65,7 +65,13 @@ Từ `my-medusa-store/apps/backend`, chạy:
 pnpm seed
 ```
 
-Lệnh seed tự chạy `medusa db:migrate` trước, sau đó nạp catalog, category, tồn kho, khách hàng demo và đơn hàng demo.
+Lệnh seed tự chạy `medusa db:migrate` trước, sau đó nạp catalog, category, tồn kho, khách hàng demo và đơn hàng demo.   
+
+
+   <!-- docker exec medusa_core_lab_postgres psql -U admin -d postgres -c "DROP DATABASE IF EXISTS medusa_core_lab_db WITH (FORCE);"
+docker exec medusa_core_lab_postgres psql -U admin -d postgres -c "CREATE DATABASE medusa_core_lab_db OWNER admin;" -->
+
+
 
 Để chạy riêng từng bước:
 
