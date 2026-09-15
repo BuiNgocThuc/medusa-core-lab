@@ -7,19 +7,22 @@ const PASSWORD = "supersecret"
 const TIER_FIXTURES = [
   {
     name: "Bronze",
-    email: "tier-bronze@test.com",
+    email: "conghung@gmail.com",
+    firstName: "Cong",
     minimumSpend: 0,
     promotion: null,
   },
   {
     name: "Silver",
-    email: "tier-silver@test.com",
+    email: "ngocthuc@gmail.com",
+    firstName: "Ngoc",
     minimumSpend: 2_000_000,
     promotion: { code: "TIER_TEST_SILVER", value: 5 },
   },
   {
     name: "Gold",
-    email: "tier-gold@test.com",
+    email: "congson@gmail.com",
+    firstName: "Cong",
     minimumSpend: 10_000_000,
     promotion: { code: "TIER_TEST_GOLD", value: 10 },
   },
@@ -64,7 +67,7 @@ export default async function seedCustomerTiers({ container }: ExecArgs) {
   const promotionModule = container.resolve(Modules.PROMOTION) as any
   const tierModule = container.resolve(TIER_MODULE) as any
   const query = container.resolve(ContainerRegistrationKeys.QUERY) as any
-  const remoteLink = container.resolve(ContainerRegistrationKeys.REMOTE_LINK) as any
+  const link = container.resolve(ContainerRegistrationKeys.LINK) as any
 
   for (const fixture of TIER_FIXTURES) {
     let promotion: { id: string } | null = null
@@ -87,7 +90,10 @@ export default async function seedCustomerTiers({ container }: ExecArgs) {
 
     const [existingTier] = await tierModule.listTiers({ name: fixture.name })
     const tier = existingTier
-      ? await tierModule.updateTiers(existingTier.id, { promo_id: promotion?.id ?? null })
+      ? await tierModule.updateTiers({
+          id: existingTier.id,
+          promo_id: promotion?.id ?? null,
+        })
       : await tierModule.createTiers({
           name: fixture.name,
           promo_id: promotion?.id ?? null,
@@ -105,14 +111,24 @@ export default async function seedCustomerTiers({ container }: ExecArgs) {
       })
     }
 
-    const customer = await ensureCustomer(container, fixture.email, fixture.name)
+    const customer = await ensureCustomer(container, fixture.email, fixture.firstName)
     const { data: customers } = await query.graph({
       entity: "customer",
       fields: ["id", "tier.id"],
       filters: { id: customer.id },
     })
-    if (!customers[0]?.tier?.id) {
-      await remoteLink.create([
+    const currentTierId = customers[0]?.tier?.id
+    if (currentTierId !== tier.id) {
+      if (currentTierId) {
+        await link.dismiss([
+          {
+            [TIER_MODULE]: { tier_id: currentTierId },
+            [Modules.CUSTOMER]: { customer_id: customer.id },
+          },
+        ])
+      }
+
+      await link.create([
         {
           [TIER_MODULE]: { tier_id: tier.id },
           [Modules.CUSTOMER]: { customer_id: customer.id },

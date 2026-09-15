@@ -5,6 +5,9 @@ import {
   seedStoreAndRegion,
   seedStockAndShipping,
   seedCategories,
+  seedCollections,
+  seedCustomerGroups,
+  seedMarketing,
   seedProducts,
   seedInventory,
   seedCustomers,
@@ -36,27 +39,27 @@ export default async function initial_data_seed({
   const logger = container.resolve(ContainerRegistrationKeys.LOGGER);
   const salesChannelModule = container.resolve(Modules.SALES_CHANNEL);
 
-  const already = await salesChannelModule.listSalesChannels({
-    name: "Default Sales Channel",
-  });
-  if (already.length) {
-    logger.warn(
-        "[seed] Default Sales Channel already exists — DB looks seeded. Skipping.",
-    );
-    return;
-  }
-
+  const [existingSalesChannel] = await salesChannelModule.listSalesChannels({ name: "Default Sales Channel" });
   logger.info("[seed] store + sales channel + region...");
-  const { defaultSalesChannel, region } = await seedStoreAndRegion(container);
+  const { defaultSalesChannel, region } = existingSalesChannel
+    ? { defaultSalesChannel: existingSalesChannel, region: undefined }
+    : await seedStoreAndRegion(container);
 
   logger.info("[seed] stock location + shipping...");
-  const { stockLocation, shippingProfile } = await seedStockAndShipping(
-      container,
-      { regionId: region.id, salesChannelId: defaultSalesChannel.id },
-  );
+  if (!region) {
+    logger.warn("[seed] core store exists; run domain seed scripts individually to avoid duplicating fulfillment data.");
+    return;
+  }
+  const { stockLocation, shippingProfile } = await seedStockAndShipping(container, { regionId: region.id, salesChannelId: defaultSalesChannel.id });
 
   logger.info("[seed] categories...");
   const categoryResult = await seedCategories(container);
+
+  logger.info("[seed] customer groups...");
+  await seedCustomerGroups(container);
+
+  logger.info("[seed] campaigns and promotions...");
+  await seedMarketing(container);
 
   logger.info("[seed] products...");
   await seedProducts(container, {
@@ -64,6 +67,9 @@ export default async function initial_data_seed({
     shippingProfileId: shippingProfile.id,
     salesChannelId: defaultSalesChannel.id,
   });
+
+  logger.info("[seed] collections...");
+  await seedCollections(container);
 
   logger.info("[seed] inventory levels...");
   await seedInventory(container, stockLocation.id);

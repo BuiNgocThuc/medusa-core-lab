@@ -67,13 +67,13 @@ const TiersPage = () => {
 
   const { data, isLoading } = useQuery({
     queryFn: () =>
-      sdk.client.fetch<TiersResponse>("/admin/tiers", {
-        method: "GET",
-        query: {
-          limit,
-          offset,
-        },
-      }),
+        sdk.client.fetch<TiersResponse>("/admin/tiers", {
+          method: "GET",
+          query: {
+            limit,
+            offset,
+          },
+        }),
     queryKey: ["tiers", "list", limit, offset],
   })
 
@@ -95,19 +95,19 @@ const TiersPage = () => {
   })
 
   return (
-    <Container className="divide-y p-0">
-      <DataTable instance={table}>
-        <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
-          <Heading level="h1">Customer Tiers</Heading>
-          <Button onClick={() => setIsCreateModalOpen(true)}>
-            Create Tier
-          </Button>
-        </DataTable.Toolbar>
-        <DataTable.Table />
-        <DataTable.Pagination />
-      </DataTable>
-      <CreateTierModal open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen} />
-    </Container>
+      <Container className="divide-y p-0">
+        <DataTable instance={table}>
+          <DataTable.Toolbar className="flex items-center justify-between px-6 py-4">
+            <Heading level="h1">Customer Tiers</Heading>
+            <Button onClick={() => setIsCreateModalOpen(true)}>
+              Create Tier
+            </Button>
+          </DataTable.Toolbar>
+          <DataTable.Table />
+          <DataTable.Pagination />
+        </DataTable>
+        <CreateTierModal open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen} />
+      </Container>
   )
 }
 
@@ -117,4 +117,3 @@ export const config = defineRouteConfig({
 })
 
 export default TiersPage
-
