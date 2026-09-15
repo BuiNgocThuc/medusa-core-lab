@@ -1,17 +1,11 @@
 import { defineMiddlewares } from "@medusajs/framework";
-import { z } from "@medusajs/framework/zod";
+import { customerAdditionalDataSchema } from "../utils/customer-additional-data";
 
-export const adminCreateCustomerAdditionalDataValidator = {
+// Re-export validator shape for route middleware | Tái sử dụng shape từ schema dùng chung
+// Tránh định nghĩa trùng lặp logic kiểm thực giữa tầng Middleware và Workflow
+// Bridges shared schema shape to Medusa route-level additionalDataValidator contract
 
-  // Zalo UID assumption: 8-20 digit numeric string
-  zalo_id: z.string()
-    .regex(/^[0-9]{8,20}$/)
-    .optional(),
-
-  // Enforce http/https explicitly - bare z.url() does not restrict protocol in Zod 4
-  avatar_url: z.url({ protocol: /^https?$/ }).optional(),
-
-};
+export const adminCreateCustomerAdditionalDataValidator = customerAdditionalDataSchema.shape;
 
 // noinspection JSUnusedGlobalSymbols
 export default defineMiddlewares({
