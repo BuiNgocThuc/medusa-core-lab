@@ -46,6 +46,9 @@ module.exports = defineConfig({
           },
         ]
         : []),
+        {
+          resolve: "./src/modules/hello",
+        }
   ]
 })
 
