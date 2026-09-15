@@ -149,6 +149,10 @@ async function completeLogin(
     return { state: "error", error: String(error) }
   }
 
+  // Lightweight debug logs to trace login/cart interaction
+  // eslint-disable-next-line no-console
+  console.log("completeLogin:start", { email })
+
   // A `location` is returned by third-party auth providers, which this flow
   // doesn't support.
   if (typeof result === "object" && "location" in result) {
@@ -182,6 +186,9 @@ async function completeLogin(
 
   let token = result
 
+  // eslint-disable-next-line no-console
+  console.log("completeLogin:got-token", { hasToken: !!token })
+
   // The token may not be tied to a customer record yet — right after
   // registration, or after verifying a brand-new account. Ask the backend:
   // `/store/customers/me` rejects tokens without a registered actor, so a
@@ -191,6 +198,9 @@ async function completeLogin(
     .retrieve({}, { authorization: `Bearer ${token}` })
     .then(() => true)
     .catch(() => false)
+
+  // eslint-disable-next-line no-console
+  console.log("completeLogin:customerExists", { customerExists })
 
   if (!customerExists) {
     const pending = await getPendingCustomer()
@@ -223,9 +233,18 @@ async function completeLogin(
   const customerCacheTag = await getCacheTag("customers")
   revalidateTag(customerCacheTag)
 
+  // Log current cart id and run transfer
+  const currentCartId = await getCartId().catch(() => undefined)
+  // eslint-disable-next-line no-console
+  console.log("completeLogin:before-transferCart", { cartId: currentCartId })
+
   try {
     await transferCart()
+    // eslint-disable-next-line no-console
+    console.log("completeLogin:transferCart:success", { cartId: currentCartId })
   } catch (error) {
+    // eslint-disable-next-line no-console
+    console.log("completeLogin:transferCart:failure", { cartId: currentCartId, error: String(error) })
     return { state: "error", error: String(error) }
   }
 

@@ -117,13 +117,18 @@ export const removePendingCustomer = async () => {
 
 export const getCartId = async () => {
   const cookies = await nextCookies()
-  return cookies.get("_medusa_cart_id")?.value
+  const val = cookies.get("_medusa_cart_id")?.value
+  // eslint-disable-next-line no-console
+  console.log("getCartId", { cartId: val })
+  return val
 }
 
 // See the note on `setAuthToken`: `sameSite: "lax"` so the cart cookie survives
 // the cross-site return navigation from a redirect-based payment method.
 export const setCartId = async (cartId: string) => {
   const cookies = await nextCookies()
+  // eslint-disable-next-line no-console
+  console.log("setCartId", { cartId })
   cookies.set("_medusa_cart_id", cartId, {
     maxAge: 60 * 60 * 24 * 7,
     httpOnly: true,
