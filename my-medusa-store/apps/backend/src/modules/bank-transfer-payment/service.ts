@@ -8,6 +8,7 @@ import type {
   BankTransactionStatus,
   MatchIncomingTransferInput,
   MatchIncomingTransferResult,
+  UpdateReferenceFromSessionInput,
   UpsertReferenceInput,
 } from "./types"
 
@@ -167,6 +168,30 @@ class BankTransferPaymentModuleService extends MedusaService({
           ? undefined
           : `Transfer marked as ${status}; payment requires manual review`,
     }
+  }
+
+  async updateReferenceFromSession(input: UpdateReferenceFromSessionInput) {
+    const methods = this.methods()
+    const [reference] = await methods.listBankPaymentReferences(
+      {
+        payment_session_id: input.payment_session_id,
+      },
+      { take: 1 }
+    )
+
+    if (!reference || reference.status !== "pending") {
+      return reference
+    }
+
+    return methods.updateBankPaymentReferences({
+      id: reference.id,
+      expected_amount: input.expected_amount,
+      currency_code: input.currency_code.toLowerCase(),
+      metadata: {
+        ...(reference.metadata ?? {}),
+        ...(input.metadata ?? {}),
+      },
+    })
   }
 
   async expirePendingReferences(now = new Date()) {

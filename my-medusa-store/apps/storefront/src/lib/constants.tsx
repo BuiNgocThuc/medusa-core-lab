@@ -37,6 +37,10 @@ export const paymentInfoMap: Record<
     title: "Bank Transfer",
     icon: <CreditCard />,
   },
+  pp_momo_default: {
+    title: "MoMo",
+    icon: <CreditCard />,
+  },
   // Add more payment providers here
 }
 
@@ -56,6 +60,10 @@ export const isManual = (providerId?: string) => {
 
 export const isBankTransfer = (providerId?: string) => {
   return providerId?.startsWith("pp_bank-transfer")
+}
+
+export const isMomo = (providerId?: string) => {
+  return providerId?.startsWith("pp_momo")
 }
 
 // Add currencies that don't need to be divided by 100

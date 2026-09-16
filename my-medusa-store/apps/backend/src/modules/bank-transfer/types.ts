@@ -23,6 +23,7 @@ export type BankTransferSessionData = {
 }
 
 export type BankTransferWebhookPayload = {
+  event_id?: string
   event_type?: "bank_transfer.completed" | "bank_transfer.failed" | string
   transaction_id?: string
   session_id?: string

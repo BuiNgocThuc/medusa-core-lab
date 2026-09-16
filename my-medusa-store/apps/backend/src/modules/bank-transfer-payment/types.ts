@@ -27,6 +27,13 @@ export type UpsertReferenceInput = {
   metadata?: Record<string, unknown>
 }
 
+export type UpdateReferenceFromSessionInput = {
+  payment_session_id: string
+  expected_amount: number
+  currency_code: string
+  metadata?: Record<string, unknown>
+}
+
 export type MatchIncomingTransferInput = {
   event_id?: string
   transaction_id: string

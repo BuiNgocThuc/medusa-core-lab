@@ -2,9 +2,20 @@
 
 Tài liệu này giải thích toàn bộ quá trình triển khai Bank Transfer provider cho MedusaJS trong repo này: kiến trúc, các file cần review, luồng checkout, luồng webhook, reconciliation, duplicate transaction, pending authorization và cách test lại từ đầu.
 
+## 0. Plan sửa sau khi đối chiếu Medusa docs
+
+Sau khi đối chiếu với tài liệu Payment Provider của Medusa, các chỉnh sửa cần làm là:
+
+1. Giữ provider theo mẫu chuẩn `AbstractPaymentProvider` + `ModuleProvider(Modules.PAYMENT, ...)`.
+2. Sửa `updatePayment()` để khi cart amount/currency đổi thì ledger reference cũng được cập nhật.
+3. Sửa `getWebhookActionAndData()` để route webhook chuẩn của Medusa dùng được và dùng ledger matching trực tiếp trong provider.
+4. Bỏ hướng xử lý webhook bằng in-memory Map trong provider, vì dữ liệu webhook/payment cần sống trong database để idempotency và reconciliation bền hơn.
+5. Bỏ route custom cũ; chỉ dùng route chuẩn của Medusa.
+6. Cập nhật tài liệu test để dùng `POST /hooks/payment/bank-transfer_default`.
+
 ## 1. Mục tiêu của provider
 
-Bank Transfer là payment provider nhỏ nhưng dạy được gần đủ các bài quan trọng khi làm payment thật:
+Bank Transfer là payment provider:
 
 - Tạo payment reference riêng cho từng payment session.
 - Hiển thị thông tin chuyển khoản cho khách ở checkout.
@@ -14,7 +25,7 @@ Bank Transfer là payment provider nhỏ nhưng dạy được gần đủ các 
 - Chặn duplicate transaction bằng external transaction id.
 - Không overwrite reference đã matched khi có giao dịch đến sau.
 - Ghi ledger để reconciliation và audit.
-- Đưa payment của Medusa qua đúng lifecycle: pending authorization -> authorized -> captured.
+- Đưa payment của Medusa qua lifecycle: pending authorization -> authorized. Capture được xử lý riêng sau khi payment đã authorized nếu business cần.
 
 Điểm quan trọng: trong Bank Transfer, khách đặt hàng trước, tiền về sau. Vì vậy lúc checkout, provider chưa thể authorized/captured ngay như card payment.
 
@@ -52,8 +63,8 @@ Bank Transfer là payment provider nhỏ nhưng dạy được gần đủ các 
    - Tạo 3 bảng ledger và indexes.
 
 6. Webhook route:
-   - `my-medusa-store/apps/backend/src/api/webhooks/payments/bank/route.ts`
-   - Nhận webhook ngân hàng, gọi ledger match, rồi gọi `processPaymentWorkflow`.
+   - Route chuẩn của Medusa: `/hooks/payment/bank-transfer_default`.
+   - Provider implement `getWebhookActionAndData()` để nhận webhook ngân hàng, gọi ledger match, rồi trả action `authorized` cho Payment Module.
 
 7. Expiry job:
    - `my-medusa-store/apps/backend/src/jobs/expire-bank-transfer-payments.ts`
@@ -81,14 +92,15 @@ Storefront checkout
   -> Bank Transfer Payment Ledger Module
   -> Webhook / reconciliation
   -> Medusa processPaymentWorkflow
-  -> Payment authorized + captured
+  -> Payment authorized
 ```
 
 Trong đó:
 
 - Provider nói chuyện với Medusa payment lifecycle.
 - Ledger module nói chuyện với dữ liệu thật cần audit.
-- Webhook route là cầu nối từ bank transaction vào Medusa payment workflow.
+- `getWebhookActionAndData()` là cầu nối chuẩn của Medusa cho webhook payment.
+- Route `/hooks/payment/bank-transfer_default` là endpoint duy nhất cho webhook Bank Transfer.
 
 Tách provider và ledger ra riêng để sau này có thể thay provider logic mà vẫn giữ lịch sử reconciliation ổn định.
 
@@ -152,6 +164,25 @@ pp_bank-transfer_default
 ```
 
 cho mọi region có `currency_code = vnd`.
+
+## 6.1. Mức độ bám Medusa docs sau khi chỉnh
+
+Provider hiện bám các điểm chính trong tài liệu Medusa Payment Provider:
+
+- Service extend `AbstractPaymentProvider`.
+- Có `static identifier = "bank-transfer"`.
+- Export bằng `ModuleProvider(Modules.PAYMENT, { services: [...] })`.
+- Đăng ký provider trong `@medusajs/medusa/payment` qua `medusa-config.ts`.
+- Provider id cuối là `pp_bank-transfer_default`.
+- `initiatePayment()` tạo session data cho payment session.
+- `updatePayment()` cập nhật payment session khi amount/currency đổi.
+- `authorizePayment()` trả `pending_authorization` cho payment async.
+- `getWebhookActionAndData()` xử lý webhook chuẩn của Medusa và trả action cho Payment Module.
+
+Điểm có chủ đích trong lab này:
+
+- Route chuẩn theo docs là `POST /hooks/payment/bank-transfer_default`.
+- Route custom cũ đã được bỏ. Webhook chuẩn trả action `authorized`; nếu cần capture tự động, nên bổ sung một workflow chuẩn hoặc job riêng thay vì route custom.
 
 ## 6. Bảng dữ liệu ledger
 
@@ -292,7 +323,24 @@ Khách phải chuyển đúng:
 amount + currency + reference
 ```
 
-### Bước 5: Place order
+### Bước 5: Cart amount thay đổi sau khi đã tạo session
+
+Nếu khách đổi shipping, voucher hoặc line item sau khi đã chọn Bank Transfer, Medusa có thể gọi:
+
+```text
+updatePayment()
+```
+
+Provider sẽ:
+
+- Cập nhật `amount`, `currency_code`, `instructions` trong payment session data.
+- Gọi ledger module `updateReferenceFromSession()`.
+- Chỉ update `bank_payment_reference.expected_amount` khi reference vẫn còn `pending`.
+- Không đụng reference đã `matched`, tránh làm sai lịch sử reconciliation.
+
+Đây là phần quan trọng để tránh webhook bị mark `underpaid` hoặc `overpaid` sai khi cart total thay đổi.
+
+### Bước 6: Place order
 
 Button Bank Transfer nằm ở:
 
@@ -312,15 +360,17 @@ Lúc này tiền chưa về, nên provider `authorizePayment()` trả:
 pending_authorization
 ```
 
-Kết quả đúng là order được tạo nhưng payment chưa captured.
+Kết quả đúng là order được tạo nhưng payment chưa authorized/captured.
 
 ## 8. Luồng webhook và reconciliation
 
-Webhook endpoint:
+Chỉ dùng endpoint chuẩn của Medusa Payment Module:
 
 ```text
-POST /webhooks/payments/bank
+POST /hooks/payment/bank-transfer_default
 ```
+
+Endpoint này gọi `getWebhookActionAndData()` trong provider. Route custom cũ đã được bỏ để tránh có hai đường webhook cùng mutate payment state.
 
 Payload dev/test:
 
@@ -337,9 +387,9 @@ Payload dev/test:
 
 `payment_reference` là optional. Nếu không gửi, service sẽ cố parse reference từ `description`.
 
-### Bước 1: Webhook validate input
+### Bước 1: Webhook validate input/signature
 
-Route yêu cầu:
+Webhook yêu cầu:
 
 - `transaction_id`
 - `amount`
@@ -351,7 +401,19 @@ Nếu `BANK_TRANSFER_WEBHOOK_SECRET` có set, route yêu cầu:
 x-bank-signature: <secret>
 ```
 
-### Bước 2: Ghi bank_webhook_event
+### Bước 2: Provider gọi ledger matching
+
+Route chuẩn:
+
+```text
+/hooks/payment/bank-transfer_default
+  -> BankTransferPaymentProviderService.getWebhookActionAndData()
+  -> bankTransferPaymentService.matchIncomingTransfer()
+```
+
+Đây là đường duy nhất dùng logic `matchIncomingTransfer()`, nên duplicate, amount matching, currency matching và reconciliation không bị tách thành hai nguồn sự thật.
+
+### Bước 3: Ghi bank_webhook_event
 
 Ngay khi nhận webhook, ledger module tạo event status:
 
@@ -359,7 +421,7 @@ Ngay khi nhận webhook, ledger module tạo event status:
 received
 ```
 
-### Bước 3: Chặn duplicate transaction
+### Bước 4: Chặn duplicate transaction
 
 Service kiểm tra:
 
@@ -375,7 +437,7 @@ Nếu transaction id đã tồn tại:
 
 Đây là cơ chế idempotency chính.
 
-### Bước 4: Tìm reference
+### Bước 5: Tìm reference
 
 Reference được lấy theo thứ tự:
 
@@ -388,7 +450,7 @@ Nếu không tìm thấy reference:
 - Mark event `processed`.
 - Không gọi payment workflow.
 
-### Bước 5: Match amount/currency/status
+### Bước 6: Match amount/currency/status
 
 Nếu tìm thấy reference, ledger tính status:
 
@@ -403,7 +465,7 @@ Chỉ status `matched` mới được tự động process payment.
 
 Các status còn lại để reconciliation/manual review.
 
-### Bước 6: Update reference
+### Bước 7: Update reference
 
 Nếu transaction status không phải `ignored`, service update reference:
 
@@ -414,28 +476,25 @@ Nếu transaction status không phải `ignored`, service update reference:
 
 Trường hợp quan trọng: nếu reference đã `matched` rồi mà có thêm giao dịch cùng reference nhưng transaction id khác, status là `ignored` và code không overwrite `matched_transaction_id` cũ. Nhờ đó transaction đầu tiên vẫn là source of truth.
 
-### Bước 7: Process Medusa payment
+### Bước 8: Process Medusa payment
 
-Nếu status là `matched`, webhook route gọi:
-
-```text
-processPaymentWorkflow(action: "authorized")
-processPaymentWorkflow(action: "captured")
-```
-
-Phải làm 2 bước vì order Bank Transfer được tạo với pending authorization. Nếu nhảy thẳng sang `captured`, Medusa chưa có payment id để capture và có thể lỗi kiểu:
+Với route chuẩn Medusa, nếu status là `matched`, provider trả:
 
 ```text
-payment - id must be defined
+action: "authorized"
+data: { session_id, amount }
 ```
 
-Vì vậy thứ tự đúng là:
+Medusa sẽ xử lý authorization qua Payment Module. Đây là đường bám sát docs nhất.
+
+Với route chuẩn hiện tại, provider trả:
 
 ```text
-pending_authorization -> authorized -> captured
+action: "authorized"
+data: { session_id, amount }
 ```
 
-Sau bước này bảng `payment` của Medusa có `captured_at`.
+Medusa sẽ xử lý authorization qua Payment Module. Nếu business muốn auto-capture cho Bank Transfer, nên bổ sung workflow/job riêng sau khi payment đã authorized thay vì tạo route webhook thứ hai.
 
 ## 9. Vai trò của authorizePayment và getPaymentStatus
 
@@ -669,10 +728,10 @@ type = order
 order status = pending
 ```
 
-10. Gửi webhook matched:
+10. Gửi webhook matched bằng route chuẩn Medusa để test authorization:
 
 ```bash
-curl -X POST "http://localhost:9101/webhooks/payments/bank" \
+curl -X POST "http://localhost:9101/hooks/payment/bank-transfer_default" \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "evt_bank_manual_001",
@@ -700,6 +759,8 @@ Expected:
   "payment_reference": "PAY ..."
 }
 ```
+
+Ghi chú khi test: cùng một `payment_reference` chỉ nên có một giao dịch matched đầu tiên. Gửi lại cùng `transaction_id` sẽ được xử lý như duplicate/ignored.
 
 11. Gửi lại cùng `transaction_id`.
 

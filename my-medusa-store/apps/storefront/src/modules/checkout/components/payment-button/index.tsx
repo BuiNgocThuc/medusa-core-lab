@@ -1,6 +1,6 @@
 "use client"
 
-import { isBankTransfer, isManual, isStripeLike } from "@lib/constants"
+import { isBankTransfer, isManual, isMomo, isStripeLike } from "@lib/constants"
 import { placeOrder } from "@lib/data/cart"
 import { HttpTypes } from "@medusajs/types"
 import { Button } from "@modules/common/components/ui"
@@ -25,7 +25,11 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
     !cart.email ||
     (cart.shipping_methods?.length ?? 0) < 1
 
-  const paymentSession = cart.payment_collection?.payment_sessions?.[0]
+  const paymentSession = cart.payment_collection?.payment_sessions?.find(
+    (session) =>
+      session.status === "pending" ||
+      session.status === "pending_authorization"
+  )
 
   switch (true) {
     case isStripeLike(paymentSession?.provider_id):
@@ -44,6 +48,14 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
       return (
         <BankTransferPaymentButton
           notReady={notReady}
+          data-testid={dataTestId}
+        />
+      )
+    case isMomo(paymentSession?.provider_id):
+      return (
+        <MomoPaymentButton
+          notReady={notReady}
+          cart={cart}
           data-testid={dataTestId}
         />
       )
@@ -244,3 +256,76 @@ const BankTransferPaymentButton = ({
 }
 
 export default PaymentButton
+
+const MomoPaymentButton = ({
+  cart,
+  notReady,
+  "data-testid": dataTestId,
+}: {
+  cart: HttpTypes.StoreCart
+  notReady: boolean
+  "data-testid"?: string
+}) => {
+  const [submitting, setSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const { countryCode } = useParams()
+  const paymentSession = cart.payment_collection?.payment_sessions?.find(
+    (session) => isMomo(session.provider_id)
+  )
+  const hostedPaymentUrl =
+    (paymentSession?.data?.pay_url as string | undefined) ??
+    (paymentSession?.data?.short_link as string | undefined)
+  const deeplink = paymentSession?.data?.deeplink as string | undefined
+  const paymentUrl =
+    typeof window !== "undefined" &&
+    /Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent) &&
+    deeplink
+      ? deeplink
+      : hostedPaymentUrl
+
+  const handlePayment = () => {
+    if (!paymentUrl) {
+      setErrorMessage("MoMo payment URL is not available")
+      return
+    }
+
+    setSubmitting(true)
+    window.location.href = withReturnContext(paymentUrl, {
+      cart_id: cart.id,
+      country_code: typeof countryCode === "string" ? countryCode : "",
+    })
+  }
+
+  return (
+    <>
+      <Button
+        disabled={notReady || !paymentUrl}
+        isLoading={submitting}
+        onClick={handlePayment}
+        size="large"
+        data-testid={dataTestId}
+      >
+        Pay with MoMo
+      </Button>
+      <ErrorMessage error={errorMessage} data-testid="momo-payment-error-message" />
+    </>
+  )
+}
+
+function withReturnContext(
+  paymentUrl: string,
+  context: { cart_id: string; country_code: string }
+) {
+  try {
+    const url = new URL(paymentUrl)
+    url.searchParams.set("cart_id", context.cart_id)
+
+    if (context.country_code) {
+      url.searchParams.set("country_code", context.country_code)
+    }
+
+    return url.toString()
+  } catch {
+    return paymentUrl
+  }
+}

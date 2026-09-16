@@ -1,6 +1,6 @@
 "use client"
 import { RadioGroup } from "@headlessui/react"
-import { isBankTransfer, isStripeLike, paymentInfoMap } from "@lib/constants"
+import { isBankTransfer, isMomo, isStripeLike, paymentInfoMap } from "@lib/constants"
 import { initiatePaymentSession } from "@lib/data/cart"
 import { convertToLocale } from "@lib/util/money"
 import { CheckCircleSolid, CreditCard } from "@medusajs/icons"
@@ -29,6 +29,20 @@ type BankTransferSessionData = {
   currency_code?: string
   expires_at?: string
   instructions?: string
+}
+
+type MomoSessionData = {
+  momo_order_id?: string
+  request_id?: string
+  amount?: number
+  currency_code?: string
+  pay_url?: string
+  short_link?: string
+  deeplink?: string
+  qr_code_url?: string
+  deeplink_mini_app?: string
+  expires_at?: string
+  message?: string
 }
 
 const Payment = ({
@@ -61,14 +75,14 @@ const Payment = ({
     setError(null)
     setSelectedPaymentMethod(method)
     if (
-      (isStripeLike(method) || isBankTransfer(method)) &&
+      (isStripeLike(method) || isBankTransfer(method) || isMomo(method)) &&
       activeSession?.provider_id !== method
     ) {
       await initiatePaymentSession(cart, {
         provider_id: method,
       })
 
-      if (isBankTransfer(method)) {
+      if (isBankTransfer(method) || isMomo(method)) {
         router.refresh()
       }
     }
@@ -192,6 +206,13 @@ const Payment = ({
                               }
                             />
                           )}
+                        {isMomo(paymentMethod.id) &&
+                          selectedPaymentMethod === paymentMethod.id &&
+                          activeSession?.provider_id === paymentMethod.id && (
+                            <MomoDetails
+                              data={activeSession.data as MomoSessionData}
+                            />
+                          )}
                       </PaymentContainer>
                     )}
                   </div>
@@ -269,6 +290,8 @@ const Payment = ({
                       ? (
                           activeSession.data as BankTransferSessionData
                         )?.payment_reference
+                      : isMomo(activeSession.provider_id)
+                      ? "Pay on the next step"
                       : "Another step will appear"}
                   </Text>
                 </div>
@@ -321,6 +344,34 @@ const BankTransferDetails = ({ data }: { data?: BankTransferSessionData }) => {
       <BankTransferRow label="Account number" value={data.bank_account_number} />
       <BankTransferRow label="Account name" value={data.bank_account_name} />
       <BankTransferRow label="Expires" value={expiresAt} />
+    </div>
+  )
+}
+
+const MomoDetails = ({ data }: { data?: MomoSessionData }) => {
+  if (!data?.pay_url && !data?.short_link && !data?.deeplink) {
+    return null
+  }
+
+  const amount =
+    typeof data.amount === "number" && data.currency_code
+      ? convertToLocale({
+          amount: data.amount,
+          currency_code: data.currency_code,
+        })
+      : undefined
+  const expiresAt = data.expires_at
+    ? new Intl.DateTimeFormat("en-US", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(new Date(data.expires_at))
+    : undefined
+
+  return (
+    <div className="grid grid-cols-1 small:grid-cols-2 gap-3 rounded-rounded border border-ui-border-base bg-ui-bg-subtle p-4">
+      <BankTransferRow label="Amount" value={amount} />
+      <BankTransferRow label="Expires" value={expiresAt} />
+      <BankTransferRow label="Method" value="MoMo wallet" strong />
     </div>
   )
 }

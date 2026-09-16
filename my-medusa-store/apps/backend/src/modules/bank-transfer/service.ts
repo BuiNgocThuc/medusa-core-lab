@@ -42,14 +42,6 @@ type InjectedDependencies = {
   [BANK_TRANSFER_PAYMENT_MODULE]?: BankTransferPaymentModuleService
 }
 
-type ConfirmedTransfer = {
-  transaction_id: string
-  amount: number
-  currency_code?: string
-  description?: string
-  payment_reference?: string
-}
-
 const REFERENCE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
 const DEFAULT_REFERENCE_PREFIX = "PAY"
 const DEFAULT_EXPIRY_MINUTES = 30
@@ -60,9 +52,6 @@ class BankTransferPaymentProviderService extends AbstractPaymentProvider<BankTra
   protected readonly logger_: Logger
   protected readonly options_: BankTransferProviderOptions
   protected readonly bankTransferPaymentService_?: BankTransferPaymentModuleService
-
-  private static confirmedTransfers = new Map<string, ConfirmedTransfer>()
-  private static processedTransactionIds = new Set<string>()
 
   constructor(
     container: InjectedDependencies,
@@ -170,24 +159,6 @@ class BankTransferPaymentProviderService extends AbstractPaymentProvider<BankTra
       }
     }
 
-    const confirmedTransfer = sessionId
-      ? BankTransferPaymentProviderService.confirmedTransfers.get(sessionId)
-      : undefined
-
-    if (confirmedTransfer) {
-      return {
-        status: "authorized",
-        data: {
-          ...input.data,
-          external_transaction_id: confirmedTransfer.transaction_id,
-          confirmed_amount: confirmedTransfer.amount,
-          confirmed_currency_code: confirmedTransfer.currency_code,
-          confirmed_description: confirmedTransfer.description,
-          confirmed_at: new Date().toISOString(),
-        },
-      }
-    }
-
     return {
       status: "pending_authorization",
       data: input.data,
@@ -241,12 +212,31 @@ class BankTransferPaymentProviderService extends AbstractPaymentProvider<BankTra
   async updatePayment(
     input: UpdatePaymentInput
   ): Promise<UpdatePaymentOutput> {
+    const sessionId = this.getSessionId(input.data)
+    const amount = this.toNumber(input.amount)
+    const currencyCode = input.currency_code.toLowerCase()
+    const paymentReference = this.getPaymentReference(input.data)
+
+    if (sessionId) {
+      await this.bankTransferPaymentService_?.updateReferenceFromSession({
+        payment_session_id: sessionId,
+        expected_amount: amount,
+        currency_code: currencyCode,
+        metadata: {
+          updated_from_payment_session: true,
+        },
+      })
+    }
+
     return {
       status: "pending",
       data: {
         ...input.data,
-        amount: this.toNumber(input.amount),
-        currency_code: input.currency_code.toLowerCase(),
+        amount,
+        currency_code: currencyCode,
+        instructions: paymentReference
+          ? `Transfer exactly ${amount} ${currencyCode.toUpperCase()} with content: ${paymentReference}`
+          : input.data?.instructions,
         updated_at: new Date().toISOString(),
       },
     }
@@ -277,16 +267,6 @@ class BankTransferPaymentProviderService extends AbstractPaymentProvider<BankTra
       }
     }
 
-    if (
-      sessionId &&
-      BankTransferPaymentProviderService.confirmedTransfers.has(sessionId)
-    ) {
-      return {
-        status: "captured",
-        data: input.data,
-      }
-    }
-
     return {
       status: "pending_authorization",
       data: input.data,
@@ -300,53 +280,63 @@ class BankTransferPaymentProviderService extends AbstractPaymentProvider<BankTra
 
     this.assertValidWebhookSecret(payload)
 
-    if (!body.session_id || !body.amount || !body.transaction_id) {
-      return {
-        action: "not_supported",
-      }
-    }
+    const transactionId = body.transaction_id?.trim()
+    const amount = this.toWebhookAmount(body.amount)
+    const currencyCode = body.currency_code?.toLowerCase()
 
     if (
-      BankTransferPaymentProviderService.processedTransactionIds.has(
-        body.transaction_id
-      )
+      body.event_type === "bank_transfer.failed" &&
+      body.session_id &&
+      amount
     ) {
-      return {
-        action: "not_supported",
-        data: {
-          session_id: body.session_id,
-          amount: this.toNumber(body.amount),
-        },
-      }
-    }
-
-    BankTransferPaymentProviderService.processedTransactionIds.add(
-      body.transaction_id
-    )
-
-    if (body.event_type === "bank_transfer.failed") {
       return {
         action: "failed",
         data: {
           session_id: body.session_id,
-          amount: this.toNumber(body.amount),
+          amount,
         },
       }
     }
 
-    BankTransferPaymentProviderService.confirmedTransfers.set(body.session_id, {
-      transaction_id: body.transaction_id,
-      amount: this.toNumber(body.amount),
-      currency_code: body.currency_code?.toLowerCase(),
+    if (
+      !this.bankTransferPaymentService_ ||
+      !transactionId ||
+      !amount ||
+      !currencyCode
+    ) {
+      return {
+        action: "not_supported",
+      }
+    }
+
+    const match = await this.bankTransferPaymentService_.matchIncomingTransfer({
+      event_id: body.event_id,
+      transaction_id: transactionId,
+      amount,
+      currency_code: currencyCode,
       description: body.description,
       payment_reference: body.payment_reference,
+      raw_payload: body as Record<string, unknown>,
+      headers: this.stringifyHeaders(payload.headers),
     })
 
+    if (!match.process_payment || !match.payment_session_id || !match.amount) {
+      return {
+        action: "not_supported",
+        data: match.payment_session_id
+          ? {
+              session_id: match.payment_session_id,
+              amount: match.amount ?? amount,
+            }
+          : undefined,
+      }
+    }
+
     return {
-      action: "captured",
+      action: "authorized",
       data: {
-        session_id: body.session_id,
-        amount: this.toNumber(body.amount),
+        session_id: match.payment_session_id,
+        amount: match.amount,
       },
     }
   }
@@ -388,6 +378,12 @@ class BankTransferPaymentProviderService extends AbstractPaymentProvider<BankTra
     const sessionId = data?.session_id
 
     return typeof sessionId === "string" ? sessionId : undefined
+  }
+
+  private getPaymentReference(data?: Record<string, unknown>) {
+    const paymentReference = data?.payment_reference
+
+    return typeof paymentReference === "string" ? paymentReference : undefined
   }
 
   private getWebhookBody(
@@ -441,6 +437,35 @@ class BankTransferPaymentProviderService extends AbstractPaymentProvider<BankTra
     }
 
     return value
+  }
+
+  private stringifyHeaders(
+    headers: ProviderWebhookPayload["payload"]["headers"]
+  ) {
+    return Object.entries(headers ?? {}).reduce<Record<string, string>>(
+      (result, [key, value]) => {
+        result[key] = Array.isArray(value)
+          ? value.join(",")
+          : value?.toString() ?? ""
+
+        return result
+      },
+      {}
+    )
+  }
+
+  private toWebhookAmount(value: unknown) {
+    if (value === undefined || value === null || value === "") {
+      return 0
+    }
+
+    try {
+      const amount = this.toNumber(value)
+
+      return Number.isFinite(amount) ? amount : 0
+    } catch {
+      return 0
+    }
   }
 
   private toNumber(value: unknown) {

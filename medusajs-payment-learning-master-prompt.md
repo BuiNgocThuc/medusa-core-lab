@@ -467,14 +467,14 @@ Bank / MoMo
 → Response
 ```
 
-Thiết kế endpoint ví dụ:
+Thiết kế theo endpoint chuẩn của Medusa Payment Module:
 
 ```http
-POST /webhooks/payments/bank
-POST /webhooks/payments/momo
+POST /hooks/payment/bank-transfer_default
+POST /hooks/payment/momo_default
 ```
 
-Nhưng phải tuân theo conventions của Medusa version hiện tại.
+Không tạo route custom song song nếu provider có thể xử lý bằng `getWebhookActionAndData()`.
 
 Webhook handler cần:
 
