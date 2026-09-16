@@ -1,0 +1,47 @@
+meta {
+  name: 10 - Reject Duplicate Email (Duplicate Conflict)
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/admin/customers
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "{{firstCustomerEmail}}",
+    "first_name": "Duplicate",
+    "last_name": "Test"
+  }
+}
+
+tests {
+  test("422 Unprocessable Entity", function () {
+    expect(res.getStatus()).to.equal(422);
+  });
+  test("duplicate error type", function () {
+    expect(res.getBody().type).to.equal("duplicate_error");
+  });
+  test("invalid request error code", function () {
+    expect(res.getBody().code).to.equal("invalid_request_error");
+  });
+}
+
+docs {
+  # 10 - Reject Duplicate Email (Duplicate Conflict)
+
+  Kiểm chứng cơ chế bảo vệ tính duy nhất của email trong Medusa Core Framework khi client cố tình tạo khách hàng với email đã tồn tại.
+
+  ## Kịch bản kiểm thử:
+  - Request gửi lại chính xác email `{{firstCustomerEmail}}` đã được tạo thành công ở request 03.
+  - Medusa Core phát hiện email đã có trong hệ thống và ném ngoại lệ `MedusaError(MedusaError.Types.DUPLICATE_ERROR)`.
+  - Theo error handler chuẩn của Medusa v2 (`@medusajs/framework`), `DUPLICATE_ERROR` được map chính xác về mã HTTP `422 Unprocessable Entity`.
+  - Assert xác nhận status code là `422`, trường `type` là `"duplicate_error"` và trường `code` là `"invalid_request_error"`.
+}

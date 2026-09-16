@@ -1,0 +1,55 @@
+meta {
+  name: 09 - Reject Invalid Avatar URL (Validation Error)
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/admin/customers
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "placeholder@example.com",
+    "first_name": "Invalid",
+    "last_name": "Avatar",
+    "additional_data": {
+      "avatar_url": "ftp://bad-url.com"
+    }
+  }
+}
+
+script:pre-request {
+  const validEmail = `valid_email_bad_url_${Date.now()}_${Math.random().toString(36).substring(2, 8)}@example.com`;
+  const body = req.getBody();
+  body.email = validEmail;
+  req.setBody(body);
+}
+
+tests {
+  test("400 Bad Request", function () {
+    expect(res.getStatus()).to.equal(400);
+  });
+  test("error message refers to avatar_url", function () {
+    const body = res.getBody();
+    const msg = typeof body === "string" ? body : JSON.stringify(body);
+    expect(msg.toLowerCase()).to.include("avatar_url");
+  });
+}
+
+docs {
+  # 09 - Reject Invalid Avatar URL (Validation Error)
+
+  Kiểm chứng cơ chế kiểm thực URL của **Route Middleware (Task 2)** đối với trường `avatar_url`.
+
+  ## Kịch bản kiểm thử:
+  - `script:pre-request` sinh một email hợp lệ ngẫu nhiên và dùng `req.setBody()` gán vào payload.
+  - Trường `additional_data.avatar_url` được gửi lên với giao thức `ftp://` (vi phạm quy tắc của Zod schema: chỉ chấp nhận giao thức `http` hoặc `https`).
+  - Assert xác nhận API trả về đúng mã lỗi `400 Bad Request` và nội dung thông báo lỗi chứa thông tin liên quan đến trường `avatar_url`.
+}
