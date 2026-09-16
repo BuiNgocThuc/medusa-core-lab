@@ -1,43 +1,28 @@
 // src/api/store/carts/[id]/merge-customer/route.ts
+import { mergeGuestCartIntoCustomerCartWorkflow } from "@/src/workflows/merge-cart/merge-guest-cart-into-customer-cart"
 import type { AuthenticatedMedusaRequest, MedusaResponse } from "@medusajs/framework/http"
-import type { HttpTypes } from "@medusajs/framework/types"
-import {
-  ContainerRegistrationKeys,
-  remoteQueryObjectFromString,
-  MedusaError,
-  Modules,
-} from "@medusajs/framework/utils"
+
+
+type MergeCartResponse = {
+  cart: { id: string }
+}
+
 
 export async function POST(
-  req: AuthenticatedMedusaRequest<{ additional_data?: unknown }, HttpTypes.SelectParams>,
-  res: MedusaResponse<HttpTypes.StoreCartResponse>
+  req: AuthenticatedMedusaRequest<{ additional_data?: Record<string, unknown> }>,
+  res: MedusaResponse<MergeCartResponse>
 ) {
-  const id = req.params.id
+  const guest_cart_id = req.params.id
   const customer_id = req.auth_context?.actor_id
-
-  const we = req.scope.resolve(Modules.WORKFLOW_ENGINE)
-
-  await we.run("merge-guest-cart-into-customer-cart", {
+  // Gọi trực tiếp workflow với Type-Safe của Medusa v2
+  const { result } = await mergeGuestCartIntoCustomerCartWorkflow(req.scope).run({
     input: {
-      guest_cart_id: id,
+      guest_cart_id,
       customer_id,
       additional_data: req.validatedBody?.additional_data,
     },
   })
-
-  const remoteQuery = req.scope.resolve(ContainerRegistrationKeys.REMOTE_QUERY)
-
-  const queryObject = remoteQueryObjectFromString({
-    entryPoint: "cart",
-    variables: { filters: { id } },
-    fields: req.queryConfig.fields,
+  return res.status(200).json({
+    cart: { id: result.cart_id },
   })
-
-  const [cart] = await remoteQuery(queryObject)
-
-  if (!cart) {
-    throw new MedusaError(MedusaError.Types.NOT_FOUND, `Cart with id '${id}' not found`)
-  }
-
-  res.status(200).json({ cart })
 }

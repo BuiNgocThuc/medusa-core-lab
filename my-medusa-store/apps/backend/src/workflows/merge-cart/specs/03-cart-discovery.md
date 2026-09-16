@@ -2,60 +2,17 @@
 
 ## Purpose
 
-Discover and resolve the two carts involved in the operation:
-1. **Cart A**: The authenticated customer's active cart (destination).
-2. **Cart B**: The guest cart to be merged or transferred (source).
-
-Cart discovery is **read-only** and acts as the initial data retrieval phase for the workflow.
+Discover and resolve the carts involved in post-login synchronization:
+1. **Cart A**: The authenticated customer's existing active cart.
+2. **Cart B** *(optional)*: The guest cart created prior to login.
 
 ---
 
-## 1. Discovering Cart B (Guest Cart)
+## 1. Discovering Cart A (Customer Cart)
 
-### Input
-- `guest_cart_id`: Provided in the workflow input.
-
-### Query Strategy
-Retrieve Cart B using Medusa's Query Engine (`useQueryGraphStep`):
+Always query active carts belonging to the customer:
 ```ts
-const guestCartQuery = useQueryGraphStep({
-  entity: "cart",
-  filters: { id: input.guest_cart_id },
-  fields: [
-    "id",
-    "completed_at",
-    "currency_code",
-    "region_id",
-    "sales_channel_id",
-    "customer_id",
-    "items.id",
-    "items.title",
-    "items.variant_id",
-    "items.quantity",
-    "items.metadata",
-  ],
-}).config({ name: "get-guest-cart" })
-```
-
-### Discovery Invariant for Cart B
-- If Cart B does not exist or `completed_at !== null`, the workflow must immediately terminate with an error (see [04-cart-validation.md](./04-cart-validation.md)).
-
----
-
-## 2. Discovering Cart A (Customer Cart)
-
-### Input
-- `customer_id`: Provided in the workflow input.
-
-### Active Cart Definition
-In Medusa, a customer may have historical completed carts. An **active** customer cart is defined as:
-- `customer_id === input.customer_id`
-- `completed_at === null`
-
-### Query Strategy
-Query all active carts belonging to the customer:
-```ts
-const customerCartQuery = useQueryGraphStep({
+const cartQuery = useQueryGraphStep({
   entity: "cart",
   filters: {
     customer_id: input.customer_id,
@@ -76,40 +33,27 @@ const customerCartQuery = useQueryGraphStep({
 }).config({ name: "get-customer-cart" })
 ```
 
-### Multiple Active Carts Resolution
-If a customer has more than one active cart (e.g., opened in multiple sessions):
-1. Sort active carts by `created_at` in descending order (`created_at desc`).
-2. Select the most recently created active cart as the canonical **Cart A**.
-3. If no active carts are returned, `Cart A = null`.
+### Active Cart Resolution
+- Sort active carts by `created_at desc`.
+- The newest active cart is selected as **Cart A**.
+- If no active carts are returned, `Cart A = null`.
 
 ---
 
-## 3. Discovery Output
+## 2. Discovering Cart B (Guest Cart)
 
-The discovery phase outputs the resolved carts to the subsequent workflow steps:
-
-```ts
-type CartDiscoveryResult = {
-  guestCart: Cart
-  customerCart: Cart | null
-}
-```
-
-```text
-                    ┌─────────────────────────┐
-                    │      Cart Discovery     │
-                    └────────────┬────────────┘
-                                 │
-                     Does Customer Cart exist?
-                                / \
-                              No   Yes
-                              /     \
-                             v       v
-                     Cart A = null   Cart A = customerCart
-```
+- If `input.guest_cart_id` is provided:
+  Query Cart B using `useQueryGraphStep({ entity: "cart", filters: { id: input.guest_cart_id } })`.
+- If `input.guest_cart_id` is undefined:
+  Cart B discovery is skipped.
 
 ---
 
-## 4. Next Step Transition
-- **If `customerCart === null`**: The workflow transitions to [13-transfer-path.md](./13-transfer-path.md).
-- **If `customerCart !== null`**: The workflow transitions to [04-cart-validation.md](./04-cart-validation.md) and [05-sales-channel.md](./05-sales-channel.md) (Merge Path).
+## 3. Path Decision Matrix
+
+| `guest_cart_id` present? | Active Cart A exists in DB? | Selected Path | Action |
+| :---: | :---: | :---: | :--- |
+| **No** | **Yes** | **Restore Path** | Return Cart A ID $\rightarrow$ Storefront sets cookie. |
+| **No** | **No** | **No-Op** | Return `cart_id: null` $\rightarrow$ Cart created lazily on first add-to-cart. |
+| **Yes** | **No** | **Transfer Path** | Transfer Cart B to customer $\rightarrow$ Return Cart B ID. |
+| **Yes** | **Yes** | **Merge Path** | Merge Cart B items into Cart A $\rightarrow$ Return Cart A ID. |

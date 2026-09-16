@@ -4,7 +4,10 @@
 
 Define the input contract and output contract of the `mergeGuestCartIntoCustomerCartWorkflow`.
 
-The workflow is responsible for merging a guest cart into the authenticated customer's existing cart, or transferring the guest cart to the customer when no existing customer cart is found.
+The workflow handles the complete cart synchronization lifecycle upon customer login:
+1. **Merge Path**: Guest cart items are merged into existing customer cart.
+2. **Transfer Path**: Guest cart is transferred to customer when no customer cart exists.
+3. **Restore Path**: Existing customer cart is restored when user logs in with no guest cart.
 
 ---
 
@@ -12,26 +15,13 @@ The workflow is responsible for merging a guest cart into the authenticated cust
 
 ```ts
 export type MergeGuestCartIntoCustomerCartWorkflowInput = {
-  guest_cart_id: string
   customer_id: string
+  guest_cart_id?: string
   additional_data?: Record<string, unknown>
 }
 ```
 
-### `guest_cart_id`
-The ID of the guest cart (referred to as **Cart B**). Cart B is the source cart in the merge path.
-
-- **Requirements**:
-  - Must be provided and non-empty.
-  - Cart B must exist in the database.
-  - Cart B must be usable (not completed or deleted).
-- **Usage**:
-  - Retrieve Cart B and its line items.
-  - Validate source items against destination sales channel.
-  - Transfer ownership to customer when Cart A does not exist.
-  - Extract line items to merge into Cart A when Cart A exists.
-
-### `customer_id`
+### `customer_id` (Required)
 The ID of the authenticated customer who will own the destination cart.
 
 - **Requirements**:
@@ -39,15 +29,17 @@ The ID of the authenticated customer who will own the destination cart.
 - **Usage**:
   - Discover the customer's existing active cart (Cart A).
   - Transfer Cart B ownership when Cart A does not exist.
-  - Verify customer ownership of Cart A when Cart A exists.
+  - Verify customer ownership of Cart A.
 
-### `additional_data`
-Optional contextual data passed through to underlying Medusa workflows if needed.
+### `guest_cart_id` (Optional)
+The ID of the guest cart (Cart B).
 
-- **Constraints**:
-  - Must not be used to bypass business rules.
-  - Must not override Cart A's region, currency, or sales channel.
-  - Must not bypass inventory or pricing validation.
+- **Scenarios**:
+  - **Present (`guest_cart_id !== undefined`)**: The customer added items to a guest cart before logging in $\rightarrow$ Merge or Transfer path.
+  - **Missing (`guest_cart_id === undefined`)**: The customer logged in without adding any items to a guest cart $\rightarrow$ Restore path.
+
+### `additional_data` (Optional)
+Optional contextual data passed through to underlying Medusa workflows.
 
 ---
 
@@ -61,7 +53,7 @@ export type SkippedCartItem = {
 }
 
 export type MergeGuestCartIntoCustomerCartResult = {
-  cart_id: string
+  cart_id: string | null
   merged: boolean
   skipped_items: SkippedCartItem[]
 }
@@ -70,73 +62,33 @@ export type MergeGuestCartIntoCustomerCartResult = {
 ### Output Fields
 
 #### `cart_id`
-The ID of the final customer cart.
-- **Transfer Path** (Cart A does not exist): `cart_id = guest_cart_id` (Cart B became the customer's cart).
-- **Merge Path** (Cart A exists): `cart_id = cartA.id` (Cart A is the canonical destination cart).
+The ID of the active customer cart, or `null` if no cart exists:
+- **Merge Path**: `cart_id = cartA.id` (Customer Cart A).
+- **Transfer Path**: `cart_id = guest_cart_id` (Guest Cart B transferred to customer).
+- **Restore Path (Cart A exists)**: `cart_id = cartA.id` (Restored customer cart).
+- **Restore Path (No cart anywhere)**: `cart_id = null` (No cart created yet; lazy creation on first item added).
 
 #### `merged`
-Boolean flag indicating whether a line-item merge into an existing cart occurred:
-- `false`: Transfer path executed (no items merged into a separate cart).
-- `true`: Merge path executed (eligible items merged into Cart A).
+- `true`: Items were merged into an existing Cart A.
+- `false`: Cart B was transferred or Cart A was restored without a merge operation.
 
 #### `skipped_items`
-Array of items from Cart B that were intentionally not merged (e.g., variant unavailable in Cart A's sales channel).
-```json
-{
-  "variant_id": "variant_123",
-  "quantity": 2,
-  "reason": "Variant is not available in the customer's sales channel"
-}
-```
+Array of items from Cart B that were intentionally not merged.
 
 ---
 
 ## Output Behavior by Execution Path
 
-### Path 1: Transfer Path (No Existing Customer Cart)
-- **Condition**: Cart A does not exist.
-- **Action**: Cart B ownership is transferred to `customer_id`.
-- **Response**:
-```json
-{
-  "cart_id": "guest_cart_id",
-  "merged": false,
-  "skipped_items": []
-}
-```
+### Path 1: Restore Path (No Guest Cart)
+- **Input**: `customer_id: "cus_123"`, `guest_cart_id: undefined`.
+- **Behavior**:
+  - If Customer Cart A exists $\rightarrow$ `{ cart_id: cartA.id, merged: false, skipped_items: [] }`.
+  - If Customer Cart A does not exist $\rightarrow$ `{ cart_id: null, merged: false, skipped_items: [] }`.
 
-### Path 2: Merge Path (Existing Customer Cart)
-- **Condition**: Cart A exists and is active.
-- **Action**: Eligible Cart B line items are merged into Cart A.
-- **Response**:
-```json
-{
-  "cart_id": "cart_a_id",
-  "merged": true,
-  "skipped_items": [
-    {
-      "variant_id": "variant_unavailable",
-      "quantity": 1,
-      "reason": "Variant is not available in the customer's sales channel"
-    }
-  ]
-}
-```
+### Path 2: Transfer Path (Guest Cart exists, No Customer Cart)
+- **Input**: `customer_id: "cus_123"`, `guest_cart_id: "cart_b"`, Customer has no Cart A.
+- **Behavior**: Cart B transferred to customer $\rightarrow$ `{ cart_id: "cart_b", merged: false, skipped_items: [] }`.
 
----
-
-## Failure Behavior
-
-The workflow fails atomically (throws an error) without returning a successful result in any of the following cases:
-1. `guest_cart_id` does not exist or represents a completed cart.
-2. Cart A exists but fails validation (e.g., belongs to another customer or is completed).
-3. All items in Cart B are unavailable in Cart A's sales channel (`validItems.length === 0`).
-4. Inventory validation fails for any merged item.
-5. Core cart mutation (`addToCartWorkflow` or `transferCartCustomerWorkflow`) fails.
-
----
-
-## Non-Responsibilities
-
-1. **Cart Totals**: The workflow result does not return recalculated financial fields (`subtotal`, `total`, `tax_total`, `discount_total`). These are handled by Medusa core on Cart A.
-2. **Cart B Persistence**: Cart B is not returned in the result and in Phase 1 is not deleted.
+### Path 3: Merge Path (Both Guest Cart and Customer Cart exist)
+- **Input**: `customer_id: "cus_123"`, `guest_cart_id: "cart_b"`, Customer has Cart A.
+- **Behavior**: Cart B items merged into Cart A $\rightarrow$ `{ cart_id: cartA.id, merged: true, skipped_items: [...] }`.

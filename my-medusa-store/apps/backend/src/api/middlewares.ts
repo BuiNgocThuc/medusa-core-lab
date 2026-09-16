@@ -1,18 +1,19 @@
-import { defineMiddlewares, validateAndTransformQuery } from "@medusajs/framework/http"
+import { authenticate, defineMiddlewares, validateAndTransformQuery } from "@medusajs/framework/http"
 import { allowFields } from "@medusajs/framework/http"
 import { createSelectParams } from "@medusajs/medusa/api/utils/validators"
 
 export default defineMiddlewares({
-    routes:[
-        {
-        matcher : "/store/carts",
-         middlewares:[allowFields("custom","custom.custom_name"),],
-         
-        },
-        {
+  routes: [
+    {
+      matcher: "/store/carts",
+      middlewares: [allowFields("custom", "custom.custom_name"),],
+
+    },
+    {
       matcher: "/store/carts/:id/merge-customer",
       method: "POST",
       middlewares: [
+        authenticate("customer", ["session", "bearer"]),
         validateAndTransformQuery(
           createSelectParams(),
           {
@@ -28,8 +29,15 @@ export default defineMiddlewares({
           }
         ),
       ],
-    }
-    ]
+    },
+    {
+      matcher: "/store/carts/restore-customer",
+      method: "POST",
+      middlewares: [
+        authenticate("customer", ["session", "bearer"]),
+      ],
+    },
+  ]
 })
 
 

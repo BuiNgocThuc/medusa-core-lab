@@ -16,6 +16,7 @@ import {
   removeCartId,
   removePendingCustomer,
   setAuthToken,
+  setCartId,
   setPendingCustomer,
 } from "./cookies"
 
@@ -137,6 +138,10 @@ export async function login(
 // Logs the customer in and reconciles the customer record. The behavior is
 // driven entirely by the backend's login response, so it works whether or not
 // email verification is enabled.
+
+// Đăng nhập khách hàng và đối chiếu hồ sơ khách hàng. Hành vi này 
+// hoàn toàn phụ thuộc vào phản hồi đăng nhập của máy chủ, 
+// vì vậy nó hoạt động bất kể  việc xác minh email có được bật hay không.
 async function completeLogin(
   email: string,
   password: string
@@ -233,13 +238,18 @@ async function completeLogin(
   const customerCacheTag = await getCacheTag("customers")
   revalidateTag(customerCacheTag)
 
+
+  //!! cart ID chỉ undefined nếu CHƯA TỪNG CÓ CLICK "ADD TO CART"vì hàm này sẽ tạo
+  //cart và lưu vào trước đó
+
   // Log current cart id and run transfer
   const currentCartId = await getCartId().catch(() => undefined)
   // eslint-disable-next-line no-console
   console.log("completeLogin:before-transferCart", { cartId: currentCartId })
 
   try {
-    await transferCart()
+    // await transferCart()
+    await handleCustomerCartAfterLogin()
     // eslint-disable-next-line no-console
     console.log("completeLogin:transferCart:success", { cartId: currentCartId })
   } catch (error) {
@@ -250,6 +260,58 @@ async function completeLogin(
 
   return { state: "success" }
 }
+
+export async function handleCustomerCartAfterLogin() {
+  const currentCartId = await getCartId().catch(() => undefined)
+  const headers = await getAuthHeaders()
+  let cartResponse: {
+    cart: { id: string } | null
+  }
+
+  try {
+    if (currentCartId) {
+      console.log("go to merge /store/carts/${currentCartId}/merge-customer")
+      cartResponse = await sdk.client.fetch<{ cart: { id: string } }>(
+        `/store/carts/${currentCartId}/merge-customer`, {
+        method: "POST",
+        headers,
+      })
+    } else {
+      console.log("go to restore-customer")
+      cartResponse = await sdk.client.fetch<{
+        cart: { id: string } | null
+      }>("/store/carts/restore-customer", { // ở đây restore-customer đại khái là  tôi muốn tách ra lấy lại cart của customer thay vì gộp chung logic merge, hãy kiễm tra core, nếu core chưa có cung cấp thì hãy lấy list cart, filter lấy cái mới nhất
+        method: "POST",
+        headers,
+      })
+    }
+  } catch (error) {
+    console.error("Failed to sync customer cart:", error)
+    throw error
+  }
+
+  if (cartResponse.cart?.id) {
+    await setCartId(cartResponse.cart.id)
+  }
+
+  const cartCacheTag = await getCacheTag("carts")
+
+  if (cartCacheTag) {
+    revalidateTag(cartCacheTag)
+  }
+
+
+}
+
+
+
+
+
+
+
+
+
+
 
 // Confirms a customer's email using the token from the verification link.
 //
