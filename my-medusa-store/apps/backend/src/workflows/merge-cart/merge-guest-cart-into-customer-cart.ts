@@ -1,60 +1,64 @@
-import {createStep, createWorkflow,StepResponse,
-    transform,when,WorkflowData,WorkflowResponse} 
-from "@medusajs/framework/workflows-sdk";
-import { MergeGuestCartInput } from "./types";
-import { useQueryGraphStep } from "@medusajs/medusa/core-flows";
 import {
-  transferCartCustomerWorkflow,
+  createWorkflow,
+  transform,
+  when,
+  WorkflowData,
+  WorkflowResponse,
+} from "@medusajs/framework/workflows-sdk"
+import {
   acquireLockStep,
   releaseLockStep,
+  transferCartCustomerWorkflow,
+  useQueryGraphStep,
 } from "@medusajs/medusa/core-flows"
-import { logCustomerCartStep } from "../logs/steps/log-customer-cart";
+import { MergeGuestCartInput } from "./types"
 
 export const mergeGuestCartIntoCustomerCartWorkflow = createWorkflow(
   "merge-guest-cart-into-customer-cart",
   (input: WorkflowData<MergeGuestCartInput>) => {
-
+    // =========================================================================
+    // BƯỚC 1: Tìm giỏ hàng hiện có của khách hàng (Cart A)
+    // Tận dụng useQueryGraphStep có sẵn của Medusa Core để query entity 'cart'
+    // =========================================================================
     const cartQuery = useQueryGraphStep({
-    entity: "cart",
-    filters: { customer_id: input.customer_id }, 
-    fields: [
+      entity: "cart",
+      filters: { customer_id: input.customer_id },
+      fields: [
         "id",
         "email",
         "customer_id",
-        "customer.has_account",
-        "shipping_address.*",
-        "region.*",
-        "region.countries.*",
-    ],
+        "completed_at",
+        "currency_code",
+        "region_id",
+        "sales_channel_id",
+      ],
     }).config({ name: "get-customer-cart" })
 
-    logCustomerCartStep(cartQuery)
-    
-    // Trong transform để lấy cart active
+    // =========================================================================
+    // BƯỚC 2: Xác định Active Cart
+    // Giỏ hàng active là giỏ hàng chưa hoàn thành thanh toán (completed_at === null)
+    // =========================================================================
     const customerCart = transform({ cartQuery }, ({ cartQuery }) => {
-    const found = cartQuery.data?.find((cart) => !cart.completed_at) ?? null
-    // Log the raw query result and the selected active cart for tracing
-    // eslint-disable-next-line no-console
-    console.log("workflow:get-customer-cart:cartQuery.data", { data: cartQuery.data })
-    // eslint-disable-next-line no-console
-    console.log("workflow:get-customer-cart:customerCartFound", { found })
-    return found
+      const activeCart = cartQuery.data?.find((cart) => !cart.completed_at)
+      return activeCart ?? null
     })
 
-
-    console.log("customerCart", customerCart)
-        // IF customerCart === null → chạy transferCartCustomerWorkflow
-    // Nhớ lock ra ngoài vì nested workflow không tự acquire lock
-   
+    // =========================================================================
+    // BƯỚC 3 (NHÁNH 1): Nếu khách hàng CHƯA có giỏ hàng (customerCart === null)
+    // -> Chuyển quyền sở hữu Cart B cho khách hàng (Transfer Path)
+    // -> Tận dụng transferCartCustomerWorkflow có sẵn của Medusa Core
+    // =========================================================================
     when("no-customer-cart", { customerCart }, ({ customerCart }) => {
       return customerCart === null
     }).then(() => {
-      acquireLockStep({ 
-        key: input.guest_cart_id, 
-        timeout: 30, 
-        ttl: 120 
+      // Khóa phân tán trên Cart B để tránh race condition khi đăng nhập song song
+      acquireLockStep({
+        key: input.guest_cart_id,
+        timeout: 30,
+        ttl: 120,
       })
-    console.log("run transferCartCustomerWorkflow");
+
+      // Gọi workflow chuyển đổi customer có sẵn từ Core
       transferCartCustomerWorkflow.runAsStep({
         input: {
           id: input.guest_cart_id,
@@ -62,18 +66,19 @@ export const mergeGuestCartIntoCustomerCartWorkflow = createWorkflow(
         },
       })
 
+      // Giải phóng khóa sau khi hoàn tất
       releaseLockStep({ key: input.guest_cart_id })
     })
 
-    // IF customerCart exists → merge logic
+    // =========================================================================
+    // BƯỚC 4 (NHÁNH 2): Nếu khách hàng ĐÃ có giỏ hàng (customerCart !== null)
+    // -> Gộp các sản phẩm hợp lệ từ Cart B vào Cart A (Merge Path)
+    // =========================================================================
     when("has-customer-cart", { customerCart }, ({ customerCart }) => {
       return customerCart !== null
     }).then(() => {
-      // ... merge logic ở đây
-      console.log("Merging guest cart into customer cart:"
-        , input.guest_cart_id, "into", customerCart.id)
+      // Vùng để học và viết tiếp logic merge các line items từng bước
     })
-
 
     return new WorkflowResponse({})
   }

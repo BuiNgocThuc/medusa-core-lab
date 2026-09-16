@@ -1,16 +1,27 @@
-# 10 — Distributed Locking
+# 10 — Distributed Locking & Core Sub-Workflow Behavior
 
 ## Purpose
 
-Prevent race conditions and concurrent modifications during cart transfer and cart merge operations.
+Prevent race conditions and concurrent modifications during cart operations by managing distributed locks via Medusa Core's locking engine.
 
 ---
 
-## 1. Locking Principle in Medusa Workflows
+## 1. How Medusa Core Handles Locks in Sub-Workflows
 
-When executing a nested workflow (such as `addToCartWorkflow` or `transferCartCustomerWorkflow`) as a step via `.runAsStep()`, the **parent workflow must manage the distributed lock**.
+An essential architectural behavior discovered directly from Medusa Core (`packages/core/core-flows/src/locking/steps/acquire-lock.ts`):
 
-Nested workflows run within the parent transaction and do not manage an independent lock lifecycle.
+```ts
+// From Medusa Core source code:
+const isSubWorkflow = !!parentStepIdempotencyKey
+if (isSubWorkflow && !data.executeOnSubWorkflow) {
+  return StepResponse.skip() as any
+}
+```
+
+### Why the Parent Workflow Must Own the Lock:
+- Both `addToCartWorkflow` and `transferCartCustomerWorkflow` have internal `acquireLockStep` calls.
+- **HOWEVER**, when they are executed as nested sub-workflows via `.runAsStep()`, Medusa Core's `acquireLockStep` **automatically skips execution** (`StepResponse.skip()`) because `executeOnSubWorkflow` is not set.
+- **Therefore, the parent workflow (`mergeGuestCartIntoCustomerCartWorkflow`) MUST explicitly acquire and release the lock**, ensuring full concurrency protection throughout the entire workflow execution.
 
 ---
 
@@ -18,17 +29,20 @@ Nested workflows run within the parent transaction and do not manage an independ
 
 ### 2.1 Merge Path (Cart A exists)
 - **Target**: Cart A (`customerCart.id`).
-- **Cart B**: Cart B is read-only during the merge phase, so acquiring a lock on Cart B is not strictly required.
-- **Locking Scope**: Cart A is locked before items are evaluated and modified, and released upon completion or failure.
+- **Cart B**: Read-only during merge, so does not require locking.
+- **Sequence**:
+  1. Acquire lock on Cart A before any inspection or mutation.
+  2. Execute `addToCartWorkflow.runAsStep(...)` (its internal lock is safely skipped by Core).
+  3. Release lock on Cart A in the final step or on compensation.
 
 ```ts
 acquireLockStep({
   key: customerCart.id,
-  timeout: 30, // Max seconds to wait for acquiring the lock
-  ttl: 120,    // Lock time-to-live in seconds
+  timeout: 30, // seconds
+  ttl: 120,    // seconds
 })
 
-// ... execute addToCartWorkflow ...
+// ... run addToCartWorkflow ...
 
 releaseLockStep({
   key: customerCart.id,
@@ -36,8 +50,11 @@ releaseLockStep({
 ```
 
 ### 2.2 Transfer Path (Cart A does not exist)
-- **Target**: Cart B (`guest_cart_id`).
-- **Locking Scope**: Cart B is locked to prevent another concurrent request from transferring or modifying the guest cart simultaneously.
+- **Target**: Cart B (`input.guest_cart_id`).
+- **Sequence**:
+  1. Acquire lock on Cart B.
+  2. Execute `transferCartCustomerWorkflow.runAsStep(...)`.
+  3. Release lock on Cart B.
 
 ```ts
 acquireLockStep({
@@ -46,7 +63,7 @@ acquireLockStep({
   ttl: 120,
 })
 
-// ... execute transferCartCustomerWorkflow ...
+// ... run transferCartCustomerWorkflow ...
 
 releaseLockStep({
   key: input.guest_cart_id,
@@ -57,14 +74,14 @@ releaseLockStep({
 
 ## 3. Lock Configuration Parameters
 
-| Parameter | Value | Description |
+| Parameter | Recommended Value | Rationale |
 | :--- | :---: | :--- |
-| `key` | `cart.id` | The unique lock identifier (scoped to the cart ID). |
-| `timeout` | `30` | Number of seconds to wait before timing out if the cart is locked by another operation. |
-| `ttl` | `120` | Time-to-live in seconds (prevents deadlocks if a server worker crashes unexpectedly). |
+| `key` | `cart.id` | Lock key scoped specifically to the cart being mutated. |
+| `timeout` | `30` | Number of seconds to wait if another request is currently holding the lock. |
+| `ttl` | `120` | Distributed lock TTL in seconds (prevents deadlocks if worker crashes). |
 
 ---
 
-## 4. Compensation & Rollback
+## 4. Automatic Lock Release on Failure
 
-- If the workflow encounters an error while holding a lock, the Saga compensation handler must guarantee that `releaseLockStep` is invoked so the cart is not left permanently locked.
+`acquireLockStep` in Medusa Core registers a compensation handler that automatically calls `locking.release(keys)`. If downstream steps throw an error, Medusa's Saga compensation engine guarantees the lock is immediately released.

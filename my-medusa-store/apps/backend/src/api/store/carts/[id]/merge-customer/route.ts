@@ -1,19 +1,17 @@
 // src/api/store/carts/[id]/merge-customer/route.ts
 import type { AuthenticatedMedusaRequest, MedusaResponse } from "@medusajs/framework/http"
-import type { HttpTypes } from "@medusajs/types"
+import type { HttpTypes } from "@medusajs/framework/types"
 import {
   ContainerRegistrationKeys,
   remoteQueryObjectFromString,
   MedusaError,
   Modules,
 } from "@medusajs/framework/utils"
-import { console } from "inspector"
 
 export async function POST(
   req: AuthenticatedMedusaRequest<{ additional_data?: unknown }, HttpTypes.SelectParams>,
   res: MedusaResponse<HttpTypes.StoreCartResponse>
 ) {
-    console.log("-------------------------------------------------------")
   const id = req.params.id
   const customer_id = req.auth_context?.actor_id
 

@@ -1,0 +1,19 @@
+{
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/**": true,
+    "**/.pnpm/**": true,
+    "**/.next/**": true,
+    "**/.turbo/**": true,
+    "**/dist/**": true,
+    "**/.yarn/**": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.pnpm": true,
+    "**/.next": true,
+    "**/.turbo": true,
+    "**/dist": true
+  }
+}
