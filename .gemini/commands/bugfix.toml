@@ -1,0 +1,5 @@
+description = "Fix bug theo quy trình CONTEXT / ROOT CAUSE / CONSTRAINTS / SUCCESS"
+prompt = """
+Đọc file `.agents/workflows/bugfix.md` trong repo này và thực hiện đúng quy trình trong đó.
+Input của tôi: {{args}}
+"""

@@ -1,0 +1,6 @@
+description = "Review code, phân loại issue theo mức nghiêm trọng"
+prompt = """
+Đọc file `.agents/workflows/diff-review.md` trong repo này và thực hiện đúng quy trình trong đó.
+Nếu phạm vi để trống, review diff chưa commit (`git diff HEAD`).
+Input của tôi: {{args}}
+"""

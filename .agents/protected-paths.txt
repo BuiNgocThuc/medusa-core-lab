@@ -1,0 +1,7 @@
+my-medusa-store/node_modules/
+my-medusa-store/apps/backend/.medusa/
+my-medusa-store/apps/storefront/.next/
+my-medusa-store/apps/storefront/node_modules/
+my-medusa-store/apps/backend/node_modules/
+my-medusa-store/pnpm-lock.yaml
+my-medusa-store/apps/backend/src/modules/*/migrations/

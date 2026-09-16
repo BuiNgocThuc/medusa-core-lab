@@ -1,0 +1,5 @@
+description = "Refactor an toàn — giữ nguyên behavior 100%"
+prompt = """
+Đọc file `.agents/workflows/refactor.md` trong repo này và thực hiện đúng quy trình trong đó.
+Input của tôi: {{args}}
+"""

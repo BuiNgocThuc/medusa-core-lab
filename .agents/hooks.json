@@ -1,0 +1,16 @@
+{
+  "agents-md-hard-rules": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command|shell_exec|git_commit|delete_directory|cloud_sql_update_schema",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "java guard/GuardCommand.java",
+            "timeout": 20
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "mcpServers": {
+    "notion": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@notionhq/notion-mcp-server"
+      ],
+      "env": {
+        "NOTION_TOKEN": "YOUR_NOTION_TOKEN_HERE",
+        "NOTION_API_TOKEN": "YOUR_NOTION_TOKEN_HERE"
+      }
+    },
+    "medusa-docs": {
+      "serverUrl": "https://docs.medusajs.com/mcp"
+    },
+    "larksuite": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@larksuiteoapi/lark-mcp",
+        "mcp",
+        "-a",
+        "YOUR_LARK_APP_ID",
+        "-s",
+        "YOUR_LARK_APP_SECRET",
+        "-d",
+        "https://open.larksuite.com"
+      ]
+    }
+  }
+}

@@ -1,0 +1,5 @@
+description = "Điều tra bug chưa rõ nguyên nhân — giả thuyết + bằng chứng trước, sửa sau"
+prompt = """
+Đọc file `.agents/workflows/diagnose.md` trong repo này và thực hiện đúng quy trình trong đó.
+Input của tôi: {{args}}
+"""

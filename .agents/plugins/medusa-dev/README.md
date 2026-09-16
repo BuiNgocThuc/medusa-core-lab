@@ -1,0 +1,104 @@
+# Medusa Claude Code Plugin
+
+A comprehensive set of skills for Claude Code to help developers build Medusa applications with best practices and architectural patterns.
+
+Use this plugin to build backend and frontend features related to Medusa.
+
+> For installation and usage with other agents, refer to the [main README](../../README.md).
+
+- [Medusa Claude Code Plugin](#medusa-claude-code-plugin)
+  - [Installation with Claude Code](#installation-with-claude-code)
+    - [Prerequisites](#prerequisites)
+    - [Install Plugin](#install-plugin)
+  - [Installation for Other AI Agents](#installation-for-other-ai-agents)
+  - [Use Plugin](#use-plugin)
+    - [Example Use Cases](#example-use-cases)
+  - [Skills Included](#skills-included)
+  - [Commands Included](#commands-included)
+  - [Privacy](#privacy)
+
+## Installation with Claude Code
+
+### Prerequisites
+
+- [Claude Code](https://github.com/anthropics/claude-code) installed
+- A Medusa project (or planning to create one)
+
+### Install Plugin
+
+1. Start Claude:
+
+```bash
+claude
+```
+
+2. Add Medusa marketplace to Claude Code:
+
+```bash
+/plugin marketplace add medusajs/medusa-agent-skills
+```
+
+3. Install the plugin:
+
+```bash
+/plugin install medusa-dev@medusa
+```
+
+4. Verify the plugin is loaded:
+
+```bash
+/plugin
+```
+
+You should see the Medusa plugin listed under the Installed tab.
+
+## Installation for Other AI Agents
+
+For other AI agents like Cursor, you can use the [skills](https://skills.sh/) command to install the plugin's skills based on your AI agent:
+
+```bash
+npx skills add medusajs/medusa-agent-skills
+# choose the following skill:
+# - learning-medusa
+```
+
+## Use Plugin
+
+In your Medusa application, ask Claude to build features. Claude will know what to load from the Medusa plugin to build your feature.
+
+### Example Use Cases
+
+Here are some examples of what you can ask Claude to build:
+
+**Example 1: Full-stack Feature with Admin UI**
+
+> Implement a product reviews feature. Authenticated customers can add reviews. Admin users can view and approve or reject reviews from the dashboard
+
+**Example 2: Backend API Development**
+
+> Create a wishlist feature where customers can save products. I need API routes for adding/removing items and retrieving the wishlist.
+
+**Example 3: Admin Dashboard Widget**
+
+> Add a widget to the product detail page in the admin that allows managing related products. Admin users should be able to select which products are related using a searchable table.
+
+**Example 5: Storefront Integration**
+
+> Help me integrate the custom reviews API into my Next.js storefront. Show product reviews on the product detail page with pagination.
+
+## Skills Included
+
+1. **building-with-medusa** - Backend development (modules, workflows, API routes)
+2. **building-admin-dashboard-customizations** - Admin UI development (widgets, pages, forms)
+3. **building-storefronts** - Storefront integration (SDK usage, React Query patterns)
+4. **creating-internal-agents** - Creating agents
+
+## Commands Included
+
+1. `/medusa-dev:db-migrate`: Run migrations in your Medusa project.
+2. `/medusa-dev:db-generate <module-name>`: Generate migrations for a module.
+3. `/medusa-dev:new-user <email> <password>`: Create an admin user.
+
+## Privacy
+
+This plugin does not collect, store, or transmit any user data or conversation information. All instructional content is provided locally through skill files, and the MCP server only queries public Medusa documentation.

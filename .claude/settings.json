@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "permissions": {
+    "deny": [
+      "Edit(./initdb.sql)",
+      "Edit(./spotbugs-exclude.xml)",
+      "Edit(./**/target/**)",
+      "Write(./initdb.sql)",
+      "Write(./spotbugs-exclude.xml)",
+      "Write(./**/target/**)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "java .agents/guard/GuardCommand.java",
+            "timeout": 20,
+            "statusMessage": "Checking against AGENTS.md hard rules..."
+          }
+        ]
+      }
+    ]
+  }
+}

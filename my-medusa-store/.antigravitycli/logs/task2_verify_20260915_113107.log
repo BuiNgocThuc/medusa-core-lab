@@ -1,0 +1,34 @@
+=== 1. Running Unit Tests for Middlewares ===
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.overrides", "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+
+> @dtc/backend@0.0.1 test:unit /home/ubuntu/Data_D/SmartOSC/project/backend/nodejs/medusa-core-lab/my-medusa-store/apps/backend
+> TEST_TYPE=unit NODE_OPTIONS=--experimental-vm-modules jest --silent --runInBand --forceExit -- src/api/__tests__/middlewares.unit.spec.ts
+
+PASS src/api/__tests__/middlewares.unit.spec.ts
+
+Test Suites: 1 passed, 1 total
+Tests:       7 passed, 7 total
+Snapshots:   0 total
+Time:        1.861 s, estimated 2 s
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?
+=== 2. Running Medusa Linter ===
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.overrides", "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+
+> @dtc/backend@0.0.1 lint /home/ubuntu/Data_D/SmartOSC/project/backend/nodejs/medusa-core-lab/my-medusa-store/apps/backend
+> medusa lint
+
+[32minfo[39m:    Linting project...
+
+/home/ubuntu/Data_D/SmartOSC/project/backend/nodejs/medusa-core-lab/my-medusa-store/apps/backend/src/migration-scripts/seed/customers.ts
+  24:36  warning  Use `ContainerRegistrationKeys.LOGGER` instead of the magic string `logger`  @medusajs/prefer-container-registration-keys
+
+/home/ubuntu/Data_D/SmartOSC/project/backend/nodejs/medusa-core-lab/my-medusa-store/apps/backend/src/migration-scripts/seed/orders.ts
+  173:36  warning  Use `ContainerRegistrationKeys.LOGGER` instead of the magic string `logger`  @medusajs/prefer-container-registration-keys
+
+/home/ubuntu/Data_D/SmartOSC/project/backend/nodejs/medusa-core-lab/my-medusa-store/apps/backend/src/migration-scripts/seed/stock-and-shipping.ts
+   84:42  warning  `amount: 30000` looks like it's in the smallest currency unit. Medusa expects prices in major units (decimals)  @medusajs/prices-in-major-units
+  104:42  warning  `amount: 60000` looks like it's in the smallest currency unit. Medusa expects prices in major units (decimals)  @medusajs/prices-in-major-units
+
+✖ 4 problems (0 errors, 4 warnings)
+  0 errors and 2 warnings potentially fixable with the `--fix` option.
+[33mwarn[39m:    Lint produced 4 warning(s).

@@ -1,0 +1,5 @@
+description = "Implement feature mới — plan trước, chờ duyệt, rồi mới code"
+prompt = """
+Đọc file `.agents/workflows/feature.md` trong repo này và thực hiện đúng quy trình trong đó.
+Input của tôi: {{args}}
+"""
