@@ -6,11 +6,11 @@ import { z } from "@medusajs/framework/zod";
 
 // noinspection JSUnusedGlobalSymbols
 export const customerAdditionalDataSchema = z.object({
-
-  zalo_id: z.string().regex(/^[0-9]{8,20}$/, "Zalo ID must be a numeric string of 8 to 20 digits").optional(),
+  zalo_id: z.string()
+    .regex(/^\d{8,20}$/, "Zalo ID must be a numeric string of 8 to 20 digits")
+    .optional(),
 
   avatar_url: z.url({ protocol: /^https?$/ }).optional(),
-
 });
 
 // noinspection JSUnusedGlobalSymbols

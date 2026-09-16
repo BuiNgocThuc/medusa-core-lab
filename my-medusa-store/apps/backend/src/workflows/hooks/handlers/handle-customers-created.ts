@@ -1,9 +1,9 @@
+import { CustomerDTO, type ICustomerModuleService } from "@medusajs/framework/types";
 import { StepExecutionContext, StepResponse } from "@medusajs/framework/workflows-sdk";
-import { CustomerDTO } from "@medusajs/framework/types";
 import { MedusaError, Modules } from "@medusajs/framework/utils";
 import {
   customerAdditionalDataSchema,
-  CustomerAdditionalData,
+  type CustomerAdditionalData,
 } from "../../../utils/customer-additional-data";
 
 export interface CustomersCreatedHookInput {
@@ -11,50 +11,54 @@ export interface CustomersCreatedHookInput {
   additional_data?: Record<string, unknown>;
 }
 
-// Handler for customersCreated workflow hook | Xử lý hook customersCreated
-// Đồng bộ additional_data (zalo_id, avatar_url) vào metadata của customer vừa tạo
-// Synchronizes validated additional_data into created customer metadata
 export async function handleCustomersCreated(
-  input: CustomersCreatedHookInput,
-  context: StepExecutionContext
+  { customers, additional_data }: CustomersCreatedHookInput,
+  { container }: StepExecutionContext
 ): Promise<StepResponse<void>> {
+  if (!additional_data || typeof additional_data !== "object") {
+    return new StepResponse();
+  }
 
-  const parseResult = customerAdditionalDataSchema.safeParse(input.additional_data);
+  const parseResult = customerAdditionalDataSchema.safeParse(additional_data);
 
   if (!parseResult.success) {
-
     throw new MedusaError(
       MedusaError.Types.INVALID_DATA,
-      `Invalid customer additional data: ${parseResult.error.message}`
+      "Invalid Task 3 customer additional data."
     );
-
   }
 
-  const extraData: CustomerAdditionalData = parseResult.data;
-  const hasTask3Fields = extraData.zalo_id !== undefined || extraData.avatar_url !== undefined;
+  const { zalo_id, avatar_url } = parseResult.data;
+
+  const hasTask3Fields = zalo_id !== undefined || avatar_url !== undefined;
 
   if (!hasTask3Fields) {
-
     return new StepResponse();
-
   }
 
-  if (input.customers.length !== 1) {
-
+  if (customers.length !== 1) {
     throw new MedusaError(
       MedusaError.Types.INVALID_DATA,
-      `Customer additional data (zalo_id, avatar_url) can only be applied to exactly 1 customer, but received ${input.customers.length}`
+      `Cannot assign single-customer additional_data to ${customers.length} customers in batch.`
     );
-
   }
 
-  const customerModuleService = context.container.resolve(Modules.CUSTOMER);
-  const customer = input.customers[0];
+  const extraData: CustomerAdditionalData = {};
 
-  await customerModuleService.updateCustomers(customer.id, {
+  if (zalo_id !== undefined) {
+    extraData.zalo_id = zalo_id;
+  }
+
+  if (avatar_url !== undefined) {
+    extraData.avatar_url = avatar_url;
+  }
+
+  const customerModuleService: ICustomerModuleService =
+    container.resolve(Modules.CUSTOMER);
+
+  await customerModuleService.updateCustomers(customers[0].id, {
     metadata: extraData,
   });
 
   return new StepResponse();
-
 }
