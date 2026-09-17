@@ -45,7 +45,7 @@ updateCartWorkflow.hooks.validate(
       )
       throw new MedusaError(
         MedusaError.Types.NOT_ALLOWED,
-        "Email này đã được đăng ký tài khoản. Vui lòng đăng nhập để tiếp tục thanh toán.",
+        "Email này đã được đăng ký tài khoản.",
         "EMAIL_ALREADY_REGISTERED"
       )
     }
@@ -57,7 +57,7 @@ updateCartWorkflow.hooks.validate(
       )
       throw new MedusaError(
         MedusaError.Types.NOT_ALLOWED,
-        "Email này thuộc về một tài khoản khác. Vui lòng sử dụng email của tài khoản đang đăng nhập.",
+        "Email này thuộc về một tài khoản khác.",
         "EMAIL_TAKEN_BY_ANOTHER_CUSTOMER"
       )
     }
