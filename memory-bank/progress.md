@@ -13,6 +13,7 @@
   - Phat hien co che phong thu 2 lop cho dia chi mac dinh (Workflow soft unset + Partial Unique Index cap DB).
   - Nghien cuu 6 Workflow Hook Points chinh thuc, Saga Compensation Pattern (`StepResponse`), va mo hinh 3 lop chong Spam Address DoS.
   - Xuat ban thanh cong tai lieu hoan chinh **Medusa Customer Module — Ban chat cot loi (v2 Enterprise Edition, 8 chuong)** len Notion.
+  - Chuan hoa va dong bo tai lieu kien truc Storefront Registration Flow 2 buoc + Token Refresh, Actorless Token (`allowUnregistered: true`), Bang doi chieu Admin vs Storefront 3 cot, va 3 trang thai dinh danh len ca 2 trang Notion (`Medusa Customer Module` va `Onboarding Guide: MedusaJS`) dua tren core commit `da9be14f`, tuan thu triet de Zero-Emoji Policy va bao toan 100% noi dung goc.
   - Cap nhat & mo rong bo cau hoi ky thuat chuyen sau tai `notes/question.md` len 16 cau hoi toan dien.
   - Ra soat, loai bo 100% icon/emoji tren 2 trang tai lieu Notion theo quy dinh doanh nghiep cua Mentor & Leader.
   - Tich hop so do quan he thuc the **Relations Overview** dang Mermaid ER diagram vao Notion.
@@ -24,8 +25,8 @@
 - **Cluster 1: Foundation & Extensions (Easy - Medium)**
   - Task 1 [Easy]: Customer Welcome Subscriber -> [Completed] (code + 4/4 unit tests).
   - Task 2 [Easy]: Admin Request Validation Middleware (`additionalDataValidator` & Zod tren `POST /admin/customers`) -> [Completed] (code + 7/7 unit tests + pass lint).
-  - Task 3 [Medium]: Workflow Hook Customization (`createCustomersWorkflow.hooks.customersCreated`) -> [Completed] (code + 8/8 unit tests + 2/2 HTTP integration tests + Bruno API test suite + Notion docs).
-  - Task 4 [Medium]: Admin Dashboard UI Widget (`customer.details` zone) -> [Pending].
+  - Task 3 [Medium]: Workflow Hook Customization (`createCustomersWorkflow.hooks.customersCreated`) -> [Completed] (code + 8/8 unit tests + 2/2 HTTP integration tests + Bruno Black-box 10/10 requests PASS 27/27 assertions + Notion docs + git pushed).
+  - Task 4 [Medium]: Admin Dashboard UI Widget (`customer.details` zone) -> [Ready / Next Up].
 - **Cluster 2: Custom Module & Distributed Transactions (Medium - Hard)**
   - Task 5 [Med-Hard]: Custom Loyalty Module & Module Link (`defineLink`, migration) -> [Pending].
   - Task 6 [Hard]: Multi-Step Saga Workflow with Compensation (4-step rollback & DB unique idempotency) -> [Pending].
