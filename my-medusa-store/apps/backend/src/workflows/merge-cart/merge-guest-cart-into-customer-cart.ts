@@ -31,7 +31,11 @@ const logStep = createStep(
 )
 
 export const mergeGuestCartIntoCustomerCartWorkflow = createWorkflow(
-  "merge-guest-cart-into-customer-cart",
+  {
+    name: "merge-guest-cart-into-customer-cart",
+    store: true, // Bật lưu trữ execution vào DB
+    retentionTime: 60 * 60 * 24 * 7, // Lưu log trong 7 ngày (tuỳ chọn)
+  },
   (input: WorkflowData<MergeGuestCartInput>): WorkflowResponse<MergeGuestCartOutput> => {
     logStep({
       stage: "Started",
