@@ -17,6 +17,7 @@ import {
 } from "@medusajs/medusa/core-flows"
 import { MergeGuestCartInput, MergeGuestCartOutput } from "./types"
 import { validateInventoryForMergeStep } from "./steps/validate-inventory-for-merge"
+import { deleteCartStep } from "./steps/delete-cart"
 
 const logStep = createStep(
   "log-step",
@@ -62,23 +63,36 @@ export const mergeGuestCartIntoCustomerCartWorkflow = createWorkflow(
       ],
     }).config({ name: "get-customer-cart" })
 
-    // Chon cart duoc cap nhat moi nhat
-    const customerCartTransform = transform({ customerCart }, ({ customerCart }) => {
-      const carts = customerCart.data || []
-      if (carts.length === 0) {
-        console.log("[Workflow: MergeCart] Customer chua co cart active (Cart A = null)")
-        return null
+    // Chon cart duoc cap nhat moi nhat (NGOẠI TRỪ guest_cart_id)
+    const customerCartTransform = transform(
+      { customerCart, input },
+      ({ customerCart, input }) => {
+        const carts = customerCart.data || []
+
+        // BẮT BUỘC: Loại trừ chính guest_cart_id ra khỏi danh sách tìm kiếm Cart A!
+        // Lý do: Nếu trước khi login, guest đã vào trang checkout và điền email,
+        // Medusa Core (findOrCreateCustomerStep) có thể đã tự động gán customer_id cho guest_cart này.
+        // Khi đó, guest_cart cũng mang customer_id và có updated_at mới hơn Cart A cũ.
+        // Nếu không loại trừ, hệ thống sẽ chọn nhầm guest_cart làm Cart A -> tự gộp vào chính mình (self-merge bug)!
+        const otherCarts = carts.filter((c) => c.id !== input.guest_cart_id)
+
+        if (otherCarts.length === 0) {
+          console.log(
+            "[Workflow: MergeCart] Customer chua co cart active nao khac (Cart A = null). Cart hien tai la cart duy nhat."
+          )
+          return null
+        }
+
+        const activeCart = otherCarts.sort((a, b) => {
+          const dateA = new Date(a.updated_at || a.created_at).getTime()
+          const dateB = new Date(b.updated_at || b.created_at).getTime()
+          return dateB - dateA
+        })[0]
+
+        console.log(`[Workflow: MergeCart] Selected Cart A: ${activeCart.id}`)
+        return activeCart
       }
-
-      const activeCart = carts.sort((a, b) => {
-        const dateA = new Date(a.updated_at || a.created_at).getTime()
-        const dateB = new Date(b.updated_at || b.created_at).getTime()
-        return dateB - dateA
-      })[0]
-
-      console.log(`[Workflow: MergeCart] Selected Cart A: ${activeCart.id}`)
-      return activeCart
-    })
+    )
 
     // Nhanh 1: Khach chua co Cart A va co guest_cart_id -> Transfer guest cart sang customer
     when("transfer-guest-cart", { customerCartTransform, input }, ({ customerCartTransform, input }) => {
@@ -195,6 +209,15 @@ export const mergeGuestCartIntoCustomerCartWorkflow = createWorkflow(
           items: inventoryValidationResult.valid_items,
         },
       })
+
+      // BẮT BUỘC: Dọn dẹp Cart B sau khi đã gộp các mặt hàng hợp lệ vào Cart A!
+      // Lý do:
+      // 1. Tránh việc một tài khoản tồn tại song song 2 giỏ hàng active trong DB.
+      // 2. Tránh xung đột multi-device (thiết bị A bốc nhầm Cart B cũ, thiết bị B bốc Cart A mới).
+      // 3. Đảm bảo toàn bộ hệ thống (Storefront, Analytics, Abandoned Cart) chỉ xem Cart A là giỏ hàng duy nhất của user.
+      deleteCartStep({
+        cart_id: input.guest_cart_id!,
+      }).config({ name: "delete-merged-guest-cart" })
 
       // Mo khoa ca 2 cart
       releaseLockStep({
