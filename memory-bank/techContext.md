@@ -3,23 +3,26 @@
 ## Technologies
 - **Core Framework:** Medusa v2 (@medusajs/medusa v2.20.1)
 - **Runtime:** Node.js (v24.18.0 via NVM), TypeScript (v5.6)
-- **Database:** PostgreSQL (v15+) tren cong 5433 (`medusa-learn` db)
-- **Cache / PubSub:** Redis (v7+) tren cong 6380
-- **Storefront:** Next.js (React), Tailwind CSS
-- **Package Manager:** pnpm (v11.9.0)
+- **Database:** PostgreSQL (v15+) tren cong 5434 (`medusa_core_lab_db` trong container `medusa_core_lab_postgres`, role `agents` password `root123`)
+- **Cache / PubSub:** Redis (v7+) tren cong 6381 (`medusa_core_lab_redis`)
+- **Backend Port:** Port 9000 (tranh xung dot voi Portainer tren port 9001)
+- **Storefront Port:** Next.js tren port 8000
+- **Package Manager:** pnpm (v10.11.1 / v11)
 - **Code Quality & Linter:** ESLint voi `@medusajs/eslint-plugin` (tuan thu convention 2 spaces, double quotes, no semicolons qua `medusa lint`)
 - **AI Tooling & Skills:** 
   - Medusa MCP Server (`https://docs.medusajs.com/mcp`)
-  - Database MCP Server (`medusa_db` query truc tiep PostgreSQL port 5433)
+  - Database MCP Server: `medusa_core_lab_db` (PostgreSQL port 5434 qua `@modelcontextprotocol/server-postgres`) va `medusa_db` (port 5433)
   - Notion MCP (`@notionhq/notion-mcp-server`)
   - LarkSuite MCP (`larksuite` cho bao cao hang ngay `/daily-report` Base)
   - Plugin `medusa-dev` (7 Medusa agentic skills)
-  - Bruno API Client (`bruno/` directory tai root): Bo suu tap kiem thu Black-box voi format v1, token Bearer tu dong, va runner guard `req.getExecutionMode() === "runner"`.
+  - Bruno API Client (`bruno/` directory tai root): Bo suu tap kiem thu Black-box dat 10/10 requests PASS (27/27 assertions PASS), token Bearer tu dong qua dual-scope storage (`token`), va runner guard `req.getExecutionMode() === "runner"`.
 
 ## Development Setup
 - Moi truong: Linux/WSL (Ubuntu).
-- Lenh chay chinh: `pnpm run dev` (khoi chay ca backend va storefront) hoac `pnpm run backend:dev`.
-- Lenh DB: `cd my-medusa-store/apps/backend` && `pnpm exec medusa db:migrate`.
+- Lenh Docker: `docker compose up -d` (PostgreSQL port 5434, Redis port 6381).
+- Lenh chay Backend: `cd my-medusa-store/apps/backend && pnpm dev` (lang nghe tai port 9000, Admin UI tai `http://localhost:9000/app`).
+- Lenh chay Storefront: `cd my-medusa-store/apps/storefront && pnpm dev` (lang nghe tai port 8000).
+- Lenh DB: `cd my-medusa-store/apps/backend && pnpm seed` (hoac `pnpm exec medusa db:migrate`).
 - Tai lieu hoc tap: `LEARNING_PLAN.md`, `notes/ai-tools-guide.md`, `notes/question.md`, va `notes/customer-module-extension-plan.md`.
 
 ## Constraints & Gotchas
@@ -33,6 +36,6 @@
 - **JWT Refresh Gotcha:** Sau khi thuc hien mapping Customer vao `AuthIdentity`, client phai goi endpoint `POST /auth/token/refresh` de nhan token JWT moi chua `actor_id` (`customer_id`).
 - **Persistent Idempotency Gotcha:** Step idempotency hoac transaction ID trong Workflow Engine chi co hieu luc trong mot workflow execution. De ngan chan cap phat trung lap tu cac request doc lap, bat buoc phai thiet lap DB unique constraint (vi du `UNIQUE(customer_id, reward_type, source_id)`).
 - **LarkSuite Bitable Payload Gotcha:** Field `Description` tren Bitable API nhan plain-text string (co chua `\n`), neu gui duoi dang mang object `[{ type: "text", text: ... }]` se bi tu choi voi ma loi `1254060 TextFieldConvFail`. Dong thoi field `Assignee` la User Object, query filter truc tiep bang ten string se gap loi `1254018 InvalidFilter`.
-- **Medusa Duplicate Error HTTP Status:** Trong Medusa v2 core error handler (`error-handler.ts:73`), `MedusaError.Types.DUPLICATE_ERROR` map ve ma HTTP `422` (Unprocessable Entity) kem `body.code = "invalid_request_error"` va `body.type = "duplicate_error"` (khong phai 400 hay 409).
+- **Medusa Duplicate Error HTTP Status:** Trong Medusa v2 `createCustomersStep`, khi duplicate email tren cung mot gia tri `has_account` bi phat hien, he thong nem `MedusaError.Types.INVALID_DATA` ("Customer with email: ... already exists") map ve ma HTTP `400` (Bad Request). Trong khi do o cac luong auth/profile khac `DUPLICATE_ERROR` co the map ve `422`. Bo test Bruno duoc thiet ke chap nhan `[400, 409, 422]` de bao dam tinh bao quat.
 - **Bruno In-Memory Session Gotcha:** Cac bien set bang `bru.setEnvVar()` / `bru.setVar()` chi luu trong RAM cua phien chay Bruno hien tai. Khi restart Bruno app, bien bi xoa; de cleanup can query ID tu DB/Admin UI.
-- **Secret Isolation in Git:** File `.agents/mcp_config.json` chua token nhay cam cua Notion va Lark, bat buoc phai dat trong `.gitignore`. File `.agents/mcp_config.sample.json` duoc commit de lam template cho lap tap ca nhan.
+- **Secret Isolation in Git:** File `.agents/mcp_config.json`, `.vscode/`, va `.antigravitycli/` chua token nhay cam cua Notion, Lark, hoac local execution logs bat buoc phai dat trong `.gitignore`. Da ap dung GitHub Push Protection mitigation thanh cong.
