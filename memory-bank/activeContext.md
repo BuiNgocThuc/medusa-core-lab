@@ -1,17 +1,29 @@
 # Active Context
 
 ## Current Focus
-Hoan thanh tron ven 100% **Task 3: Implement Workflow Hook Customization** (`createCustomersWorkflow.hooks.customersCreated`), bo kiem thu 3 tang (8/8 unit tests, 2/2 HTTP integration tests), bo suu tap kiem thu Black-box API qua Bruno Collection (`bruno/`), va dong bo toan dien len Notion. San sang buoc vao **Task 4: Admin Dashboard UI Widget** (`customer.details`).
+Chinh thuc hoan thanh va xac thuc toan dien 100% **Task 3: Workflow Hook Customization** qua bo kiem thu Black-box Bruno API Collection dat 10/10 requests PASS (27/27 assertions PASS) tren live backend. He thong backend (port 9000), storefront (port 8000), database `medusa_core_lab_db` (port 5434), va redis (port 6381) da hoat dong on dinh. MCP Server `medusa_core_lab_db` da ket noi thanh cong. San sang 100% buoc vao **Task 4: Admin Dashboard UI Widget** (`customer.details`).
 
 ## Recent Changes
-- Hoan thanh tron ven 100% **Task 3: Workflow Hook Customization**:
+- Hoan thanh tron ven 100% **Task 3: Workflow Hook Customization** va Black-box API Verification:
   - Trien khai hook registration tai `src/workflows/hooks/customer-created.ts` va isolated handler tai `src/workflows/hooks/handlers/handle-customers-created.ts`.
   - Tuyen bo `customerAdditionalDataSchema` tai `src/utils/customer-additional-data.ts` lam Single Source of Truth cho ca Middleware va Hook.
-  - Bao ve quy tac Batch: Chi ap dung khi `customers.length === 1`; tu choi dứt khoat `customers.length !== 1` bang `MedusaError(INVALID_DATA)` de kich hoat rollback compensation xoa sach ban ghi vua tao.
+  - Bao ve quy tac Batch: Chi ap dung khi `customers.length === 1`; tu choi dut khoat `customers.length !== 1` bang `MedusaError(INVALID_DATA)` de kich hoat rollback compensation xoa sach ban ghi vua tao.
   - Cap nhat metadata toi thieu qua `customerModuleService.updateCustomers` tan dung `mergeMetadata` cua Medusa v2.20.1 ma khong kich hoat cascade event thua.
   - Bo Unit Tests dat 8/8 pass (`handle-customers-created.unit.spec.ts`), bo HTTP Integration Test dat 2/2 pass (`customer-additional-data.spec.ts`).
-  - Xay dung bo suu tap API Bruno tai `bruno/` voi 10 requests tu dong theo luong nghiep vu va 3 request cleanup doc lap kem chot chan Runner Guard `req.getExecutionMode() === "runner"`.
-  - Dong bo toan dien trang thai COMPLETED & VERIFIED, kien truc va bang chung kiem thu len Notion page Task 3.
+  - Xay dung va tinh chinh bo suu tap Bruno Suite (`bruno/`): Tinh chinh 3 test assertions (08 - Zalo format, 09 - URL format, 10 - Duplicate email) khop chuan voi Zod va Medusa v2 core error handler. Xac nhan tren live backend dat **10/10 requests PASS (27/27 assertions PASS)**.
+  - Dong bo toan dien trang thai COMPLETED & VERIFIED, kien truc va bang chung kiem thu len Notion page Task 3 va `LEARNING_PLAN.md`.
+- Chuan hoa va dong bo tai lieu kien truc Medusa v2 Storefront Registration Flow len Notion:
+  - Nghien cuu sau tu repo goc `medusa-core-source` tai commit `da9be14f`: Doi chieu 15 dan chung ma nguon tu `emailpass.ts`, `authenticate-middleware.ts`, `generate-jwt-token.ts`, `create-customer-account.ts`, `set-auth-app-metadata.ts` den `js-sdk`.
+  - Cap nhat Trang 1 (`Medusa Customer Module` - `3d54499f-ebfc-809f-9493-e02b69e1f691`): Bo sung Bang doi chieu Admin vs Storefront 3 cot tai Muc 3.1 va Sequence Diagram 4 lan + Mau SDK + Phan tich 3 giai doan tai Muc 4.2.
+  - Cap nhat Trang 2 (`Onboarding Guide: MedusaJS` - `3d64499f-ebfc-8155-bb93-e1057d90716c`): Bo sung Callout Box kien truc tai Muc 4.4 tom tat 3 trang thai dinh danh va dan link dieu huong sang Trang 1.
+  - Kiem thu hau ki (Post-flight verification): Xac nhan bao toan 100% noi dung cu ngoai pham vi (zero-drift) va tuan thu tuyet doi Zero-Emoji Policy.
+- Giai quyet su co GitHub Push Protection va dong bo Git:
+  - Dua `.vscode/` va `.antigravitycli/` vao `.gitignore`, loai bo secret token khoi git cache, amend commit sach va push thanh cong branch `feature/MEDUSA-001-extendsion-customer-module` len GitHub.
+  - Kiem tra ket noi truc tiep Notion MCP va LarkSuite MCP xac nhan token van an toan, hoat dong binh thuong va khong bi revoke.
+- Chuan hoa ha tang local va port mapping:
+  - Dong bo port Backend ve `PORT=9000` (tranh xung dot Portainer 9001).
+  - Khoi dong Docker compose voi Postgres port `5434` (`medusa_core_lab_db`) va Redis port `6381` (`medusa_core_lab_redis`), tao file `.env` chuan cho Backend va Storefront (port 8000).
+  - Thiet lap tai khoan `agents` password `root123` va cau hinh thanh cong MCP Server `medusa_core_lab_db` tren ca 3 tang (Antigravity global, `.agents`, `.vscode`), truy van truc tiep 146 bang du lieu va phan tich query plan.
 - Bo sung thanh cong **Chuong 6: DAG Mental Model: 20% Kien Thuc Doc 80% Core-Flows** vao trang Notion Architecture Playbook (`3d64499f-ebfc-8076-b39e-c685ead3185e`), bao toan 100% noi dung 5 chuong cu, render dung table va code block ASCII, tuan thu triet de Zero-Emoji Policy.
 - Hoan thanh tron ven **Task 2: Admin Request Validation Middleware**:
   - Trien khai middleware tai `my-medusa-store/apps/backend/src/api/middlewares.ts` mo rong schema `additional_data` cho route `POST /admin/customers`.
