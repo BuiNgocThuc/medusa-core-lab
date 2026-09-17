@@ -24,15 +24,7 @@ export default async function enableMomoProvider({
 }) {
   const logger = container.resolve(ContainerRegistrationKeys.LOGGER)
   const regionModule = container.resolve(Modules.REGION)
-  const realConfigured = REQUIRED_MOMO_ENV.every((key) => process.env[key])
-  const mockEnabled =
-    process.env.MOMO_MOCK_ENABLED === "true" ||
-    (process.env.NODE_ENV !== "production" &&
-      process.env.MOMO_MOCK_ENABLED !== "false" &&
-      !realConfigured)
-  const missingEnv = mockEnabled
-    ? []
-    : REQUIRED_MOMO_ENV.filter((key) => !process.env[key])
+  const missingEnv = REQUIRED_MOMO_ENV.filter((key) => !process.env[key])
 
   if (missingEnv.length) {
     throw new MedusaError(
@@ -40,7 +32,7 @@ export default async function enableMomoProvider({
       [
         `[momo] ${MOMO_PROVIDER_ID} is not registered because MoMo env is incomplete.`,
         `Missing: ${missingEnv.join(", ")}`,
-        "For local demo, set MOMO_MOCK_ENABLED=true or leave it unset in non-production. For real sandbox/prod, add the missing variables to apps/backend/.env, restart the Medusa command, then run this script again.",
+        "Add the missing variables to apps/backend/.env, restart the Medusa command, then run this script again.",
       ].join(" ")
     )
   }

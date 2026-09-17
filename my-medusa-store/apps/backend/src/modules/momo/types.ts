@@ -8,11 +8,10 @@ export type MomoProviderOptions = {
   partnerName?: string
   redirectUrl: string
   ipnUrl: string
-  requestType?: "captureWallet"
+  requestType?: "captureWallet" | "payWithMethod"
   autoCapture?: boolean
   lang?: "vi" | "en"
   orderExpireTimeMinutes?: number
-  mockEnabled?: boolean
 }
 
 export type MomoSessionData = {
@@ -45,7 +44,7 @@ export type MomoCreatePaymentRequest = {
   orderInfo: string
   redirectUrl: string
   ipnUrl: string
-  requestType: "captureWallet"
+  requestType: "captureWallet" | "payWithMethod"
   extraData: string
   autoCapture: boolean
   lang: "vi" | "en"

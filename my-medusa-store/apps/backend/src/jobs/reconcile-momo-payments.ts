@@ -11,15 +11,12 @@ import MomoPaymentModuleService from "../modules/momo-payment/service"
 export default async function reconcileMomoPayments(container: MedusaContainer) {
   const logger = container.resolve(ContainerRegistrationKeys.LOGGER)
 
-  const mockEnabled = process.env.MOMO_MOCK_ENABLED === "true"
-
   if (
-    !mockEnabled &&
-    (!process.env.MOMO_PARTNER_CODE ||
+    !process.env.MOMO_PARTNER_CODE ||
       !process.env.MOMO_ACCESS_KEY ||
       !process.env.MOMO_SECRET_KEY ||
       !process.env.MOMO_REDIRECT_URL ||
-      !process.env.MOMO_IPN_URL)
+      !process.env.MOMO_IPN_URL
   ) {
     logger.info("[momo] Reconciliation skipped because MoMo is not configured")
     return
@@ -29,9 +26,9 @@ export default async function reconcileMomoPayments(container: MedusaContainer) 
     MOMO_PAYMENT_MODULE
   )
   const momoClient = new MomoClient({
-    partnerCode: process.env.MOMO_PARTNER_CODE || "MOMO_MOCK_PARTNER",
-    accessKey: process.env.MOMO_ACCESS_KEY || "MOMO_MOCK_ACCESS",
-    secretKey: process.env.MOMO_SECRET_KEY || "MOMO_MOCK_SECRET",
+    partnerCode: process.env.MOMO_PARTNER_CODE,
+    accessKey: process.env.MOMO_ACCESS_KEY,
+    secretKey: process.env.MOMO_SECRET_KEY,
     endpoint: process.env.MOMO_ENDPOINT || "https://test-payment.momo.vn",
     redirectUrl:
       process.env.MOMO_REDIRECT_URL ||
@@ -40,7 +37,6 @@ export default async function reconcileMomoPayments(container: MedusaContainer) 
       process.env.MOMO_IPN_URL ||
       "http://localhost:9001/hooks/payment/momo_default",
     lang: (process.env.MOMO_LANG || "vi") as "vi" | "en",
-    mockEnabled,
   })
 
   const candidates = await momoPaymentService.listReconciliationCandidates(50)

@@ -13,16 +13,6 @@ const MOMO_REAL_CONFIGURED = Boolean(
     process.env.MOMO_REDIRECT_URL &&
     process.env.MOMO_IPN_URL
 )
-const MOMO_MOCK_ENABLED =
-  process.env.MOMO_MOCK_ENABLED === "true" ||
-  (process.env.NODE_ENV !== "production" &&
-    process.env.MOMO_MOCK_ENABLED !== "false" &&
-    !MOMO_REAL_CONFIGURED)
-const MOMO_ENABLED = Boolean(
-  MOMO_MOCK_ENABLED || MOMO_REAL_CONFIGURED
-)
-
-
 module.exports = defineConfig({
   projectConfig: {
     databaseUrl: process.env.DATABASE_URL,
@@ -71,17 +61,16 @@ module.exports = defineConfig({
               webhookSecret: process.env.BANK_TRANSFER_WEBHOOK_SECRET,
             },
           },
-          ...(MOMO_ENABLED
+          ...(MOMO_REAL_CONFIGURED
             ? [
                 {
                   resolve: "./src/modules/momo",
                   id: "default",
                   options: {
                     providerId: "pp_momo_default",
-                    partnerCode:
-                      process.env.MOMO_PARTNER_CODE || "MOMO_MOCK_PARTNER",
-                    accessKey: process.env.MOMO_ACCESS_KEY || "MOMO_MOCK_ACCESS",
-                    secretKey: process.env.MOMO_SECRET_KEY || "MOMO_MOCK_SECRET",
+                    partnerCode: process.env.MOMO_PARTNER_CODE,
+                    accessKey: process.env.MOMO_ACCESS_KEY,
+                    secretKey: process.env.MOMO_SECRET_KEY,
                     endpoint:
                       process.env.MOMO_ENDPOINT ||
                       "https://test-payment.momo.vn",
@@ -94,13 +83,12 @@ module.exports = defineConfig({
                     ipnUrl:
                       process.env.MOMO_IPN_URL ||
                       "http://localhost:9001/hooks/payment/momo_default",
-                    requestType: "captureWallet",
+                    requestType: "payWithMethod",
                     autoCapture: process.env.MOMO_AUTO_CAPTURE !== "false",
                     lang: (process.env.MOMO_LANG || "vi") as "vi" | "en",
                     orderExpireTimeMinutes: Number(
                       process.env.MOMO_ORDER_EXPIRE_MINUTES || 15
                     ),
-                    mockEnabled: MOMO_MOCK_ENABLED,
                   },
                 },
               ]

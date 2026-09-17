@@ -30,7 +30,7 @@ export class MomoClient {
   constructor(options: MomoProviderOptions) {
     this.options_ = {
       endpoint: DEFAULT_MOMO_ENDPOINT,
-      requestType: "captureWallet",
+      requestType: "payWithMethod",
       autoCapture: true,
       lang: "vi",
       ...options,
@@ -45,7 +45,7 @@ export class MomoClient {
     extraData?: string
   }) {
     const extraData = input.extraData ?? ""
-    const requestType = this.options_.requestType ?? "captureWallet"
+    const requestType = this.options_.requestType ?? "payWithMethod"
     const rawSignatureData = buildCreatePaymentSignatureData({
       accessKey: this.options_.accessKey,
       amount: input.amount,
@@ -77,13 +77,6 @@ export class MomoClient {
       signature: signMomoPayload(rawSignatureData, this.options_.secretKey),
     }
 
-    if (this.options_.mockEnabled) {
-      return {
-        request: body,
-        response: this.createMockPaymentResponse(input),
-      }
-    }
-
     return {
       request: body,
       response: await this.post<MomoCreatePaymentResponse>(
@@ -105,20 +98,6 @@ export class MomoClient {
       orderId: input.orderId,
       lang: this.options_.lang ?? "vi",
       signature: signMomoPayload(rawSignatureData, this.options_.secretKey),
-    }
-
-    if (this.options_.mockEnabled) {
-      return {
-        partnerCode: this.options_.partnerCode,
-        requestId: input.requestId,
-        orderId: input.orderId,
-        amount: input.amount ?? 0,
-        transId: Date.now(),
-        payType: "mock",
-        resultCode: 0,
-        message: "Mock MoMo payment succeeded",
-        responseTime: Date.now(),
-      } satisfies MomoQueryResponse
     }
 
     return this.post<MomoQueryResponse>("/v2/gateway/api/query", body)
@@ -149,22 +128,6 @@ export class MomoClient {
       lang: this.options_.lang ?? "vi",
       description: input.description,
       signature: signMomoPayload(rawSignatureData, this.options_.secretKey),
-    }
-
-    if (this.options_.mockEnabled) {
-      return {
-        request: body,
-        response: {
-          partnerCode: this.options_.partnerCode,
-          orderId: input.orderId,
-          requestId: input.requestId,
-          amount: input.amount,
-          transId: Date.now(),
-          resultCode: 0,
-          message: "Mock MoMo refund succeeded",
-          responseTime: Date.now(),
-        } satisfies MomoRefundResponse,
-      }
     }
 
     return {
@@ -199,34 +162,5 @@ export class MomoClient {
     }
 
     return data
-  }
-
-  private createMockPaymentResponse(input: {
-    orderId: string
-    requestId: string
-    amount: number
-  }): MomoCreatePaymentResponse {
-    const redirectUrl = new URL(this.options_.redirectUrl)
-    redirectUrl.searchParams.set("resultCode", "0")
-    redirectUrl.searchParams.set("orderId", input.orderId)
-    redirectUrl.searchParams.set("requestId", input.requestId)
-    redirectUrl.searchParams.set("amount", input.amount.toString())
-    redirectUrl.searchParams.set("momo_mock", "1")
-
-    return {
-      partnerCode: this.options_.partnerCode,
-      requestId: input.requestId,
-      orderId: input.orderId,
-      amount: input.amount,
-      responseTime: Date.now(),
-      message: "Mock MoMo payment created",
-      resultCode: 0,
-      payUrl: redirectUrl.toString(),
-      shortLink: redirectUrl.toString(),
-      deeplink: `momo://app?action=payWithApp&serviceType=app&orderId=${input.orderId}`,
-      qrCodeUrl: `MOCK_MOMO_QR_${input.orderId}_${input.amount}`,
-      deeplinkMiniApp: `momo://miniapp?action=pay&orderId=${input.orderId}`,
-      userFee: 0,
-    }
   }
 }

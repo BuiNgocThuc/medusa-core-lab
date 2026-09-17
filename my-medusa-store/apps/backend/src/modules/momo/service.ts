@@ -67,7 +67,7 @@ class MomoPaymentProviderService extends AbstractPaymentProvider<MomoProviderOpt
     this.options_ = {
       endpoint: DEFAULT_ENDPOINT,
       providerId: DEFAULT_PROVIDER_ID,
-      requestType: "captureWallet",
+      requestType: "payWithMethod",
       autoCapture: true,
       lang: "vi",
       orderExpireTimeMinutes: DEFAULT_EXPIRE_MINUTES,
@@ -77,10 +77,6 @@ class MomoPaymentProviderService extends AbstractPaymentProvider<MomoProviderOpt
   }
 
   static validateOptions(options: Record<string, unknown>) {
-    if (options.mockEnabled) {
-      return
-    }
-
     for (const key of [
       "partnerCode",
       "accessKey",
