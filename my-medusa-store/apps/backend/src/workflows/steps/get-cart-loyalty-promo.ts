@@ -17,12 +17,12 @@ export const getCartLoyaltyPromoStep = createStep(
         if (throwErrorOn === "found" && loyaltyPromo) {
             throw new MedusaError(
                 MedusaError.Types.INVALID_DATA,
-                "Loyalty promotion already applied to cart",
+                "Ưu đãi đổi điểm đã được áp dụng",
             );
         } else if (throwErrorOn === "not-found" && !loyaltyPromo) {
             throw new MedusaError(
                 MedusaError.Types.INVALID_DATA,
-                "No loyalty promotion found on cart",
+                "Không tìm thấy ưu đãi đổi điểm",
             );
         }
 

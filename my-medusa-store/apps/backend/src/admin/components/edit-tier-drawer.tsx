@@ -5,6 +5,7 @@ import { sdk } from "../lib/sdk";
 import { useState, useEffect } from "react";
 import { Tier } from "../routes/tiers/page";
 import { Trash } from "@medusajs/icons";
+import { CurrencyAmountInput } from "./currency-amount-input";
 
 type EditTierFormData = {
     name: string;
@@ -271,16 +272,13 @@ export const EditTierDrawer = ({ tier }: EditTierDrawerProps) => {
                                         </div>
                                         <div className="flex flex-1 flex-col gap-y-2">
                                             <Label size="small">Minimum Purchase Value</Label>
-                                            <Input
-                                                type="number"
-                                                min="0"
-                                                step="0.01"
+                                            <CurrencyAmountInput
                                                 value={rule.min_purchase_value}
-                                                onChange={(e) =>
+                                                onValueChange={(value) =>
                                                     updateTierRule(
                                                         index,
                                                         "min_purchase_value",
-                                                        parseFloat(e.target.value) || 0,
+                                                        value,
                                                     )
                                                 }
                                             />

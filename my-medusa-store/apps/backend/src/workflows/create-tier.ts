@@ -5,7 +5,11 @@ import {
     WorkflowResponse,
 } from "@medusajs/framework/workflows-sdk";
 import { useQueryGraphStep } from "@medusajs/medusa/core-flows";
-import { createTierRulesStep, createTierStep } from "./steps";
+import {
+    createTierRulesStep,
+    createTierStep,
+    validateTierPromotionOwnershipStep,
+} from "./steps";
 
 const CREATE_TIER_WORKFLOW_NAME = "create_tier";
 type CreateTierWorkflowInput = {
@@ -31,6 +35,9 @@ export const createTierWorkflow = createWorkflow(
                 options: {
                     throwIfKeyNotFound: true,
                 },
+            });
+            validateTierPromotionOwnershipStep({
+                promo_id: input.promo_id!,
             });
         });
 

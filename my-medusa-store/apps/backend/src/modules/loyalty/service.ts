@@ -1,5 +1,6 @@
 import { MedusaError, MedusaService } from "@medusajs/framework/utils";
 import LoyaltyPoint from "./models/loyalty-point";
+import { LoyaltyTransaction } from "./models";
 import { InferTypeOf } from "@medusajs/framework/types";
 import {
     LOYALTY_EARN_VND_PER_POINT,
@@ -11,6 +12,7 @@ type LoyaltyPoint = InferTypeOf<typeof LoyaltyPoint>;
 
 class LoyaltyModuleService extends MedusaService({
     LoyaltyPoint,
+    LoyaltyTransaction,
 }) {
     async addPoints(customerId: string, points: number): Promise<LoyaltyPoint> {
         const existingPoints = await this.listLoyaltyPoints({
@@ -51,6 +53,52 @@ class LoyaltyModuleService extends MedusaService({
         });
 
         return points[0]?.points || 0;
+    }
+
+    async recordTransaction(input: {
+        customer_id: string
+        type: string
+        reference_id: string
+        points: number
+        status?: string
+        cart_id?: string | null
+        order_id?: string | null
+        promotion_id?: string | null
+    }) {
+        const [existing] = await this.listLoyaltyTransactions({
+            type: input.type,
+            reference_id: input.reference_id,
+        })
+
+        if (existing) {
+            return existing
+        }
+
+        const transaction = await this.createLoyaltyTransactions(input)
+        await this.addPoints(input.customer_id, input.points)
+
+        return transaction
+    }
+
+    async releaseReservation(customerId: string, cartId: string, points: number) {
+        const [reservation] = await this.listLoyaltyTransactions({
+            type: "redemption_reservation",
+            reference_id: cartId,
+        })
+
+        if (!reservation || reservation.status !== "reserved") {
+            return reservation
+        }
+
+        await this.updateLoyaltyTransactions({ id: reservation.id, status: "released" })
+        return await this.recordTransaction({
+            customer_id: customerId,
+            type: "redemption_release",
+            reference_id: cartId,
+            points,
+            status: "released",
+            cart_id: cartId,
+        })
     }
 
     async calculatePointsFromAmount(amount: number): Promise<number> {

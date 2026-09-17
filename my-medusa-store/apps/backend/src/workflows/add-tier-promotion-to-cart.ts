@@ -48,17 +48,27 @@ export const addTierPromotionToCartWorkflow = createWorkflow(
             timeout: 2,
             ttl: 10,
         });
-        const tierPromotionInput = transform({ carts }, ({ carts }) => ({
-            has_account: carts[0].customer!.has_account,
-            tier: {
-                promo_id: carts[0].customer!.tier!.promo_id || null,
-                promotion: {
-                    id: carts[0].customer!.tier!.promotion!.id,
-                    code: carts[0].customer!.tier!.promotion!.code || null,
-                    status: carts[0].customer!.tier!.promotion!.status || null,
-                },
-            },
-        }));
+        const tierPromotionInput = transform({ carts }, ({ carts }) => {
+            const customer = carts[0]?.customer
+            const tier = customer?.tier
+            const promotion = tier?.promotion
+
+            return {
+                has_account: customer?.has_account ?? false,
+                tier: tier
+                    ? {
+                          promo_id: tier.promo_id || null,
+                          promotion: promotion
+                              ? {
+                                    id: promotion.id,
+                                    code: promotion.code || null,
+                                    status: promotion.status || null,
+                                }
+                              : null,
+                      }
+                    : null,
+            }
+        })
 
         const validationResult = when({ carts }, (data) => !!data.carts[0].customer).then(() => {
             return validateTierPromotionStep({

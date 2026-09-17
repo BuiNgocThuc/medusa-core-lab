@@ -11,3 +11,10 @@ export * from "./get-cart-loyalty-promo.ts";
 export * from "./validate-customer-exists.ts";
 export * from "./validate-tier-promotion.ts";
 export * from "./get-cart-loyalty-promo-amount.ts";
+export * from "./mark-order-loyalty-processed";
+export * from "./process-order-loyalty";
+export * from "./validate-tier-promotion-ownership"
+export * from "./reserve-first-purchase"
+export * from "./consume-first-purchase"
+export * from "./reserve-loyalty-points"
+export * from "./release-loyalty-reservation"

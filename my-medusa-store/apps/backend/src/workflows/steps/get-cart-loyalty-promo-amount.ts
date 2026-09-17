@@ -11,6 +11,7 @@ export type GetCartLoyaltyPromoAmountStepInput = {
         customer: CustomerDTO;
         promotions?: PromotionDTO[];
         total: number;
+        points: number;
     };
 };
 
@@ -31,18 +32,16 @@ export const getCartLoyaltyPromoAmountStep = createStep(
         //
         // return new StepResponse(amount);
 
-        const availableDiscount =
-            await loyaltyModuleService.calculateDiscountAmountFromPoints(loyaltyPoints);
+        if (loyaltyPoints < cart.points) {
+            throw new MedusaError(MedusaError.Types.NOT_ALLOWED, "Không đủ điểm tích lũy");
+        }
 
-        const maxCartDiscount =
-            Math.floor(cart.total / LOYALTY_REDEEM_VND_PER_BLOCK) * LOYALTY_REDEEM_VND_PER_BLOCK;
+        const amount = await loyaltyModuleService.calculateDiscountAmountFromPoints(cart.points);
 
-        const amount = Math.min(availableDiscount, maxCartDiscount);
-
-        if (amount <= 0) {
+        if (amount <= 0 || amount > cart.total) {
             throw new MedusaError(
                 MedusaError.Types.INVALID_DATA,
-                "Cart total is too low for a loyalty redemption block",
+                "Số điểm đổi vượt giá trị giỏ hàng",
             );
         }
 

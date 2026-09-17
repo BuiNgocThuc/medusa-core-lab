@@ -7,7 +7,7 @@ import {
     updateCartsStep,
     updatePromotionsStep,
 } from "@medusajs/medusa/core-flows";
-import { getCartLoyaltyPromoStep } from "@/src/workflows/steps";
+import { getCartLoyaltyPromoStep, releaseLoyaltyReservationStep } from "@/src/workflows/steps";
 import { PromotionActions } from "@medusajs/framework/utils";
 import { CartData } from "@/src/utils";
 
@@ -44,6 +44,11 @@ export const removeLoyaltyFromCartWorkflow = createWorkflow(
         const loyaltyPromo = getCartLoyaltyPromoStep({
             cart: carts[0] as unknown as CartData,
             throwErrorOn: "not-found",
+        });
+
+        releaseLoyaltyReservationStep({
+            customer_id: carts[0].customer!.id,
+            cart_id: input.cart_id,
         });
 
         acquireLockStep({

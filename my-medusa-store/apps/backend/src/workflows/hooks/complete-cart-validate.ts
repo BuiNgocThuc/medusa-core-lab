@@ -3,6 +3,10 @@ import { MedusaError, ContainerRegistrationKeys } from "@medusajs/framework/util
 import { FIRST_PURCHASE_PROMOTION_CODE } from "@/src/constant";
 import { CartData, getCartLoyaltyPromotion } from "@/src/utils";
 import { LOYALTY_MODULE, LoyaltyModuleService } from "@/src/modules/loyalty";
+import {
+    PROMOTION_ENTITLEMENT_MODULE,
+    PromotionEntitlementModuleService,
+} from "@/src/modules/promotion-entitlement";
 
 type Query = {
     graph: (query: unknown, options?: unknown) => Promise<any>;
@@ -61,6 +65,8 @@ async function validateFirstPurchasePromotion(
     query: Query,
     promotions: Promotion[],
     customerId?: string | null,
+    cartId?: string,
+    entitlementService?: PromotionEntitlementModuleService,
 ): Promise<void> {
     const hasFirstPurchasePromotion = promotions.some(
         (promotion) => promotion.code === FIRST_PURCHASE_PROMOTION_CODE,
@@ -71,17 +77,13 @@ async function validateFirstPurchasePromotion(
     }
 
     if (!customerId) {
-        throwInvalidPromotion(
-            "First purchase discount can only be applied to carts with a customer",
-        );
+        throwInvalidPromotion("Ưu đãi đơn đầu cần đăng nhập");
     }
 
-    const {
-        data: [customer],
-    } = await query.graph(
+    const { data: customers } = await query.graph(
         {
             entity: "customer",
-            fields: ["id", "has_account", "orders.id"],
+            fields: ["id", "has_account"],
             filters: {
                 id: customerId,
             },
@@ -91,11 +93,23 @@ async function validateFirstPurchasePromotion(
         },
     );
 
-    const hasPreviousOrders = (customer.orders?.length ?? 0) > 0;
+    const customer = customers[0]
+    if (!customer) {
+        throwInvalidPromotion("Cần tài khoản để dùng ưu đãi đơn đầu");
+    }
 
-    if (!customer.has_account || hasPreviousOrders) {
+    const [entitlement] = await entitlementService!.listFirstPurchaseEntitlements({
+        customer_id: customer.id,
+    });
+
+    if (
+        !customer.has_account ||
+        !entitlement ||
+        entitlement.state !== "reserved" ||
+        entitlement.cart_id !== cartId
+    ) {
         throwInvalidPromotion(
-            "First purchase discount can only be applied to customers with an account and no previous orders",
+            "Ưu đãi đơn đầu không hợp lệ cho giỏ hàng này",
         );
     }
 }
@@ -132,17 +146,23 @@ async function validateLoyaltyPoints(
         return;
     }
 
-    const customerLoyaltyPoints = await loyaltyModuleService.getPoints(carts[0].customer!.id);
-    const requiredPoints = await loyaltyModuleService.calculatePointsFromAmount(
+    const requiredPoints = await loyaltyModuleService.calculatePointsFromDiscountAmount(
         loyaltyPromo.application_method!.value as number,
     );
+    const [reservation] = await loyaltyModuleService.listLoyaltyTransactions({
+        type: "redemption_reservation",
+        reference_id: cart_id,
+    });
 
-    if (customerLoyaltyPoints < requiredPoints) {
+    if (
+        !reservation ||
+        reservation.status !== "reserved" ||
+        reservation.customer_id !== carts[0].customer!.id ||
+        -reservation.points !== requiredPoints
+    ) {
         throw new MedusaError(
             MedusaError.Types.INVALID_DATA,
-            `Customer does not have enough loyalty points. Required: ${
-                requiredPoints
-            }, Available: ${customerLoyaltyPoints}`,
+            "Đổi điểm chưa hợp lệ cho giỏ hàng này",
         );
     }
 }
@@ -175,7 +195,16 @@ completeCartWorkflow.hooks.validate(async ({ cart }, { container }) => {
 
     await validateTierPromotions(query, promotions, detailedCart.customer?.tier?.id);
 
-    await validateFirstPurchasePromotion(query, promotions, detailedCart.customer_id);
+    const entitlementService: PromotionEntitlementModuleService = container.resolve(
+        PROMOTION_ENTITLEMENT_MODULE,
+    );
+    await validateFirstPurchasePromotion(
+        query,
+        promotions,
+        detailedCart.customer_id,
+        cart.id,
+        entitlementService,
+    );
 
     const loyaltyModuleService: LoyaltyModuleService = container.resolve(LOYALTY_MODULE);
     await validateLoyaltyPoints(query, cart.id, loyaltyModuleService);

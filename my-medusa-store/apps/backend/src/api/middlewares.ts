@@ -7,6 +7,7 @@ import {
 import { CreateTierSchema, UpdateTierSchema } from "@/src/api/admin/tiers";
 import { createFindParams } from "@medusajs/medusa/api/utils/validators";
 import { NextTierSchema } from "@/src/api/store/customers";
+import { RedeemLoyaltyPointsSchema } from "@/src/api/store/carts/[id]/loyalty-points/validators";
 
 export default defineMiddlewares({
     routes: [
@@ -59,12 +60,33 @@ export default defineMiddlewares({
         {
             matcher: "/store/customers/me/next-tier",
             methods: ["GET"],
-            middlewares: [validateAndTransformQuery(NextTierSchema, {})],
+            middlewares: [
+                authenticate("customer", ["session", "bearer"]),
+                validateAndTransformQuery(NextTierSchema, {}),
+            ],
+        },
+        {
+            matcher: "/store/customers/me/loyalty-points",
+            methods: ["GET"],
+            middlewares: [authenticate("customer", ["session", "bearer"])],
+        },
+        {
+            matcher: "/store/customers/me/cart",
+            methods: ["GET"],
+            middlewares: [authenticate("customer", ["session", "bearer"])],
         },
         // get loyalty points
         {
             matcher: "/store/carts/:id/loyalty-points",
-            methods: ["POST", "DELETE"],
+            methods: ["POST"],
+            middlewares: [
+                authenticate("customer", ["session", "bearer"]),
+                validateAndTransformBody(RedeemLoyaltyPointsSchema),
+            ],
+        },
+        {
+            matcher: "/store/carts/:id/loyalty-points",
+            methods: ["DELETE"],
             middlewares: [authenticate("customer", ["session", "bearer"])],
         },
         //...

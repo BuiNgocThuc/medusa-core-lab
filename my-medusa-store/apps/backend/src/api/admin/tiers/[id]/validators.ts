@@ -1,14 +1,14 @@
 import { z } from "@medusajs/framework/zod";
 
 export const UpdateTierSchema = z.object({
-    name: z.string(),
+    name: z.string().trim().min(1),
     promo_id: z.string().nullable(),
     tier_rules: z.array(
         z.object({
-            min_purchase_value: z.number(),
-            currency_code: z.string(),
+            min_purchase_value: z.number().finite().nonnegative(),
+            currency_code: z.string().trim().length(3).toLowerCase(),
         }),
-    ),
+    ).min(1),
 });
 
 export type UpdateTierInput = z.infer<typeof UpdateTierSchema>;

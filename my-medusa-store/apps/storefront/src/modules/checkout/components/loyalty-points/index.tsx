@@ -22,6 +22,7 @@ const LoyaltyPoints = ({ cart }: LoyaltyPointsProps) => {
         )
     }, [cart])
     const [loyaltyPoints, setLoyaltyPoints] = useState<number | null>(null)
+    const [pointsToRedeem, setPointsToRedeem] = useState(100)
 
     useEffect(() => {
         getLoyaltyPoints().then((points) => {
@@ -35,7 +36,7 @@ const LoyaltyPoints = ({ cart }: LoyaltyPointsProps) => {
     ) => {
         e.preventDefault()
         if (!isLoyaltyPointsPromoApplied) {
-            await applyLoyaltyPointsOnCart()
+            await applyLoyaltyPointsOnCart(pointsToRedeem)
         } else {
             await removeLoyaltyPointsOnCart()
         }
@@ -56,6 +57,17 @@ const LoyaltyPoints = ({ cart }: LoyaltyPointsProps) => {
                 )}
                 {loyaltyPoints !== null && (
                     <div className="flex items-center justify-between my-6 gap-1">
+                        {!isLoyaltyPointsPromoApplied && (
+                            <input
+                                aria-label="Loyalty points to redeem"
+                                className="w-1/4 rounded border p-2"
+                                min={100}
+                                step={100}
+                                type="number"
+                                value={pointsToRedeem}
+                                onChange={(event) => setPointsToRedeem(Number(event.target.value))}
+                            />
+                        )}
                         <Button
                             variant="secondary"
                             className="w-1/2"

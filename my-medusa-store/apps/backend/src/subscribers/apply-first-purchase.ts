@@ -13,5 +13,5 @@ export default async function cartCreatedHandler({
 }
 
 export const config: SubscriberConfig = {
-    event: ["cart.created", "cart.customer_transferred"],
+    event: ["cart.created", "cart.customer_transferred", "cart.updated"],
 };

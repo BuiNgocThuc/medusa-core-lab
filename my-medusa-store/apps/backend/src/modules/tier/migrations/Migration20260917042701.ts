@@ -1,6 +1,6 @@
 import { Migration } from "@medusajs/framework/mikro-orm/migrations";
 
-export class Migration20260916094243 extends Migration {
+export class Migration20260917042701 extends Migration {
 
   override async up(): Promise<void> {
     this.addSql(`alter table if exists "tier_rule" drop constraint if exists "tier_rule_tier_id_currency_code_unique";`);

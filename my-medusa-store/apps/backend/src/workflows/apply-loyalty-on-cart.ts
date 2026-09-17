@@ -12,6 +12,7 @@ import {
     ValidateCustomerExistsStepInput,
     getCartLoyaltyPromoStep,
     getCartLoyaltyPromoAmountStep,
+    reserveLoyaltyPointsStep,
     GetCartLoyaltyPromoAmountStepInput,
 } from "@/src/workflows/steps";
 import { CartData } from "../utils";
@@ -22,6 +23,7 @@ import { CreatePromotionDTO } from "@medusajs/framework/types";
 const APPLY_LOYALTY_ON_CART_WORKFLOW_ID = "apply-loyalty-on-cart";
 type ApplyLoyaltyOnCartWorkflowInput = {
     cart_id: string;
+    points: number;
 };
 
 const fields = [
@@ -59,15 +61,34 @@ export const applyLoyaltyOnCartWorkflow = createWorkflow(
             throwErrorOn: "found",
         });
 
+        const customerLockKey = transform({ carts }, ({ carts }) =>
+            `loyalty-customer-${carts[0].customer!.id}`,
+        );
+
         acquireLockStep({
-            key: input.cart_id,
+            key: customerLockKey,
             timeout: 2,
             ttl: 10,
         });
 
-        const amount = getCartLoyaltyPromoAmountStep({
-            cart: carts[0],
-        } as unknown as GetCartLoyaltyPromoAmountStepInput);
+        const loyaltyAmountInput = transform({ carts }, ({ carts }) => ({
+            cart: {
+                id: carts[0].id,
+                customer: carts[0].customer,
+                promotions: carts[0].promotions,
+                total: carts[0].total,
+                points: input.points,
+            },
+        }));
+        const amount = getCartLoyaltyPromoAmountStep(
+            loyaltyAmountInput as unknown as GetCartLoyaltyPromoAmountStepInput,
+        );
+
+        reserveLoyaltyPointsStep({
+            customer_id: carts[0].customer!.id,
+            cart_id: input.cart_id,
+            points: input.points,
+        });
 
         const promoToCreate = transform(
             {
@@ -159,7 +180,7 @@ export const applyLoyaltyOnCartWorkflow = createWorkflow(
         }).config({ name: "retrieve-cart" });
 
         releaseLockStep({
-            key: input.cart_id,
+            key: customerLockKey,
         });
 
         return new WorkflowResponse(updatedCarts[0]);

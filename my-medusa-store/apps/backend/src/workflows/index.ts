@@ -6,3 +6,4 @@ export * from "./handle-order-points.ts";
 export * from "./add-tier-promotion-to-cart.ts";
 export * from "./apply-loyalty-on-cart.ts";
 export * from "./remove-loyalty-from-cart.ts";
+export * from "./consume-first-purchase-on-order"

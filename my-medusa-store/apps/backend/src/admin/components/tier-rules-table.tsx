@@ -6,6 +6,7 @@ import {
     Container,
 } from "@medusajs/ui";
 import { Tier } from "../routes/tiers/page";
+import { formatCurrencyAmount } from "./currency-amount-input";
 
 type TierRulesTableProps = {
     tierRules: Tier["tier_rules"] | undefined;
@@ -26,6 +27,7 @@ const columns = [
     }),
     columnHelper.accessor("min_purchase_value", {
         header: "Minimum Purchase Value",
+        cell: ({ getValue }) => formatCurrencyAmount(getValue()),
     }),
 ];
 

@@ -30,6 +30,6 @@ export default function medusaError(error: unknown): never {
     } else if (err.request) {
         throw new Error('No response received: ' + String(err.request))
     } else {
-        throw new Error('Error setting up the request: ' + err.message)
+        throw new Error(err.message)
     }
 }

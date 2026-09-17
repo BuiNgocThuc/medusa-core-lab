@@ -481,7 +481,7 @@ export async function listCartOptions() {
     })
 }
 
-export async function applyLoyaltyPointsOnCart() {
+export async function applyLoyaltyPointsOnCart(points: number) {
     const cartId = await getCartId()
     const headers = {
         ...(await getAuthHeaders()),
@@ -495,6 +495,7 @@ export async function applyLoyaltyPointsOnCart() {
         }>(`/store/carts/${cartId}/loyalty-points`, {
             method: 'POST',
             headers,
+            body: { points },
         })
         .then(async (result) => {
             const cartCacheTag = await getCacheTag('carts')

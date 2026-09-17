@@ -1,4 +1,9 @@
-import { createTierRulesStep, deleteTierRulesStep, updateTierStep } from "@/src/workflows/steps";
+import {
+    createTierRulesStep,
+    deleteTierRulesStep,
+    updateTierStep,
+    validateTierPromotionOwnershipStep,
+} from "@/src/workflows/steps";
 import {
     createWorkflow,
     transform,
@@ -44,6 +49,10 @@ export const updateTierWorkflow = createWorkflow(
                     throwIfKeyNotFound: true,
                 },
             }).config({ name: "retrieve-promotion" });
+            validateTierPromotionOwnershipStep({
+                promo_id: input.promo_id!,
+                tier_id: input.id,
+            });
         });
         const promoId = transform({ input }, ({ input }) => input.promo_id || null);
 

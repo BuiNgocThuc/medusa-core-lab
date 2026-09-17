@@ -10,6 +10,12 @@ type PromotionFixture = {
 
 const PROMOTIONS: PromotionFixture[] = [
     {
+        code: "FIRST_PURCHASE",
+        type: "percentage",
+        value: 10,
+        description: "10% off a customer's first purchase",
+    },
+    {
         code: "WELCOME10",
         type: "percentage",
         value: 10,
@@ -79,9 +85,14 @@ export default async function seedPromotions({ container }: ExecArgs) {
     for (const fixture of PROMOTIONS) {
         const [existing] = await promotionModule.listPromotions({
             code: fixture.code,
-        });
+        }, { select: ["id"] });
         if (existing) {
-            logger.info(`[seed:promotions] ${fixture.code} exists — skip`);
+            await promotionModule.updatePromotions({
+                id: existing.id,
+                status: "active",
+                is_automatic: false,
+            });
+            logger.info(`[seed:promotions] ${fixture.code} exists — normalized`);
             continue;
         }
 

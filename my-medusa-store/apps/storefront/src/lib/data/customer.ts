@@ -16,6 +16,7 @@ import {
     removeCartId,
     removePendingCustomer,
     setAuthToken,
+    setCartId,
     setPendingCustomer,
 } from './cookies'
 import { CustomerNextTier } from 'types/tier'
@@ -308,12 +309,25 @@ export async function signout(countryCode: string) {
 
 export async function transferCart() {
     const cartId = await getCartId()
+    const headers = await getAuthHeaders()
+
+    const { cart: customerCart } = await sdk.client.fetch<{
+        cart: { id: string } | null
+    }>('/store/customers/me/cart', {
+        method: 'GET',
+        headers,
+    })
+
+    if (customerCart) {
+        await setCartId(customerCart.id)
+        const cartCacheTag = await getCacheTag('carts')
+        revalidateTag(cartCacheTag)
+        return
+    }
 
     if (!cartId) {
         return
     }
-
-    const headers = await getAuthHeaders()
 
     await sdk.store.cart.transferCart(cartId, {}, headers)
 

@@ -31,6 +31,6 @@ export const createTierRulesStep = createStep(
         }
 
         const tierModuleService = container.resolve(TIER_MODULE);
-        await tierModuleService.deleteTierRules(createdRules.map((r) => r.tier_id));
+        await tierModuleService.deleteTierRules(createdRules.map((rule) => rule.id));
     },
 );

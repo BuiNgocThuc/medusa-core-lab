@@ -5,6 +5,10 @@ import {
     PromotionActions,
 } from "@medusajs/framework/utils";
 import { FIRST_PURCHASE_PROMOTION_CODE } from "@/src/constant";
+import {
+    PROMOTION_ENTITLEMENT_MODULE,
+    PromotionEntitlementModuleService,
+} from "@/src/modules/promotion-entitlement";
 
 type Promotion = {
     id: string;
@@ -29,13 +33,15 @@ function isAddingPromotions(
     return isAddOrReplace && Boolean(promoCodes?.length);
 }
 
-function validateFirstPurchasePromotion(
+async function validateFirstPurchasePromotion(
     promoCodes: string[],
+    cartId: string,
+    entitlementService: PromotionEntitlementModuleService,
     customer?: {
         has_account?: boolean | null;
-        orders?: unknown[] | null;
+        id?: string;
     },
-): void {
+): Promise<void> {
     const hasFirstPurchasePromotion = promoCodes.includes(FIRST_PURCHASE_PROMOTION_CODE);
 
     if (!hasFirstPurchasePromotion) {
@@ -44,15 +50,22 @@ function validateFirstPurchasePromotion(
 
     if (!customer) {
         throwInvalidPromotion(
-            "First purchase discount can only be applied to carts with a customer",
+            "Ưu đãi đơn đầu cần đăng nhập",
         );
     }
 
-    const hasPreviousOrders = (customer.orders?.length ?? 0) > 0;
+    const [entitlement] = await entitlementService.listFirstPurchaseEntitlements({
+        customer_id: customer.id,
+    });
 
-    if (!customer.has_account || hasPreviousOrders) {
+    if (
+        !customer.has_account ||
+        !entitlement ||
+        entitlement.state !== "reserved" ||
+        entitlement.cart_id !== cartId
+    ) {
         throwInvalidPromotion(
-            "First purchase discount can only be applied to customers with an account and no previous orders",
+            "Ưu đãi đơn đầu không hợp lệ cho giỏ hàng này",
         );
     }
 }
@@ -98,7 +111,7 @@ updateCartPromotionsWorkflow.hooks.validate(async ({ input, cart }, { container 
     const customerResult = cart.customer_id
         ? await query.graph({
               entity: "customer",
-              fields: ["id", "has_account", "orders.id", "tier.id"],
+              fields: ["id", "has_account", "tier.id"],
               filters: {
                   id: cart.customer_id,
               },
@@ -107,7 +120,10 @@ updateCartPromotionsWorkflow.hooks.validate(async ({ input, cart }, { container 
 
     const customer = customerResult?.data?.[0];
 
-    validateFirstPurchasePromotion(promoCodes, customer);
+    const entitlementService: PromotionEntitlementModuleService = container.resolve(
+        PROMOTION_ENTITLEMENT_MODULE,
+    );
+    await validateFirstPurchasePromotion(promoCodes, cart.id, entitlementService, customer);
 
     const { data: promotionResults } = await query.graph({
         entity: "promotion",

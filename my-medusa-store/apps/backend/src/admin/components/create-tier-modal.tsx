@@ -6,6 +6,7 @@ import { sdk } from "../lib/sdk";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Tier } from "../routes/tiers/page";
+import { CurrencyAmountInput } from "./currency-amount-input";
 
 type CreateTierFormData = {
     name: string;
@@ -264,16 +265,13 @@ export const CreateTierModal = ({ open, onOpenChange }: CreateTierModalProps) =>
                                                     <Label size="small">
                                                         Minimum Purchase Value
                                                     </Label>
-                                                    <Input
-                                                        type="number"
-                                                        min="0"
-                                                        step="0.01"
+                                                    <CurrencyAmountInput
                                                         value={rule.min_purchase_value}
-                                                        onChange={(e) =>
+                                                        onValueChange={(value) =>
                                                             updateTierRule(
                                                                 index,
                                                                 "min_purchase_value",
-                                                                parseFloat(e.target.value) || 0,
+                                                                value,
                                                             )
                                                         }
                                                     />
