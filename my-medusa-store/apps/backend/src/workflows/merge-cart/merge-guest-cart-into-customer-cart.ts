@@ -1,3 +1,4 @@
+
 import {
   createStep,
   createWorkflow,
@@ -14,7 +15,8 @@ import {
   transferCartCustomerWorkflow,
   useQueryGraphStep,
 } from "@medusajs/medusa/core-flows"
-import { MergeGuestCartInput } from "./types"
+import { MergeGuestCartInput, MergeGuestCartOutput } from "./types"
+import { validateInventoryForMergeStep } from "./steps/validate-inventory-for-merge"
 
 const logStep = createStep(
   "log-step",
@@ -29,7 +31,7 @@ const logStep = createStep(
 
 export const mergeGuestCartIntoCustomerCartWorkflow = createWorkflow(
   "merge-guest-cart-into-customer-cart",
-  (input: WorkflowData<MergeGuestCartInput>) => {
+  (input: WorkflowData<MergeGuestCartInput>): WorkflowResponse<MergeGuestCartOutput> => {
     logStep({
       stage: "Started",
       payload: input,
@@ -52,6 +54,11 @@ export const mergeGuestCartIntoCustomerCartWorkflow = createWorkflow(
         "completed_at",
         "created_at",
         "updated_at",
+        "items.id",
+        "items.title",
+        "items.variant_title",
+        "items.variant_id",
+        "items.quantity",
       ],
     }).config({ name: "get-customer-cart" })
 
@@ -103,15 +110,15 @@ export const mergeGuestCartIntoCustomerCartWorkflow = createWorkflow(
         stage: "Branch: Transfer guest cart completed",
       }).config({ name: "log-transfer-done" })
     })
-    // đảm bảo có compensation ? lock cart guest luôn?
+
     // Nhanh 2: Khach da co Cart A -> Merge line items tu Cart B vao Cart A
-    when("has-customer-cart", { customerCartTransform }, ({ customerCartTransform }) => {
+    const mergeBranchResult = when("has-customer-cart", { customerCartTransform }, ({ customerCartTransform }) => {
       const condition = customerCartTransform !== null
       console.log(`[Workflow: MergeCart] Condition has-customer-cart: ${condition}`)
       return condition
     }).then(() => {
       logStep({
-        stage: "Branch: Merge guest cart items into customer cart (TODO)",
+        stage: "Branch: Merge guest cart items into customer cart",
       }).config({ name: "log-merge-branch" })
 
       acquireLockStep({
@@ -119,7 +126,6 @@ export const mergeGuestCartIntoCustomerCartWorkflow = createWorkflow(
         timeout: 30,
         ttl: 120,
       }).config({ name: "acquire-merge-locks" })
-
 
       const guestCart = useQueryGraphStep({
         entity: "cart",
@@ -133,55 +139,82 @@ export const mergeGuestCartIntoCustomerCartWorkflow = createWorkflow(
           "region_id",
           "sales_channel_id",
           "items.id",
+          "items.title",
+          "items.variant_title",
           "items.variant_id",
           "items.quantity",
           "items.metadata",
         ],
         options: {
-          isList: false, // Core luôn dùng cái này cho 1 cart cụ thể!
+          isList: false,
         },
       }).config({ name: "get-guest-cart" })
 
-
-      const itemsToAdd = transform(
-        { guestCart },
-        ({ guestCart }) => {
-          // Vì có isList: false, guestCart.data là cart trực tiếp
-          const items = guestCart.data?.items ?? []
-
-          // Lọc bỏ item null và item không có variant_id (giống Core filter)
-          return items
+      // Chuan bi input de validate inventory (gom ca Cart A va Cart B)
+      const validationInput = transform(
+        { customerCartTransform, guestCart },
+        ({ customerCartTransform, guestCart }) => {
+          const guestItems = (guestCart.data?.items ?? [])
             .filter((item) => Boolean(item?.variant_id))
             .map((item) => ({
+              id: item!.id,
               variant_id: item!.variant_id!,
               quantity: item!.quantity,
+              title: item!.title,
+              variant_title: item!.variant_title,
               metadata: (item!.metadata as Record<string, unknown>) ?? undefined,
             }))
+
+          const existingItems = (customerCartTransform?.items ?? [])
+            .filter((item: any) => Boolean(item?.variant_id))
+            .map((item: any) => ({
+              id: item.id,
+              variant_id: item.variant_id,
+              quantity: item.quantity,
+              title: item.title,
+              variant_title: item.variant_title,
+            }))
+
+          return {
+            sales_channel_id: customerCartTransform?.sales_channel_id,
+            guest_items: guestItems,
+            existing_items: existingItems,
+          }
         }
       )
 
+      // Validate inventory: tinh tong Cart A + Cart B truoc khi them vao
+      const inventoryValidationResult = validateInventoryForMergeStep(validationInput).config({
+        name: "validate-inventory-for-merge-step",
+      })
+
+      // Chi add vao cart nhung items hop le (valid_items)
       addToCartWorkflow.runAsStep({
         input: {
           cart_id: customerCartTransform.id,
-          items: itemsToAdd,
+          items: inventoryValidationResult.valid_items,
         },
       })
 
-      // 4. Mở khóa cả 2 cart
+      // Mo khoa ca 2 cart
       releaseLockStep({
         key: [customerCartTransform.id, input.guest_cart_id],
       }).config({ name: "release-merge-locks" })
 
-
+      return inventoryValidationResult
     })
 
     const result = transform(
-      { customerCartTransform, input },
-      ({ customerCartTransform, input }) => {
+      { customerCartTransform, input, mergeBranchResult },
+      ({ customerCartTransform, input, mergeBranchResult }) => {
         const finalCartId = customerCartTransform ? customerCartTransform.id : input.guest_cart_id
-        console.log(`[Workflow: MergeCart] Done. Result cart_id: ${finalCartId}`)
+        const skipped_items = (mergeBranchResult as any)?.skipped_items ?? []
+        console.log(
+          `[Workflow: MergeCart] Done. Result cart_id: ${finalCartId}, skipped_items count: ${skipped_items.length}`
+        )
         return {
           cart_id: finalCartId,
+          skipped_items,
         }
       }
     )
