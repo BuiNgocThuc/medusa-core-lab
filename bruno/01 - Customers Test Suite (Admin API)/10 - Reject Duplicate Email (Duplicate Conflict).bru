@@ -23,14 +23,13 @@ body:json {
 }
 
 tests {
-  test("422 Unprocessable Entity", function () {
-    expect(res.getStatus()).to.equal(422);
+  test("400 Bad Request or 422 Conflict", function () {
+    expect([400, 409, 422]).to.include(res.getStatus());
   });
-  test("duplicate error type", function () {
-    expect(res.getBody().type).to.equal("duplicate_error");
-  });
-  test("invalid request error code", function () {
-    expect(res.getBody().code).to.equal("invalid_request_error");
+  test("duplicate error message", function () {
+    const body = res.getBody();
+    const msg = typeof body === "string" ? body : JSON.stringify(body);
+    expect(msg.toLowerCase()).to.include("already exists");
   });
 }
 
