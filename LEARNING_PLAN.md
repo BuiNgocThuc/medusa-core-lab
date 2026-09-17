@@ -2,8 +2,8 @@
 
 > **Muc tieu Trong tam:** Nghien cuu sau ve **Customer Module** trong MedusaJS v2 (v2.20.1). Hieu ro cau truc du lieu mac dinh, co che cach ly (isolation), muc do anh huong (impact) khi tuong tac voi cac module khac (Auth, Order, Cart), ky thuat mo rong qua Metadata / Custom Module + Module Link, va xu ly toan ven du lieu (Data Integrity) giua Guest va Registered Customer khi trien khai Social Login.
 >
-> **Cap nhat lan cuoi:** 2026-09-14
-> **Trang thai:** Dang thuc thi
+> **Cap nhat lan cuoi:** 2026-09-17
+> **Trang thai:** Dang thuc thi (Hoan thanh Task 1, Task 2, Task 3 - San sang Task 4)
 
 ---
 
@@ -121,7 +121,7 @@ Task 8 [Expert]     : Social Login & Multi-Identity Orchestration (OAuth Callbac
 
 #### Task 3 [Medium] - Workflow Hook Customization
 - **Muc tieu:** Xu ly dong bo an toan du lieu bo sung (`additional_data`) vao `metadata` cua khach hang thong qua Workflow Hook voi day du co che kiem soat ranh gioi va transactional rollback.
-- **Trang thai:** Da hoan thanh ma nguon tai `src/workflows/hooks/customer-created.ts` va handler doc lap tai `src/workflows/hooks/handlers/handle-customers-created.ts`; pass 8/8 unit tests tai `src/workflows/hooks/__tests__/handle-customers-created.unit.spec.ts`, pass 2/2 HTTP integration tests tai `integration-tests/http/customer-additional-data.spec.ts`, va pass kiem thu Black-box toan dien qua Bruno API Collection (`bruno/`).
+- **Trang thai:** Da hoan thanh ma nguon tai `src/workflows/hooks/customer-created.ts` va handler doc lap tai `src/workflows/hooks/handlers/handle-customers-created.ts`; pass 8/8 unit tests tai `src/workflows/hooks/__tests__/handle-customers-created.unit.spec.ts`, pass 2/2 HTTP integration tests tai `integration-tests/http/customer-additional-data.spec.ts`, va pass kiem thu Black-box toan dien qua Bruno API Collection (`bruno/` dat 10/10 requests PASS, 27/27 assertions PASS tren live backend port 9000 & DB `medusa_core_lab_db` port 5434).
 - **Kien truc:** Su dung diem neo hook `createCustomersWorkflow.hooks.customersCreated` tu `@medusajs/medusa/core-flows`. Tuyen bo schema dung chung `customerAdditionalDataSchema` tai `src/utils/customer-additional-data.ts` lam Single Source of Truth cho ca Middleware va Hook.
 - **Dac ta:**
   - Tach biet hook handler khoi file dang ky de ho tro unit test truc tiep khong gay side-effect dang ky trung lap.
