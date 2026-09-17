@@ -7,10 +7,10 @@
 - **Workflows:** Su dung he thong Workflow (Saga pattern) cua Medusa cho cac luong logic phuc tap, dam bao tinh nhat quan du lieu (Rollback khi co loi).
 
 ## Technical Decisions
-- **Dockerized Infrastructure:** Su dung `docker-compose` tu build de quan ly rieng re PostgreSQL (port 5433) va Redis (port 6380), thay vi dung dich vu Cloud mac dinh.
+- **Dockerized Infrastructure:** Su dung `docker-compose` de quan ly rieng re PostgreSQL (port 5434 - `medusa_core_lab_db`) va Redis (port 6381 - `medusa_core_lab_redis`), chay Backend tren port 9000 va Storefront tren port 8000.
 - **Package Manager:** Dung `pnpm` workspace chuan.
 - **Custom AI Tooling:** Tich hop `Portable Agent Kit` de bao ve ma nguon (Guard System), cung cap Workflows va quy dinh (Rules) code chuyen biet cho Medusa/Node.js.
-- **AI-Assisted Development Stack:** Ket hop MCP Server (`medusa-docs` cung cap real-time schema/API context) cung Plugin `medusa-dev` (7 skills cung cap code generator, architectural rules va anti-pattern prevention) theo workflow 6 buoc (Think -> Ask -> Code -> Validate -> DB -> Test).
+- **AI-Assisted Development Stack:** Ket hop MCP Server (`medusa_core_lab_db` port 5434, `medusa-docs` schema context) cung Plugin `medusa-dev` (7 skills cung cap code generator, architectural rules va anti-pattern prevention) theo workflow 6 buoc (Think -> Ask -> Code -> Validate -> DB -> Test).
 
 ## Component Relationships & Module Links
 - `Storefront (Next.js)` --> `Backend API (Cong 9000)` (Xac thuc qua Publishable Key).
@@ -31,6 +31,10 @@
   - `has_account` co mat trong `CreateCustomerDTO` nhung hoan toan vang mat trong `UpdateCustomerDTO` va `CustomerUpdatableFields`.
   - Public service `customerModuleService.updateCustomers` khong cho phep cap nhat `has_account`.
   - Do do, viec nang cap Guest tai cho (in-place upgrade) la customization nam ngoai public contract, can thiep entity internal hoac DB truc tiep.
+- **Storefront 2-Step Registration & Actorless Token Pattern:**
+  - *Phase 1 (Identity Creation):* Client goi `POST /auth/customer/emailpass/register` -> Auth Module tao `auth_identity` voi `app_metadata` rong (`customer_id: null`) va cap Actorless JWT token (`allowUnregistered: true`).
+  - *Phase 2 (Customer Creation):* Client gui Actorless JWT kem payload sang `POST /store/customers` -> `createCustomerAccountWorkflow` kiem tra danh tinh, tao ban ghi `customer` va goi `setAuthAppMetadataStep` de ghi `app_metadata.customer_id = customer.id`.
+  - *Phase 3 (Token Refresh):* Client gui token ban dau toi `POST /auth/token/refresh` -> Auth Module doc lai `app_metadata` da cap nhat va cap phat JWT moi chua `actor_id` (`customer_id`) de truy cap cac route yeu cau danh tinh khach hang day du.
 - **Production Account Reconciliation & Order Transfer Pattern:**
   - Khi Guest dang ky tai khoan moi hoac dang nhap lan dau qua Social Auth: He thong tao Registered Customer moi thong qua `createCustomerAccountWorkflow`.
   - Hai ban ghi (Guest va Registered) ton tai song song hop le nho Partial Unique Index.
