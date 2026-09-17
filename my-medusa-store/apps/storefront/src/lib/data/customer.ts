@@ -280,7 +280,7 @@ export async function handleCustomerCartAfterLogin() {
       console.log("go to restore-customer")
       cartResponse = await sdk.client.fetch<{
         cart: { id: string } | null
-      }>("/store/carts/restore-customer", { // ở đây restore-customer đại khái là  tôi muốn tách ra lấy lại cart của customer thay vì gộp chung logic merge, hãy kiễm tra core, nếu core chưa có cung cấp thì hãy lấy list cart, filter lấy cái mới nhất
+      }>("/store/carts/restore-customer", {
         method: "POST",
         headers,
       })
@@ -302,15 +302,6 @@ export async function handleCustomerCartAfterLogin() {
 
 
 }
-
-
-
-
-
-
-
-
-
 
 
 // Confirms a customer's email using the token from the verification link.

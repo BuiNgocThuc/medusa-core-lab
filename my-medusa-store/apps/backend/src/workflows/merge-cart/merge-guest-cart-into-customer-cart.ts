@@ -9,6 +9,7 @@ import {
 } from "@medusajs/framework/workflows-sdk"
 import {
   acquireLockStep,
+  addToCartWorkflow,
   releaseLockStep,
   transferCartCustomerWorkflow,
   useQueryGraphStep,
@@ -102,7 +103,7 @@ export const mergeGuestCartIntoCustomerCartWorkflow = createWorkflow(
         stage: "Branch: Transfer guest cart completed",
       }).config({ name: "log-transfer-done" })
     })
-
+    // đảm bảo có compensation ? lock cart guest luôn?
     // Nhanh 2: Khach da co Cart A -> Merge line items tu Cart B vao Cart A
     when("has-customer-cart", { customerCartTransform }, ({ customerCartTransform }) => {
       const condition = customerCartTransform !== null
@@ -112,6 +113,66 @@ export const mergeGuestCartIntoCustomerCartWorkflow = createWorkflow(
       logStep({
         stage: "Branch: Merge guest cart items into customer cart (TODO)",
       }).config({ name: "log-merge-branch" })
+
+      acquireLockStep({
+        key: [customerCartTransform.id, input.guest_cart_id!],
+        timeout: 30,
+        ttl: 120,
+      }).config({ name: "acquire-merge-locks" })
+
+
+      const guestCart = useQueryGraphStep({
+        entity: "cart",
+        filters: {
+          id: input.guest_cart_id,
+        },
+        fields: [
+          "id",
+          "completed_at",
+          "currency_code",
+          "region_id",
+          "sales_channel_id",
+          "items.id",
+          "items.variant_id",
+          "items.quantity",
+          "items.metadata",
+        ],
+        options: {
+          isList: false, // Core luôn dùng cái này cho 1 cart cụ thể!
+        },
+      }).config({ name: "get-guest-cart" })
+
+
+      const itemsToAdd = transform(
+        { guestCart },
+        ({ guestCart }) => {
+          // Vì có isList: false, guestCart.data là cart trực tiếp
+          const items = guestCart.data?.items ?? []
+
+          // Lọc bỏ item null và item không có variant_id (giống Core filter)
+          return items
+            .filter((item) => Boolean(item?.variant_id))
+            .map((item) => ({
+              variant_id: item!.variant_id!,
+              quantity: item!.quantity,
+              metadata: (item!.metadata as Record<string, unknown>) ?? undefined,
+            }))
+        }
+      )
+
+      addToCartWorkflow.runAsStep({
+        input: {
+          cart_id: customerCartTransform.id,
+          items: itemsToAdd,
+        },
+      })
+
+      // 4. Mở khóa cả 2 cart
+      releaseLockStep({
+        key: [customerCartTransform.id, input.guest_cart_id],
+      }).config({ name: "release-merge-locks" })
+
+
     })
 
     const result = transform(
