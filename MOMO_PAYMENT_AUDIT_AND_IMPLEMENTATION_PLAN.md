@@ -1,12 +1,22 @@
 # MoMo Payment Audit and Implementation Plan
 
-Updated: 2026-09-15
+Updated: 2026-09-17
 
 ## 1. Executive Summary
 
-Repo hiện tại đã có một Bank Transfer provider đúng hướng cho Medusa v2: provider được tách khỏi ledger module, có payment reference riêng, có Medusa standard webhook method, có expiry job và storefront hiển thị thông tin chuyển khoản.
+Repo hiện tại đã có Bank Transfer provider và MoMo provider theo hướng Medusa v2: provider được tách khỏi ledger module, có route webhook chuẩn của Medusa, có expiry/reconciliation job và storefront đã render được Bank Transfer/MoMo trong checkout.
 
-Điểm quan trọng nhất khi thiết kế MoMo: không copy Bank Transfer một cách máy móc. Bank Transfer là offline/asynchronous transfer, còn MoMo là payment gateway redirect/QR/deeplink có create-payment API, IPN, query API và refund API. Redirect URL chỉ dùng để đưa khách quay lại storefront, không được xem là source of truth. Source of truth phải là IPN đã verify signature, hoặc transaction query server-side.
+Điểm quan trọng nhất khi vận hành MoMo: không copy Bank Transfer một cách máy móc. Bank Transfer là offline/asynchronous transfer, còn MoMo là payment gateway redirect/QR/deeplink có create-payment API, IPN, query API và refund API. Redirect URL chỉ dùng để đưa khách quay lại storefront, không được xem là source of truth. Source of truth phải là IPN đã verify signature, hoặc transaction query server-side.
+
+Current MoMo implementation snapshot:
+
+- `my-medusa-store/apps/backend/medusa-config.ts` đăng ký `momo-payment` ledger module luôn, nhưng chỉ đăng ký `momo` payment provider khi đủ `MOMO_PARTNER_CODE`, `MOMO_ACCESS_KEY`, `MOMO_SECRET_KEY`, `MOMO_REDIRECT_URL`, `MOMO_IPN_URL`.
+- Provider id hiệu lực: `pp_momo_default`.
+- Current configured `requestType`: `payWithMethod`. Code type/client vẫn support `captureWallet`, nhưng config đang chạy không dùng `captureWallet` nếu chưa đổi option.
+- Không có automatic mock fallback trong config hiện tại.
+- IPN chuẩn: `POST /hooks/payment/momo_default`.
+- Reconciliation job: `reconcile-momo-payments`, schedule `*/5 * * * *`.
+- Storefront có `MomoDetails`, `MomoPaymentButton`, và `/api/payment-return/momo`; return route hiện chỉ redirect UX về checkout theo `resultCode`, chưa query trusted backend state.
 
 Nguồn chính đã đối chiếu:
 
@@ -19,9 +29,13 @@ Backend config:
 
 - `my-medusa-store/apps/backend/medusa-config.ts`
 - Registers `bank-transfer-payment` module.
+- Registers `momo-payment` module.
 - Registers `@medusajs/medusa/payment` with provider `./src/modules/bank-transfer`, id `default`.
+- Registers `./src/modules/momo`, id `default`, only when required MoMo env vars are present.
 - Effective provider id: `pp_bank-transfer_default`.
+- Effective MoMo provider id: `pp_momo_default`.
 - Bank options come from `BANK_TRANSFER_*`.
+- MoMo options come from `MOMO_*`.
 
 Bank Transfer provider:
 
@@ -50,6 +64,7 @@ Storefront:
 Background jobs:
 
 - `src/jobs/expire-bank-transfer-payments.ts`: runs every 5 minutes and expires pending references.
+- `src/jobs/reconcile-momo-payments.ts`: runs every 5 minutes, queries MoMo for pending/authorized payments, and repairs Medusa payment state when MoMo reports success.
 
 ## 3. Reconstructed Bank Transfer Flow
 
@@ -156,7 +171,7 @@ Recommended fix -> Record every gateway event before returning action.
 
 ## 5. MoMo API Contract
 
-Terminology: cụm “MoMo Banking” không phải tên API chính thức trong phần docs đã kiểm tra. Với ecommerce checkout hiện tại, lựa chọn đang áp dụng là MoMo Wallet one-time payment, tiếng Việt trong docs là “Thanh Toán Ví MoMo / Thanh Toán Thông Thường”, với `requestType: "captureWallet"`.
+Terminology: cụm “MoMo Banking” không phải tên API chính thức trong phần docs đã kiểm tra. Với ecommerce checkout hiện tại, lựa chọn ban đầu là MoMo Wallet one-time payment. Tuy nhiên code mới nhất đang cấu hình `requestType: "payWithMethod"` trong `medusa-config.ts`. Nếu muốn ép đúng flow `captureWallet`, cần đổi option provider và test lại create-payment/IPN với sandbox.
 
 Environment:
 
@@ -169,7 +184,7 @@ Create payment:
 
 - Endpoint: `POST /v2/gateway/api/create`
 - Important request fields: `partnerCode`, `storeId`, `requestId`, `amount`, `orderId`, `orderInfo`, `redirectUrl`, `ipnUrl`, `requestType`, `extraData`, `items`, `userInfo`, `autoCapture`, `lang`, `signature`.
-- Use `requestType = "captureWallet"`.
+- Current config uses `requestType = "payWithMethod"`. `captureWallet` vẫn được type hỗ trợ và có thể bật bằng config nếu business chọn flow ví one-time payment thuần.
 - Signature raw string:
   `accessKey=$accessKey&amount=$amount&extraData=$extraData&ipnUrl=$ipnUrl&orderId=$orderId&orderInfo=$orderInfo&partnerCode=$partnerCode&redirectUrl=$redirectUrl&requestId=$requestId&requestType=$requestType`
 - Response fields include `partnerCode`, `requestId`, `orderId`, `amount`, `responseTime`, `message`, `resultCode`, `payUrl`, `shortLink`.
@@ -217,6 +232,7 @@ Use auto-capture default:
 
 - For ecommerce, prefer `autoCapture: true` unless the business explicitly needs separate authorization/capture. With Medusa's standard webhook path, map IPN `resultCode=0` to `captured` and `resultCode=9000` to `authorized`.
 - Use only `POST /hooks/payment/momo_default` for MoMo IPN.
+- Do not rely on `MOMO_MOCK_ENABLED`; current provider registration ignores it.
 
 ## 7. MoMo Payment Flow
 
@@ -245,6 +261,7 @@ sequenceDiagram
   API->>DB: insert webhook event, mark paid atomically
   API->>API: processPaymentWorkflow authorized/captured
   MoMo-->>C: redirectUrl back to storefront
+  SF->>SF: /api/payment-return/momo redirects to checkout UI
 ```
 
 Failed/cancelled:

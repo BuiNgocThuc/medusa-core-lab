@@ -2,6 +2,19 @@
 
 Tài liệu này giải thích toàn bộ quá trình triển khai Bank Transfer provider cho MedusaJS trong repo này: kiến trúc, các file cần review, luồng checkout, luồng webhook, reconciliation, duplicate transaction, pending authorization và cách test lại từ đầu.
 
+Updated: 2026-09-17
+
+Trạng thái mới nhất:
+
+- Provider id: `pp_bank-transfer_default`.
+- Provider được đăng ký trong `medusa-config.ts` mọi lúc.
+- Ledger module riêng: `bank-transfer-payment`.
+- Webhook duy nhất: `POST /hooks/payment/bank-transfer_default`.
+- Storefront chọn active payment session theo status `pending` hoặc `pending_authorization`.
+- Khi webhook match đúng reference/amount/currency, provider trả Medusa action `authorized`.
+- Bank Transfer hiện không auto-capture trong provider; nếu business muốn capture tự động sau khi tiền về, nên thêm workflow/job riêng sau authorization.
+- Job `expire-bank-transfer-payments` chạy mỗi 5 phút để expire reference đang `pending`.
+
 ## 0. Plan sửa sau khi đối chiếu Medusa docs
 
 Sau khi đối chiếu với tài liệu Payment Provider của Medusa, các chỉnh sửa cần làm là:
@@ -129,6 +142,7 @@ Ghi chú:
 - Nếu `BANK_TRANSFER_WEBHOOK_SECRET` có giá trị, webhook phải gửi header `x-bank-signature` đúng bằng secret đó.
 - Nếu secret rỗng, webhook route cho phép gọi không cần signature để tiện dev.
 - Không commit secret thật. File `.env` hiện có giá trị thật-looking như S3/Cloudflare; nếu repo từng được share hoặc commit public thì nên rotate key.
+- Local Docker publish PostgreSQL ở `localhost:5434`, nên `DATABASE_URL` local phải dùng port `5434` nếu dùng compose của repo.
 
 ## 5. Provider id và cách Medusa nhìn thấy provider
 
@@ -164,6 +178,8 @@ pp_bank-transfer_default
 ```
 
 cho mọi region có `currency_code = vnd`.
+
+Nếu sau khi chạy script checkout vẫn không thấy Bank Transfer, kiểm tra cart đang dùng đúng VND region và restart backend/storefront để clear state cũ.
 
 ## 6.1. Mức độ bám Medusa docs sau khi chỉnh
 
@@ -731,7 +747,7 @@ order status = pending
 10. Gửi webhook matched bằng route chuẩn Medusa để test authorization:
 
 ```bash
-curl -X POST "http://localhost:9101/hooks/payment/bank-transfer_default" \
+curl -X POST "http://localhost:9001/hooks/payment/bank-transfer_default" \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "evt_bank_manual_001",
@@ -797,7 +813,7 @@ Expected:
 
 ## 14. Kết quả full-flow test đã chạy
 
-Test backend API-only trên port `9101`, không đụng process đang giữ port `9001`.
+Test backend API-only này từng chạy trên port `9101` vì lúc đó port `9001` đang bận. Khi chạy theo onboarding mới, dùng port mặc định `9001` và đổi URL webhook tương ứng.
 
 Kết quả:
 

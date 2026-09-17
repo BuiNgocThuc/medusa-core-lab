@@ -370,9 +370,9 @@ class MomoPaymentProviderService extends AbstractPaymentProvider<MomoProviderOpt
       const data =
         result.payment_session_id && result.amount
           ? {
-              session_id: result.payment_session_id,
-              amount: result.amount,
-            }
+            session_id: result.payment_session_id,
+            amount: result.amount,
+          }
           : undefined
 
       return {
@@ -493,7 +493,7 @@ class MomoPaymentProviderService extends AbstractPaymentProvider<MomoProviderOpt
     const expiresAt = new Date()
     expiresAt.setMinutes(
       expiresAt.getMinutes() +
-        (this.options_.orderExpireTimeMinutes ?? DEFAULT_EXPIRE_MINUTES)
+      (this.options_.orderExpireTimeMinutes ?? DEFAULT_EXPIRE_MINUTES)
     )
 
     return expiresAt

@@ -1,10 +1,22 @@
 # MoMo Payment Implementation Guide
 
-Updated: 2026-09-15
+Updated: 2026-09-17
 
 ## 1. Overview
 
 This repo now includes an initial MoMo payment integration for MedusaJS v2. It is implemented beside the existing Bank Transfer provider, not on top of it.
+
+Current implementation status as of 2026-09-17:
+
+- Backend has `momo` payment provider and `momo-payment` ledger module.
+- Provider id is `pp_momo_default`.
+- Provider is registered only when all required real MoMo variables are present: `MOMO_PARTNER_CODE`, `MOMO_ACCESS_KEY`, `MOMO_SECRET_KEY`, `MOMO_REDIRECT_URL`, `MOMO_IPN_URL`.
+- Current configured `requestType` in `medusa-config.ts` is `payWithMethod`. The code types still support `captureWallet`, but the running config is not `captureWallet` unless changed in provider options.
+- There is no automatic mock provider fallback in `medusa-config.ts`.
+- Storefront redirects customer to `pay_url`/`short_link`, or mobile `deeplink`, from the active MoMo payment session.
+- `/api/payment-return/momo` is currently UX routing only; it redirects back to checkout based on `resultCode`. It does not query trusted backend payment state yet.
+- Standard MoMo IPN path is `POST /hooks/payment/momo_default`.
+- `reconcile-momo-payments` runs every 5 minutes and can repair successful MoMo payments by querying MoMo.
 
 MoMo is treated as a payment gateway flow:
 
@@ -50,23 +62,15 @@ Storefront:
 
 ## 3. Environment Variables
 
-Personal demo mock mode:
+Personal demo without MoMo credentials:
 
-```bash
-MOMO_MOCK_ENABLED=true
-MOMO_REDIRECT_URL=http://localhost:8000/api/payment-return/momo
-MOMO_IPN_URL=http://localhost:9001/hooks/payment/momo_default
-MOMO_AUTO_CAPTURE=true
-MOMO_LANG=vi
-MOMO_ORDER_EXPIRE_MINUTES=15
-```
+There is currently no working mock provider fallback in `medusa-config.ts`. Leave MoMo credentials empty so the backend does not register `pp_momo_default`, and use `pp_system_default` or Bank Transfer for local checkout demos.
 
-In mock mode, the provider registers `pp_momo_default` and `createPayment()` returns a fake local MoMo payment URL without calling MoMo's network APIs. This is the recommended path for a personal demo without a business merchant account.
+Do not copy placeholder values like `<your-momo-partner-code>` into a real `.env` and leave them there. The current config checks whether variables are non-empty, so placeholders make the app try to register and call MoMo with invalid credentials.
 
 Development/sandbox with real MoMo credentials:
 
 ```bash
-MOMO_MOCK_ENABLED=false
 MOMO_ENDPOINT=https://test-payment.momo.vn
 MOMO_PARTNER_CODE=<sandbox-partner-code>
 MOMO_ACCESS_KEY=<sandbox-access-key>
@@ -91,17 +95,17 @@ MOMO_REDIRECT_URL=https://<production-storefront>/api/payment-return/momo
 MOMO_IPN_URL=https://<production-backend>/hooks/payment/momo_default
 ```
 
-The provider is registered when `MOMO_MOCK_ENABLED=true` or when all required real MoMo variables are present.
+The provider is registered when all required real MoMo variables are present.
 
 ## 4. Provider Registration
 
 `medusa-config.ts` registers:
 
 - Ledger module: `./src/modules/momo-payment`
-- Payment provider: `./src/modules/momo`
+- Payment provider: `./src/modules/momo`, only when required MoMo env vars are non-empty.
 - Provider id: `pp_momo_default`
 
-Enable the provider for VND regions:
+Enable the provider for VND regions after credentials are configured and backend has been restarted:
 
 ```bash
 cd my-medusa-store
@@ -112,7 +116,7 @@ pnpm --filter @dtc/backend exec medusa exec ./src/migration-scripts/enable-momo-
 
 `momo_payment` stores the gateway order/request and Medusa payment session mapping.
 
-For `captureWallet`, it also stores wallet-specific fields such as `deeplink_mini_app`, `user_fee`, `payment_option`, and `order_type`.
+It also stores wallet/gateway fields such as `deeplink_mini_app`, `user_fee`, `payment_option`, and `order_type` when MoMo returns them.
 
 Important uniqueness:
 
@@ -139,9 +143,10 @@ Important uniqueness:
 1. Storefront lists payment providers from Medusa.
 2. Customer selects `pp_momo_default`.
 3. Storefront initiates a payment session.
-4. Backend provider calls MoMo `POST /v2/gateway/api/create` with `requestType=captureWallet`.
-5. Provider returns `pay_url` / `short_link` in payment session data.
-6. Storefront button redirects the customer to MoMo.
+4. Backend provider calls MoMo `POST /v2/gateway/api/create` with the configured `requestType`. Current config uses `payWithMethod`.
+5. Provider returns `pay_url`, `short_link`, `deeplink`, `qr_code_url`, gateway ids and expiry in payment session data.
+6. Checkout shows amount/expiry/method, then review shows `Pay with MoMo`.
+7. Storefront button chooses mobile `deeplink` when possible, otherwise `pay_url`/`short_link`, and appends `cart_id`/`country_code` to the URL for return context.
 
 ## 7. IPN Flow
 
@@ -160,7 +165,7 @@ Medusa resolves the provider from the path and calls `MomoPaymentProviderService
 5. Records webhook event in `momo_webhook_event`.
 6. Matches `orderId`, `requestId`, and `amount` against `momo_payment`.
 7. Marks the ledger as `paid`, `authorized`, `pending`, `failed`, or `manual_review`.
-8. Returns a Medusa webhook action. `resultCode=0` maps to `captured`, `resultCode=9000` maps to `authorized`, failed final result codes map to `failed`, and pending or unknown states map to `not_supported`.
+8. Returns a Medusa webhook action. `resultCode=0` maps to `captured`, `resultCode=9000` maps to `authorized`, failed final result codes map to `failed`, and pending/duplicate/manual-review states map to `not_supported`.
 
 Duplicate IPNs are acknowledged and do not trigger duplicate workflow processing.
 
@@ -198,7 +203,7 @@ Schedule:
 */5 * * * *
 ```
 
-It queries pending MoMo payments using `POST /v2/gateway/api/query`. If MoMo reports success with a `transId`, the job records a query-derived event and repairs Medusa payment state by running `authorized` and `captured`.
+It queries `initiated`, `pending`, and `authorized` MoMo payments using `POST /v2/gateway/api/query`. If MoMo reports success with a `transId`, the job records a query-derived event and repairs Medusa payment state by running `authorized` and `captured`.
 
 ## 10. Refund
 
@@ -247,7 +252,7 @@ https://<storefront-public-url>/api/payment-return/momo
 pnpm --filter @dtc/backend exec medusa db:migrate
 ```
 
-7. Enable provider:
+7. Enable provider only after all required MoMo env vars are set:
 
 ```bash
 pnpm --filter @dtc/backend exec medusa exec ./src/migration-scripts/enable-momo-provider.ts
@@ -255,7 +260,7 @@ pnpm --filter @dtc/backend exec medusa exec ./src/migration-scripts/enable-momo-
 
 8. Start backend and storefront.
 
-For local mock mode, no public tunnel is required.
+There is no local MoMo mock mode in the current backend config. For real sandbox testing, a public HTTPS backend URL is required for IPN.
 
 ## 12. Manual Sandbox Test
 

@@ -1,12 +1,12 @@
 # MoMo Capture Wallet Flow Plan
 
-Updated: 2026-09-15
+Updated: 2026-09-17
 
 Official API: https://developers.momo.vn/v3/vi/docs/payment/api/wallet/onetime/
 
 ## 1. Goal
 
-Implement MoMo Wallet one-time payment for MedusaJS using:
+Original target was MoMo Wallet one-time payment for MedusaJS using:
 
 ```text
 Thanh Toán Ví MoMo
@@ -18,15 +18,19 @@ Thanh Toán Ví MoMo
 Execution modes:
 
 ```text
-Development
-├── Real credentials available → Real MoMo
-└── Credentials unavailable → Automatic Mock MoMo
-
-Production
-└── Real credentials REQUIRED → Never auto-fallback to mock
+Current code
+├── Real credentials complete → Register pp_momo_default and call real MoMo
+└── Credentials missing/empty → Do not register pp_momo_default
 ```
 
 > Browser redirect is UX only. Payment success must be confirmed server-side through MoMo IPN or transaction-status reconciliation.
+
+Current implementation note:
+
+- `medusa-config.ts` currently passes `requestType: "payWithMethod"`, not `captureWallet`.
+- `MomoProviderOptions` and `MomoClient` support both `captureWallet` and `payWithMethod`.
+- There is no automatic mock fallback in the current config.
+- Keep this document as the capture-wallet target/decision record; use `MOMO_PAYMENT_IMPLEMENTATION_GUIDE.md` for the exact running implementation.
 
 ## 2. Current Problem
 
@@ -117,8 +121,8 @@ sequenceDiagram
     alt Real MoMo mode
         MP->>MOMO: POST /v2/gateway/api/create
         MOMO-->>MP: payUrl + deeplink + qrCodeUrl
-    else Development Mock Mode
-        MP->>MP: Generate mock payment response
+    else Credentials missing
+        MP-->>PM: Provider not registered
     end
 
     MP->>DB: Save momo_payment = pending
@@ -263,13 +267,7 @@ Duplicate IPN must never produce a second capture. Do not use in-memory state fo
 
 ## 13. Development Mode Strategy
 
-Previous behavior required:
-
-```bash
-MOMO_MOCK_ENABLED=true
-```
-
-New behavior:
+Previous target behavior:
 
 ```text
 NODE_ENV != production
@@ -277,9 +275,19 @@ AND real credentials missing
 → Automatically enable Mock MoMo
 ```
 
-Therefore local development does not require explicitly setting `MOMO_MOCK_ENABLED=true`.
+Current code behavior:
 
-## 14. Environment Resolution
+```text
+Required MoMo env missing
+→ pp_momo_default is not registered
+→ use Bank Transfer or Manual Payment for local demos
+```
+
+Therefore local development requires real sandbox credentials for MoMo checkout. `MOMO_MOCK_ENABLED` appears in `.env.template`, but is not used by current provider registration.
+
+## 14. Planned Environment Resolution
+
+The following resolution logic is a proposed future improvement, not the current repo behavior. Current behavior only registers MoMo when all required real credentials and URLs are present.
 
 ```text
 Application starts
@@ -335,23 +343,20 @@ MOMO_LANG=vi
 MOMO_ORDER_EXPIRE_MINUTES=15
 ```
 
-Expected:
+Expected with current code:
 
 ```text
 NODE_ENV=development
 credentials missing
-MOMO_MOCK_ENABLED unset
-→ Mock automatically enabled
+→ MoMo provider not registered
 ```
 
-Developers may still explicitly set `MOMO_MOCK_ENABLED=true` for deterministic tests, demos, frontend work, or CI.
+Developers should not expect `MOMO_MOCK_ENABLED=true` to register MoMo until mock support is implemented in code.
 
 ## 16. Real Sandbox
 
 ```bash
 NODE_ENV=development
-MOMO_MOCK_ENABLED=false
-
 MOMO_PARTNER_CODE=<sandbox-partner-code>
 MOMO_ACCESS_KEY=<sandbox-access-key>
 MOMO_SECRET_KEY=<sandbox-secret-key>
@@ -390,7 +395,9 @@ MOMO_IPN_URL=https://api.example.com/hooks/payment/momo_default
 
 Secrets must come from deployment secret management, not source control.
 
-## 18. Mock Payment Flow
+## 18. Planned Mock Payment Flow
+
+This section is backlog/design, not implemented in the current source.
 
 Mock only the external MoMo boundary:
 
@@ -411,7 +418,9 @@ Select MoMo
 
 Avoid mocking the entire business flow.
 
-## 19. Mock Payment Page
+## 19. Planned Mock Payment Page
+
+This section is backlog/design, not implemented in the current source.
 
 Development-only simulator:
 
@@ -493,12 +502,12 @@ momo_payment=pending
 → update Medusa
 ```
 
-Mock mode should optionally simulate missing IPN followed by reconciliation.
+Future mock mode should optionally simulate missing IPN followed by reconciliation. Current code does not implement mock mode.
 
 ## 23. Required Code Changes
 
 Backend types:
-- Ensure `captureWallet`.
+- Decide whether production should use current `payWithMethod` or switch config to `captureWallet`.
 - Support `payUrl`, `deeplink`, `qrCodeUrl`, `deeplinkMiniApp`, signature and required IPN fields.
 
 MoMo client:
@@ -506,7 +515,7 @@ MoMo client:
 - `queryPayment()`
 - `refundPayment()`
 - `verifySignature()`
-- Production real-only; development supports explicit/automatic mock.
+- Current code is real-only when credentials are configured; explicit/automatic mock is backlog.
 
 Provider:
 - Generate `orderId` and `requestId`.
@@ -544,13 +553,11 @@ Storefront:
 ## 24. Test Plan
 
 Unit:
-- `captureWallet` request.
+- Configured request type, currently `payWithMethod`; add `captureWallet` tests if switching flow.
 - Create/IPN signatures.
 - Invalid signature rejection.
-- Mock response shape.
 - Production fails on missing credentials.
-- Development auto-mocks when credentials are absent.
-- Explicit mock override.
+- Development without credentials does not register provider.
 - Real mode when credentials exist.
 
 Storefront:
@@ -571,7 +578,7 @@ Integration:
 - Missing IPN can be reconciled.
 - Refund uses original transaction identity where required.
 
-Mock E2E:
+Future Mock E2E:
 
 ```text
 Checkout
@@ -590,10 +597,10 @@ Also test failure, cancel, duplicate IPN, delayed IPN and missing IPN.
 
 ## 25. Implementation Order
 
-1. Verify current `captureWallet` client/types.
+1. Decide and verify final MoMo `requestType`.
 2. Finalize environment mode resolution.
 3. Add production fail-fast credential validation.
-4. Make mock client mirror real create-payment response.
+4. Add mock client only if local MoMo demo remains a requirement.
 5. Verify pending ledger persistence.
 6. Remove debug metadata from customer-facing payment UI.
 7. Keep payment-session initialization on MoMo selection.
@@ -607,13 +614,13 @@ Also test failure, cancel, duplicate IPN, delayed IPN and missing IPN.
 15. Verify standard IPN route.
 16. Verify signature + amount + request/order identity.
 17. Verify persistent idempotency.
-18. Add mock payment simulator.
-19. Make simulator exercise normal IPN/payment processing.
+18. Add mock payment simulator if needed.
+19. Make simulator exercise normal IPN/payment processing if needed.
 20. Verify reconciliation.
 21. Verify refund.
 22. Add unit tests.
 23. Add integration tests.
-24. Run mock E2E.
+24. Run mock E2E if mock is implemented.
 25. Run real sandbox E2E when credentials are available.
 26. Update implementation docs.
 27. Prepare production security/config checklist.
@@ -621,7 +628,7 @@ Also test failure, cancel, duplicate IPN, delayed IPN and missing IPN.
 
 ## 26. Definition of Done
 
-- [ ] `captureWallet` is used.
+- [ ] Final `requestType` is explicit and tested.
 - [ ] Selecting MoMo creates/updates payment session.
 - [ ] Selecting MoMo does not imply payment success.
 - [ ] Customer UI hides unnecessary debug IDs.
@@ -635,8 +642,7 @@ Also test failure, cancel, duplicate IPN, delayed IPN and missing IPN.
 - [ ] Duplicate IPN cannot double-capture.
 - [ ] Ledger is persistent/auditable.
 - [ ] Missing/delayed IPN has reconciliation.
-- [ ] Development auto-mocks without credentials.
-- [ ] Explicit mock override works.
+- [ ] Development without credentials behaves intentionally: either no provider registered or a real mock provider is implemented.
 - [ ] Production never auto-mocks.
 - [ ] Production fails fast without credentials.
 - [ ] Mock simulator exercises normal internal processing.

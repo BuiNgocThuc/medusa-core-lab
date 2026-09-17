@@ -1,12 +1,12 @@
 # MoMo Payment Demo Script
 
-Updated: 2026-09-15
+Updated: 2026-09-17
 
 ## 1. Demo Message
 
 Short version:
 
-> Đây là demo MoMo Payment cho Medusa. Khách chọn MoMo ở checkout, backend tạo một payment session và một MoMo one-time payment request theo flow `captureWallet`. Khách bấm Pay with MoMo để đi sang MoMo. Kết quả thanh toán thật phải được xác nhận qua server-side IPN tại route chuẩn của Medusa: `/hooks/payment/momo_default`.
+> Đây là demo MoMo Payment cho Medusa. Khách chọn MoMo ở checkout, backend tạo một payment session và một MoMo payment request với `requestType` đang cấu hình là `payWithMethod`. Khách bấm Pay with MoMo để đi sang MoMo. Kết quả thanh toán thật phải được xác nhận qua server-side IPN tại route chuẩn của Medusa: `/hooks/payment/momo_default`.
 
 Important point:
 
@@ -14,39 +14,15 @@ Important point:
 
 ## 2. Demo Modes
 
-### Mock Mode
+### No-Credential Local Mode
 
-Dùng khi dev cá nhân không có MoMo merchant credentials.
-
-```bash
-MOMO_MOCK_ENABLED=true
-MOMO_REDIRECT_URL=http://localhost:8000/api/payment-return/momo
-MOMO_IPN_URL=http://localhost:9001/hooks/payment/momo_default
-MOMO_AUTO_CAPTURE=true
-MOMO_LANG=vi
-MOMO_ORDER_EXPIRE_MINUTES=15
-```
-
-Mock mode chứng minh được:
-
-- `pp_momo_default` được register và enable trong region.
-- Storefront hiển thị MoMo trong checkout.
-- Backend tạo `momo_payment` ledger.
-- MoMo session có fake `payUrl`, `deeplink`, `qrCodeUrl`.
-- Khách đi qua flow redirect UX.
-
-Mock mode không chứng minh được:
-
-- MoMo app sandbox thật.
-- IPN thật từ MoMo.
-- Refund thật.
+Code hiện tại không có mock MoMo provider tự động. Khi thiếu credentials thật, `pp_momo_default` không được register. Với demo cá nhân chưa có MoMo merchant/sandbox, dùng `pp_system_default` hoặc Bank Transfer để demo checkout, còn MoMo chỉ demo được ở mức đọc code/tài liệu.
 
 ### Real Sandbox Mode
 
 Dùng khi có MoMo sandbox credentials:
 
 ```bash
-MOMO_MOCK_ENABLED=false
 MOMO_ENDPOINT=https://test-payment.momo.vn
 MOMO_PARTNER_CODE=<sandbox-partner-code>
 MOMO_ACCESS_KEY=<sandbox-access-key>
@@ -84,6 +60,8 @@ Expected log:
 ```text
 [momo] Enabled pp_momo_default for 1 VND region(s).
 ```
+
+Nếu script báo thiếu env, đó là đúng: cần đủ `MOMO_PARTNER_CODE`, `MOMO_ACCESS_KEY`, `MOMO_SECRET_KEY`, `MOMO_REDIRECT_URL`, `MOMO_IPN_URL`, restart backend rồi chạy lại script.
 
 Start backend:
 
@@ -158,7 +136,7 @@ Payment
 
 Talking point:
 
-> Khi chọn MoMo, frontend gọi Store API để initiate payment session. Backend provider tạo `momo_order_id`, `request_id`, ký request MoMo, rồi nhận về `payUrl`. Trong mock mode, phần gọi MoMo thật được thay bằng fake response local.
+> Khi chọn MoMo, frontend gọi Store API để initiate payment session. Backend provider tạo `momo_order_id`, `request_id`, ký request MoMo, rồi gọi MoMo create API để nhận `payUrl`/`deeplink`.
 
 Expected DB:
 
@@ -182,7 +160,7 @@ Expected behavior:
 
 - Desktop opens `payUrl`.
 - Mobile opens `deeplink` if available.
-- Mock mode redirects to local return route.
+- MoMo redirects back to the configured return route after payment UX.
 
 Talking point:
 
@@ -204,7 +182,7 @@ Important caveat:
 
 Expected current behavior:
 
-- In mock mode, browser returns to checkout review.
+- Browser returns to checkout review when MoMo redirect contains `resultCode=0`.
 - You may still need to complete order flow after implementing trusted-state return handling.
 
 ## 8. Demo Flow D - Standard MoMo Webhook
@@ -321,13 +299,13 @@ Schedule:
 
 Talking point:
 
-> Nếu IPN bị mất hoặc backend crash giữa đường, reconciliation query sẽ hỏi lại MoMo transaction status. Trong mock mode, query trả success fake để chứng minh repair path.
+> Nếu IPN bị mất hoặc backend crash giữa đường, reconciliation query sẽ hỏi lại MoMo transaction status. Current code query real MoMo khi credentials đầy đủ; mock reconciliation chưa được implement.
 
 Expected:
 
 ```text
 pending momo_payment
-→ query MoMo/mock
+→ query MoMo
 → paid if gateway reports success
 → Medusa payment workflow repaired
 ```
@@ -422,13 +400,17 @@ What this demo proves:
 
 - MoMo provider can be registered in Medusa.
 - Storefront can select MoMo.
-- Provider creates a `captureWallet` payment session.
+- Provider creates a MoMo payment session with current configured `requestType=payWithMethod`.
 - Ledger stores MoMo order/request/payment state.
 - Standard Medusa webhook path is the integration point.
-- Mock mode lets personal developers demo without merchant credentials.
 
 What still needs real sandbox credentials:
 
 - Real MoMo app payment.
 - Real IPN from MoMo.
 - Real refund behavior.
+
+What is not implemented yet:
+
+- Local mock MoMo provider/simulator.
+- Trusted backend status query in the return route.

@@ -2,6 +2,8 @@
 
 Tài liệu này là kịch bản demo Bank Transfer cho sếp hoặc stakeholder không cần đọc sâu code. Mục tiêu là cho thấy khách có thể đặt hàng bằng chuyển khoản ngân hàng, hệ thống sinh mã tham chiếu riêng, nhận webhook giao dịch, tự đối soát và cập nhật payment/order.
 
+Updated: 2026-09-17
+
 ## 1. Thông điệp chính khi mở demo
 
 Nói ngắn gọn:
@@ -25,7 +27,7 @@ Sau demo, người xem cần hiểu được 5 thứ:
 3. Order được tạo ở trạng thái chờ thanh toán.
 4. Webhook bank gửi giao dịch về backend.
 5. Backend tự xử lý:
-   - đúng tiền -> matched -> payment confirmed/captured
+   - đúng tiền -> matched -> payment authorized
    - trùng transaction -> duplicate
    - sai reference -> unmatched
    - dư/thiếu tiền -> manual review
@@ -77,7 +79,7 @@ PORT=9101 MEDUSA_ADMIN_DISABLED=true pnpm --filter @dtc/backend start
 Trong tài liệu này mặc định backend demo là:
 
 ```text
-http://localhost:9101
+http://localhost:9001
 ```
 
 Nếu bạn chạy port khác, đổi URL trong các command webhook.
@@ -164,7 +166,7 @@ Copy amount đúng từ UI. Ví dụ:
 Demo dùng route chuẩn của Medusa:
 
 ```bash
-curl -X POST "http://localhost:9101/hooks/payment/bank-transfer_default" \
+curl -X POST "http://localhost:9001/hooks/payment/bank-transfer_default" \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "evt_demo_success_001",
@@ -210,6 +212,7 @@ bank_webhook_event   -> processed
 bank_transaction     -> matched
 bank_payment_reference -> matched
 payment authorized   -> true
+payment captured     -> false, trừ khi có workflow/job capture riêng
 ```
 
 ## 6. Demo Flow C - Gửi lại cùng transaction để chứng minh idempotency
@@ -238,7 +241,7 @@ Lời thoại:
 Gửi một webhook với reference không tồn tại:
 
 ```bash
-curl -X POST "http://localhost:9101/hooks/payment/bank-transfer_default" \
+curl -X POST "http://localhost:9001/hooks/payment/bank-transfer_default" \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "evt_demo_unmatched_001",
@@ -272,7 +275,7 @@ Dùng reference mới còn pending, rồi gửi amount nhỏ hơn hoặc lớn h
 Underpaid:
 
 ```bash
-curl -X POST "http://localhost:9101/hooks/payment/bank-transfer_default" \
+curl -X POST "http://localhost:9001/hooks/payment/bank-transfer_default" \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "evt_demo_underpaid_001",
@@ -296,7 +299,7 @@ Expected:
 Overpaid:
 
 ```bash
-curl -X POST "http://localhost:9101/hooks/payment/bank-transfer_default" \
+curl -X POST "http://localhost:9001/hooks/payment/bank-transfer_default" \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "evt_demo_overpaid_001",
@@ -326,7 +329,7 @@ Lời thoại:
 Nếu muốn nói về mức độ bám docs Medusa, demo thêm route chuẩn:
 
 ```bash
-curl -X POST "http://localhost:9101/hooks/payment/bank-transfer_default" \
+curl -X POST "http://localhost:9001/hooks/payment/bank-transfer_default" \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "evt_demo_standard_001",
@@ -397,7 +400,7 @@ order by created_at desc
 limit 20;
 ```
 
-Kiểm tra payment đã capture:
+Kiểm tra payment/capture:
 
 ```sql
 select
@@ -410,6 +413,8 @@ from payment
 order by created_at desc
 limit 10;
 ```
+
+Ghi chú: webhook Bank Transfer hiện trả action `authorized`, không auto-capture. `captured_at` chỉ có giá trị nếu đã có workflow/job/admin action capture riêng.
 
 ## 11. Câu trả lời cho các câu hỏi sếp có thể hỏi
 
@@ -431,7 +436,7 @@ Giao dịch vào `underpaid` hoặc `overpaid`. Hệ thống không auto capture
 
 ### Nếu ngân hàng gửi webhook lặp lại?
 
-Hệ thống dùng `transaction_id` unique để phát hiện `duplicate`, không capture hai lần.
+Hệ thống dùng `transaction_id` unique để phát hiện `duplicate`, không authorize/capture hai lần.
 
 ### Có an toàn để lên production chưa?
 
