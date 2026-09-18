@@ -158,6 +158,7 @@ Task 8 [Expert]     : Social Login & Multi-Identity Orchestration (OAuth Callbac
   - Compensation Step 3: Atomic decrement dung so diem (delta) ma execution nay da cong.
   - Compensation Step 2: Delete / reverse ban ghi claim do execution nay tao ra.
 - *(Luu y kien truc: Trong production, mot thiet ke chat che hon nua la gop tao ledger va cap nhat balance vao cung mot SQL transaction noi bo cua Loyalty Module, sau do dung Saga cho cac thao tac xuyen module).*
+- **Mo rong (Customer Deletion & Cleanup):** Xay dung workflow/hook don dep `LoyaltyAccount` va ban ghi Module Link tuong ung khi xoa `Customer` de khac phuc gioi han khong tu dong cascade cua core `deleteCustomersWorkflow` (da duoc xac dinh tu Task 5).
 
 #### Task 7 [Hard] - Account Reconciliation & Order Transfer
 - **Muc tieu:** Nam vung co che quan ly Customer khi Guest dang ky tai khoan, chuyen don hang an toan theo kien truc Medusa chuan, va danh gia gioi han cua in-place upgrade.
