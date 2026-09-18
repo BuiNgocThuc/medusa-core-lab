@@ -8,87 +8,104 @@ Define the complete execution sequence when the authenticated customer already h
 
 ## 1. Preconditions
 
-- Cart A exists and belongs to `customer_id`.
-- Cart B exists and is uncompleted.
-- Both carts passed initial validation (see [04-cart-validation.md](./04-cart-validation.md)).
+- Customer Cart A exists, is active, and is distinct from `guest_cart_id`.
+- Guest Cart B exists and is active.
+- Customer is authenticated.
 
 ---
 
-## 2. Merge Path Flow
+## 2. Execution Sequence Diagram
 
 ```text
        Start Merge Path (Cart A exists)
-                     │
-                     ▼
-        1. Acquire Lock on Cart A
-                     │
-                     ▼
-      2. Validate Sales Channel Items
-      (Check Cart B items against Cart A sales channel)
-                     │
-          ┌──────────┴──────────┐
-          │                     │
-    validItems > 0        validItems == 0
-          │                     │
-          ▼                     ▼
-3. Call addToCartWorkflow   Throw INVALID_DATA error
-(items: validItems)             │
-          │                     ▼
-          ▼                Rollback & Unlock
-  4. Release Lock on Cart A
-          │
-          ▼
-  5. Return Merge Result
-  { cart_id: cartA.id, merged: true, skipped_items: [...] }
+                      │
+                      ▼
+        1. Acquire Dual Locks [Cart A, Cart B]
+                      │
+                      ▼
+        2. Query Guest Cart (useQueryGraphStep)
+                      │
+                      ▼
+        3. Validate Cumulative Inventory & Channel
+        (validateInventoryForMergeStep)
+                      │
+           ┌──────────┴──────────┐
+           │                     │
+     valid_items > 0       valid_items == 0
+           │                     │
+           ▼                     │
+ 4. addToCartWorkflow            │
+ (Cart A, valid_items)           │
+           │                     │
+           └──────────┬──────────┘
+                      │
+                      ▼
+        5. Delete Guest Cart (deleteCartStep)
+                      │
+                      ▼
+        6. Release Dual Locks [Cart A, Cart B]
+                      │
+                      ▼
+        7. Return Merge Result
+        { cart_id: cartA.id, skipped_items: [...] }
 ```
 
 ---
 
-## 3. Detailed Step Execution
+## 3. Step Execution Details
 
-### Step 1: Acquire Distributed Lock on Cart A
+### Step 1: Acquire Dual Locks
+Locks both carts to protect Cart A from concurrent writes and prevent Cart B from being accessed while merging/deleting:
 ```ts
 acquireLockStep({
-  key: customerCart.id,
+  key: [customerCartTransform.id, input.guest_cart_id!],
   timeout: 30,
   ttl: 120,
-})
+}).config({ name: "acquire-merge-locks" })
 ```
 
-### Step 2: Validate & Filter Eligible Items
-- Query variants from Cart B.
-- Filter variants published in `customerCart.sales_channel_id`.
-- If `validItems.length === 0`, throw `MedusaError(INVALID_DATA, "No items available in sales channel")`.
+### Step 2: Query Guest Cart
+Fetches line items, variant IDs, quantities, and metadata from Cart B via `useQueryGraphStep`.
 
-### Step 3: Execute `addToCartWorkflow`
-Add eligible items to Cart A as a nested workflow step:
+### Step 3: Validate Inventory & Sales Channel
+Executes custom step `validateInventoryForMergeStep`:
+- Computes `existingQty (Cart A) + guestQty (Cart B)` for each variant.
+- Verifies stock locations linked to Cart A's sales channel.
+- Partitions items into `valid_items` and `skipped_items` with reason codes.
+
+### Step 4: Add Eligible Items to Cart A
+Calls Medusa Core's `addToCartWorkflow`:
 ```ts
 addToCartWorkflow.runAsStep({
   input: {
-    cart_id: customerCart.id,
-    items: validItems.map((item) => ({
-      variant_id: item.variant_id,
-      quantity: item.quantity,
-      metadata: item.metadata,
-    })),
+    cart_id: customerCartTransform.id,
+    items: inventoryValidationResult.valid_items,
   },
 })
 ```
-*Note: `addToCartWorkflow` automatically manages pricing recalculation, inventory confirmation, quantity accumulation for duplicate items, and cart totals.*
+Medusa Core automatically manages price recalculation, item quantity accumulation, promotions, and tax recalculation on Cart A.
 
-### Step 4: Release Distributed Lock
+### Step 5: Clean Up Guest Cart
+Removes Cart B from the database:
+```ts
+deleteCartStep({
+  cart_id: input.guest_cart_id!,
+}).config({ name: "delete-merged-guest-cart" })
+```
+If a failure occurs during execution, `deleteCartStep`'s compensation handler restores Cart B.
+
+### Step 6: Release Distributed Locks
 ```ts
 releaseLockStep({
-  key: customerCart.id,
-})
+  key: [customerCartTransform.id, input.guest_cart_id],
+}).config({ name: "release-merge-locks" })
 ```
 
-### Step 5: Format & Return Result
+### Step 7: Format & Return Result
 ```ts
 return new WorkflowResponse({
-  cart_id: customerCart.id,
-  merged: true,
-  skipped_items: skippedItems,
+  cart_id: customerCartTransform.id,
+  skipped_items: inventoryValidationResult.skipped_items,
 })
 ```
 
@@ -96,5 +113,6 @@ return new WorkflowResponse({
 
 ## 4. Invariants
 
-1. **Cart A is Canonical**: The final returned cart is always Cart A.
-2. **Cart B is Read-Only**: Cart B line items are not deleted or mutated in this phase.
+1. **Cart A is Primary**: Customer continues using Cart A as their sole active cart.
+2. **Cart B is Cleaned Up**: Cart B is deleted from the active database to ensure multi-device consistency.
+3. **Graceful Degradation**: Out-of-stock items in Cart B do not prevent in-stock items from merging.

@@ -1,32 +1,35 @@
-# 15 — Out of Scope (Phase 1)
+# 15 — Scope Boundaries & Implemented Features
 
 ## Purpose
 
-Define the explicit functional boundaries and items deferred to future phases.
+Define the functional boundaries, implemented architectural decisions, and features deferred to future phases.
 
 ---
 
-## 1. Out of Scope for Phase 1
+## 1. Features Implemented in Current Architecture
 
-### 1.1 Cart B Deletion
-- In Phase 1, Cart B is **NOT deleted** after a successful merge.
-- **Reason**: Preserves an audit trail and prevents data loss in case of downstream network dropouts. The client application is responsible for switching its active session/cookie to Cart A's ID.
+### 1.1 Cart B Cleanup (`deleteCartStep`)
+- **Implemented**: Cart B is deleted from the active database upon successful completion of the merge.
+- **Rationale**:
+  1. **Multi-device Consistency**: Prevents a customer logging in on a second device from resuming an orphaned Cart B.
+  2. **Single Active Cart Guarantee**: Avoids having multiple uncompleted carts tied to the same customer.
+  3. **Transactional Safety**: Backed by a Saga compensation function (`restoreCarts`) that recovers Cart B if the transaction fails before completion.
 
-### 1.2 Address Merging
-- Shipping and billing addresses from Cart B are **not copied** to Cart A.
-- Cart A's existing addresses remain authoritative.
+### 1.2 Graceful Inventory Degradation
+- **Implemented**: Out-of-stock items in Cart B are reported in `skipped_items` while allowing in-stock items to merge seamlessly into Cart A.
 
-### 1.3 Payment Sessions & Collections
-- Payment sessions and payment collections on Cart B are **not transferred**.
-- Because cart totals change when items are merged, the customer must select or re-authorize payment methods on Cart A during checkout.
+---
 
-### 1.4 Shipping Methods
-- Selected shipping methods from Cart B are **not transferred**.
-- Shipping options must be recalculated on Cart A based on the newly merged package weight/dimensions and Cart A's destination address.
+## 2. Deferred / Out of Scope
 
-### 1.5 Partial Inventory Split
-- If an item in Cart B has quantity 5, but only 3 are in stock, the workflow does **not** perform a partial addition of 3 units.
-- The workflow follows an **all-or-nothing** transactional guarantee (see [08-inventory.md](./08-inventory.md)).
+### 2.1 Address Merging
+- Shipping and billing addresses from Cart B are **not copied** to Cart A. Cart A's existing addresses remain authoritative.
 
-### 1.6 Multi-Cart Consolidation
-- The workflow only supports merging **one** guest cart into **one** customer cart. Consolidating multiple legacy guest carts into a single cart is not supported in this phase.
+### 2.2 Payment Sessions & Collections
+- Payment sessions and collections from Cart B are **not transferred**. Because cart totals and items change, payment sessions must be re-authorized on Cart A during checkout.
+
+### 2.3 Shipping Methods
+- Selected shipping methods from Cart B are **not transferred**. Shipping options must be refreshed on Cart A based on the newly merged items and package weight.
+
+### 2.4 Multi-Cart Consolidation
+- The workflow merges **one** guest cart into **one** customer cart. Merging multiple legacy carts across multiple browser sessions simultaneously is not supported.

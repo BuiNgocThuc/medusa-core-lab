@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define the comprehensive test scenarios and assertions for automated integration tests.
+Define the comprehensive test scenarios and assertions for automated integration tests and manual Postman verification.
 
 ---
 
@@ -10,15 +10,13 @@ Define the comprehensive test scenarios and assertions for automated integration
 
 | ID | Category | Initial State | Execution / Action | Expected Result |
 | :---: | :--- | :--- | :--- | :--- |
-| **TC01** | **Transfer Path** | Cart B has 2 items.<br>Customer has **no** Cart A. | Run workflow with `guest_cart_id` and `customer_id`. | - Result: `{ cart_id: guest_cart_id, merged: false, skipped_items: [] }`<br>- Cart B `customer_id` updated to customer. |
-| **TC02** | **Merge Path (Disjoint)** | Cart A has Variant 1 (qty: 1).<br>Cart B has Variant 2 (qty: 2).<br>Both in Cart A's sales channel. | Run workflow. | - Result: `{ cart_id: cartA.id, merged: true, skipped_items: [] }`<br>- Cart A has 2 line items.<br>- Prices recalculated using Cart A context. |
-| **TC03** | **Merge Path (Duplicate)** | Cart A has Variant 1 (qty: 2).<br>Cart B has Variant 1 (qty: 3). | Run workflow. | - Result: `{ cart_id: cartA.id, merged: true, skipped_items: [] }`<br>- Cart A has 1 line item for Variant 1 with **accumulated quantity = 5**. |
-| **TC04** | **Partial Availability** | Cart B has Variant 1 (valid) and Variant 2 (not in sales channel). | Run workflow. | - Result: `{ cart_id: cartA.id, merged: true, skipped_items: [{ variant_id: "variant_2", ... }] }`<br>- Only Variant 1 added to Cart A. |
-| **TC05** | **Failure: All Unavailable** | Cart B has only Variant 2 (not in sales channel). | Run workflow. | - Throws `MedusaError.Types.INVALID_DATA`.<br>- Cart A and Cart B unchanged. |
-| **TC06** | **Failure: Out of Stock** | Variant 1 requested qty exceeds available inventory. | Run workflow. | - Throws inventory confirmation error.<br>- Saga compensation rolls back all changes. |
-| **TC07** | **Failure: Missing Cart B** | `guest_cart_id` does not exist in DB. | Run workflow. | - Throws `MedusaError.Types.NOT_FOUND` (404). |
-| **TC08** | **Failure: Completed Cart B** | Cart B has `completed_at !== null`. | Run workflow. | - Throws `MedusaError.Types.NOT_ALLOWED` (400). |
-| **TC09** | **Locking & Concurrency** | Two merge requests arrive simultaneously for same Cart A. | Run workflow concurrently. | - Distributed lock ensures sequential execution without data corruption. |
-| **TC10** | **Promotion Preservation** | Cart A has `SAVE20`, Cart B has `GUEST5`. | Run workflow. | - Merged Cart A preserves `SAVE20`; `GUEST5` discarded. |
-| **TC11** | **Restore Path (Cart A exists)** | Customer has Cart A in DB.<br>Customer logs in with **no guest cart**. | Run workflow with `guest_cart_id: undefined`. | - Result: `{ cart_id: cartA.id, merged: false, skipped_items: [] }`<br>- Storefront sets cookie to `cartA.id`. |
-| **TC12** | **Restore Path (No Cart at all)** | Customer has no Cart A.<br>Customer logs in with **no guest cart**. | Run workflow with `guest_cart_id: undefined`. | - Result: `{ cart_id: null, merged: false, skipped_items: [] }`<br>- No cookie set; cart created on first add-to-cart. |
+| **TC01** | **Transfer Path** | Cart B has items.<br>Customer has **no** active Cart A. | Run workflow with `guest_cart_id` and `customer_id`. | - Result: `{ cart_id: guest_cart_id, skipped_items: [] }`<br>- Cart B `customer_id` updated to customer.<br>- Cart B is preserved. |
+| **TC02** | **Merge Path (Disjoint Items)** | Cart A has Variant 1 (qty: 1).<br>Cart B has Variant 2 (qty: 2).<br>Both in stock. | Run workflow. | - Result: `{ cart_id: cartA.id, skipped_items: [] }`<br>- Cart A has both line items.<br>- Prices computed in Cart A context.<br>- Cart B is deleted from database. |
+| **TC03** | **Merge Path (Duplicate Items)** | Cart A has Variant 1 (qty: 2).<br>Cart B has Variant 1 (qty: 3).<br>Stock >= 5. | Run workflow. | - Result: `{ cart_id: cartA.id, skipped_items: [] }`<br>- Cart A has 1 line item for Variant 1 with **accumulated quantity = 5**.<br>- Cart B deleted. |
+| **TC04** | **Partial Availability (Graceful Skip)** | Cart B has Variant 1 (in-stock) and Variant 2 (out-of-stock / channel). | Run workflow. | - Result: `{ cart_id: cartA.id, skipped_items: [{ variant_id: "variant_2", reason: "OUT_OF_STOCK" }] }`<br>- Variant 1 merged into Cart A.<br>- Cart B deleted. |
+| **TC05** | **All Items Out-of-Stock** | All items in Cart B exceed stock or are unavailable. | Run workflow. | - Result: `{ cart_id: cartA.id, skipped_items: [...] }` (HTTP 200).<br>- Cart A remains unchanged.<br>- Cart B deleted. |
+| **TC06** | **Self-Merge Bug Prevention** | Guest entered email at checkout before login, so Cart B already carries `customer_id`. Customer also has prior Cart A. | Run workflow. | - Workflow filters `c.id !== guest_cart_id`.<br>- Cart A is correctly identified as the prior cart.<br>- Cart B merges into Cart A and does NOT self-merge. |
+| **TC07** | **Rollback & Cart B Restoration** | Merge fails mid-transaction (e.g. database error). | Simulate failure after deletion. | - Saga compensation executes `restoreCarts([cartB.id])`.<br>- Cart A reverts to pre-merge state.<br>- Cart B is restored in database. |
+| **TC08** | **Failure: Missing Guest Cart** | `guest_cart_id` does not exist in DB. | Run workflow. | - Throws `MedusaError.Types.NOT_FOUND` (404). |
+| **TC09** | **Failure: Completed Guest Cart** | Cart B has `completed_at !== null`. | Run workflow. | - Throws `MedusaError.Types.NOT_ALLOWED` (400). |
+| **TC10** | **Concurrency Protection** | Two merge requests arrive simultaneously for same customer. | Concurrent execution. | - Dual lock ensures sequential execution without race conditions or duplicated quantities. |

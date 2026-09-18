@@ -8,69 +8,41 @@ Define how line items from Cart B are prepared, mapped, and merged into Cart A.
 
 ## 1. Line Item Data Mapping
 
-When Cart B's eligible items are passed to `addToCartWorkflow`, only essential line-item fields are mapped:
+Only `valid_items` identified during inventory and sales channel validation are passed to Medusa Core's `addToCartWorkflow`:
 
 ```ts
-export type AddToCartItemInput = {
+addToCartWorkflow.runAsStep({
+  input: {
+    cart_id: customerCartTransform.id,
+    items: inventoryValidationResult.valid_items,
+  },
+})
+```
+
+### Data Schema of `valid_items`:
+```ts
+{
   variant_id: string
   quantity: number
   metadata?: Record<string, unknown>
 }
 ```
 
-### Mapping Transformation
-```ts
-const itemsToAdd = validItems.map((item) => ({
-  variant_id: item.variant_id,
-  quantity: item.quantity,
-  metadata: item.metadata ?? undefined,
-}))
-```
-
-### Fields explicitly excluded from mapping:
-- `id`: Must NOT pass Cart B's line-item ID (Cart A generates its own IDs).
-- `unit_price`, `raw_unit_price`: Must NOT pass prices (see [06-pricing.md](./06-pricing.md)).
-- `adjustments`, `tax_lines`: Must NOT pass discounts or tax lines.
-- `cart_id`: Must NOT pass Cart B's cart ID.
+### Fields Explicitly Excluded:
+- `id`: Must NOT pass Cart B's line-item ID (Medusa Core creates new line items or increments existing line item quantity).
+- `unit_price`, `raw_unit_price`: Prices are dynamically computed by Medusa Core's pricing engine for Cart A's region/currency.
+- `tax_lines`, `adjustments`: Computed freshly by Medusa Core.
 
 ---
 
 ## 2. Item Duplication & Quantity Accumulation
 
-When merging into Cart A, two scenarios occur for each variant:
-
-### Scenario A: Variant already exists in Cart A
-- **Behavior**: The quantity from Cart B is added to the existing quantity in Cart A.
-```text
-Cart A existing: Variant X (qty: 2)
-Cart B source:   Variant X (qty: 3)
-───────────────────────────────────
-Result in Cart A: Variant X (qty: 5)
-```
-- **Medusa Core Native Support**: Handled natively by Medusa's `addToCartWorkflow`. It inspects `cart.items`, finds matching `variant_id`, and executes `updateLineItemsStep` instead of creating a duplicate line item.
-
-### Scenario B: Variant does not exist in Cart A
-- **Behavior**: A new line item is created in Cart A.
-```text
-Cart A existing: (none)
-Cart B source:   Variant Y (qty: 1)
-───────────────────────────────────
-Result in Cart A: Variant Y (qty: 1)
-```
-- **Medusa Core Native Support**: Handled natively by Medusa's `addToCartWorkflow` via `createLineItemsStep`.
+When merging into Cart A:
+- **Variant already in Cart A**: Quantity is accumulated (`existing + added`). Handled natively by Medusa Core's `addToCartWorkflow`.
+- **Variant new to Cart A**: Added as a new line item. Handled natively by Medusa Core.
 
 ---
 
-## 3. Metadata Merging Policy
+## 3. Post-Merge Cleanup
 
-For line items containing `metadata` (e.g. custom product notes, engraving):
-1. **New Line Items**: Metadata from Cart B is copied directly to the newly created line item in Cart A.
-2. **Duplicate Line Items (Quantity Accumulated)**:
-   - By default, Cart A's existing metadata takes precedence to preserve customer preferences already in Cart A.
-
----
-
-## 4. Invariants
-
-1. **No Phantom Items**: Only line items identified as valid during [05-sales-channel.md](./05-sales-channel.md) are added.
-2. **Cart B Integrity**: Cart B's line items remain completely unchanged in the database throughout this phase.
+After `valid_items` are successfully committed to Cart A, Cart B is deleted via `deleteCartStep` to prevent multi-device cart collisions and duplicate active carts.

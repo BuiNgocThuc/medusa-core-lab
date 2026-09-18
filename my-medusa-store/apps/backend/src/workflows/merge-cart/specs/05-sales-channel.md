@@ -1,89 +1,59 @@
-# 05 — Sales Channel Validation
+# 05 — Sales Channel & Location Validation
 
 ## Purpose
 
-Validate that the product variants in Cart B are available in Cart A's sales channel before adding them to Cart A.
-
-Cart A's sales channel is **authoritative**. Items from Cart B that do not belong to Cart A's sales channel must be filtered out and reported as skipped.
+Ensure product variants from Cart B are available in Cart A's target sales channel before attempting to add them.
 
 ---
 
-## 1. Core Business Rules
+## 1. Core Principles
 
-```text
-Cart B Items
-    │
-    ▼
-Check against Cart A Sales Channel
-    │
-    ├── Available   ───► validItems   ───► addToCartWorkflow (Cart A)
-    │
-    └── Unavailable ───► skippedItems ───► Report in workflow output
-```
-
-1. **Authoritative Sales Channel**: `Cart A.sales_channel_id` is the single source of truth. Cart A's sales channel is never modified to match Cart B.
-2. **Item Eligibility**: For each line item in Cart B, check whether its `variant_id` belongs to a product published in `Cart A.sales_channel_id`.
-3. **Partial Availability**: If some items are available and others are not, the merge proceeds with the available items (`validItems`). The unavailable items are collected in `skippedItems`.
-4. **All Items Unavailable**: If **all** items in Cart B are unavailable in Cart A's sales channel (`validItems.length === 0`), the workflow **must throw an error** (`MedusaError.Types.INVALID_DATA`). It must not silently return a successful merge with 0 items added.
+1. **Authoritative Sales Channel**: `Cart A.sales_channel_id` is the single source of truth.
+2. **Location Level Linking**: In Medusa v2, sales channels are connected to stock locations. A variant is only fulfillable if its inventory items are located at a stock location enabled for Cart A's sales channel:
+   ```text
+   Variant -> Inventory Item -> Location Level -> Stock Location -> Sales Channel
+   ```
+3. **Graceful Degradation**: Items not assigned to or out-of-stock in Cart A's sales channel are routed to `skipped_items` rather than crashing the workflow.
 
 ---
 
-## 2. Querying Sales Channel Availability in Medusa v2
+## 2. Implementation in `validateInventoryForMergeStep`
 
-In Medusa v2, products are linked to sales channels via the `product_sales_channel` link. A variant is eligible if its product is assigned to `Cart A.sales_channel_id`.
+Sales channel checking is performed directly within the inventory validation step:
 
-### Step Implementation Pattern:
 ```ts
-const variantSalesChannelQuery = useQueryGraphStep({
-  entity: "product_variant",
-  filters: { id: cartBVariantIds },
-  fields: [
-    "id",
-    "product.sales_channels.id",
-  ],
-}).config({ name: "validate-variants-sales-channel" })
-```
-
-### Filtering Logic:
-```ts
-const targetSalesChannelId = customerCart.sales_channel_id
-
-const validItems: Array<{ variant_id: string; quantity: number }> = []
-const skippedItems: Array<{ variant_id: string; quantity: number; reason: string }> = []
-
-for (const item of guestCart.items) {
-  const variant = variantsData.find((v) => v.id === item.variant_id)
-  const isAvailable = variant?.product?.sales_channels?.some(
-    (sc) => sc.id === targetSalesChannelId
-  )
-
-  if (isAvailable) {
-    validItems.push({
-      variant_id: item.variant_id,
-      quantity: item.quantity,
+// Filter location IDs associated with the target sales channel
+let locationIds: string[] = []
+if (input.sales_channel_id) {
+  locationIds = locationLevels
+    .filter((lvl: any) => {
+      const stockLocations = Array.isArray(lvl.stock_locations)
+        ? lvl.stock_locations
+        : lvl.stock_locations
+        ? [lvl.stock_locations]
+        : []
+      return stockLocations.some((loc: any) => {
+        const salesChannels = Array.isArray(loc.sales_channels)
+          ? loc.sales_channels
+          : loc.sales_channels
+          ? [loc.sales_channels]
+          : []
+        return salesChannels.some((sc: any) => sc.id === input.sales_channel_id)
+      })
     })
-  } else {
-    skippedItems.push({
-      variant_id: item.variant_id,
-      quantity: item.quantity,
-      reason: "Variant is unavailable in customer's sales channel",
-    })
-  }
+    .map((lvl: any) => lvl.location_id)
 }
 
-if (guestCart.items.length > 0 && validItems.length === 0) {
-  throw new MedusaError(
-    MedusaError.Types.INVALID_DATA,
-    "None of the items from the guest cart are available in the customer's sales channel"
-  )
+if (locationIds.length === 0) {
+  // Variant has no stock location linked to Cart A's sales channel
+  allCovered = false
 }
 ```
 
 ---
 
-## 3. Separation of Concerns
+## 3. Behavior
 
-- **This Step**: Decides *which* items are eligible based solely on sales channel permissions.
-- **Do NOT validate inventory here**: Handled by Medusa core in [08-inventory.md](./08-inventory.md).
-- **Do NOT calculate prices here**: Handled by Medusa core in [06-pricing.md](./06-pricing.md).
-- **Do NOT mutate Cart A here**: Handled by `addToCartWorkflow` in [14-merge-path.md](./14-merge-path.md).
+- **Available in Channel & In-Stock**: Added to `valid_items` and passed to `addToCartWorkflow`.
+- **Not in Channel or 0 Stock**: Separated into `skipped_items` with reason `"OUT_OF_STOCK"`.
+- **All Items Missing**: Cart A remains untouched, and all items are returned in `skipped_items`.

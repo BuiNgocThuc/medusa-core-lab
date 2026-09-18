@@ -1,64 +1,63 @@
-# 08 — Inventory Validation
+# 08 — Cumulative Inventory Validation & Graceful Skipping
 
 ## Purpose
 
-Define the inventory rules governing the merge of Cart B items into Cart A.
+Define how inventory is validated when merging items from Cart B into Cart A, ensuring combined stock accuracy and graceful error handling.
 
 ---
 
-## 1. Core Rule: Complete Delegation to Medusa Core
+## 1. Cumulative Stock Calculation
 
-Inventory validation is **100% delegated to Medusa core**. The custom merge workflow does not implement custom inventory calculation logic.
+When a variant exists in both Cart A and Cart B, stock availability must be validated against the **total combined quantity**:
 
 ```text
-Merged Items (validItems)
-        │
-        ▼
-addToCartWorkflow(Cart A)
-        │
-        ▼
-confirmVariantInventoryWorkflow (Medusa Core)
-        │
-        ├── Checks stock locations linked to Cart A.sales_channel_id
-        ├── Evaluates manage_inventory & allow_backorder flags
-        └── Validates cumulative quantity:
-            (Existing Cart A qty + Added Cart B qty) <= Available Stock
+Cart A existing quantity:  5 units of Variant X
+Cart B incoming quantity:  3 units of Variant X
+───────────────────────────────────────────────
+Total stock needed:        8 units of Variant X
 ```
 
+If only 6 units are available:
+- Adding 3 units would violate inventory constraints.
+- Rather than crashing the entire login/merge process, Variant X is categorized as a skipped item with reason `"EXCEEDS_AVAILABLE_STOCK"`.
+
 ---
 
-## 2. Cumulative Stock Confirmation
+## 2. Dedicated Validation Step (`validateInventoryForMergeStep`)
 
-When a variant already exists in Cart A, inventory is checked against the **total combined quantity**:
+Because Medusa Core's `addToCartWorkflow` aborts the entire transaction on out-of-stock items, we implemented a custom pre-validation step:
 
-```text
-Cart A existing: 5 units of Variant X
-Cart B adding:   3 units of Variant X
-──────────────────────────────────────
-Required Stock:  8 units of Variant X
+```ts
+const inventoryValidationResult = validateInventoryForMergeStep(validationInput)
 ```
 
-If only 6 units are available in inventory:
-- Medusa core's `confirmVariantInventoryWorkflow` throws `NOT_ALLOWED` or `INSUFFICIENT_INVENTORY`.
-- The entire merge operation is aborted.
+### Validation Algorithm:
+1. **Aggregate Existing Quantities**: Map existing Cart A quantities by `variant_id`.
+2. **Aggregate Guest Quantities**: Map incoming Cart B quantities by `variant_id`.
+3. **Query Inventory Graph**:
+   - `manage_inventory = false` $\rightarrow$ Valid (always available).
+   - `allow_backorder = true` $\rightarrow$ Valid (backorders allowed).
+   - Filter inventory location levels to only those linked to Cart A's sales channel.
+4. **Confirm Stock Availability**:
+   Call `inventoryService.confirmInventory(inventory_item_id, locationIds, totalNeeded)`.
+5. **Partition Items**:
+   - In-stock items $\rightarrow$ `valid_items`
+   - Insufficient stock items $\rightarrow$ `skipped_items`
 
 ---
 
-## 3. Atomicity & Failure Behavior
+## 3. Reason Code Classification
 
-Inventory validation is strictly **atomic**:
-
-1. **No Partial Inventory Merge**: The workflow does NOT partially add available stock while dropping the rest (e.g., adding 1 unit when 3 were requested).
-2. **All-or-Nothing Rollback**: If inventory validation fails for even a single line item, the entire workflow aborts.
-3. **Clean State Guarantee**:
-   - Cart A remains unchanged in its pre-merge state.
-   - Cart B remains unchanged.
-   - Locks on Cart A are safely released.
+| Scenario | Condition | Reported Reason |
+| :--- | :--- | :--- |
+| **Out of Stock** | Variant is managed, no backorder, available = 0, no items in Cart A | `"OUT_OF_STOCK"` |
+| **Exceeds Combined Stock** | Cart A has items, available stock < `existingQty + guestQty` | `"EXCEEDS_AVAILABLE_STOCK"` |
+| **No Stock Locations** | Managed inventory has no inventory item levels linked to sales channel | `"NO_INVENTORY_ITEMS"` |
+| **Non-existent Variant** | Variant ID cannot be found in database | `"VARIANT_NOT_FOUND"` |
 
 ---
 
-## 4. Backorders & Non-Managed Inventory
+## 4. User Experience Guarantee
 
-Medusa's inventory engine handles special variant configurations automatically:
-- **`manage_inventory = false`**: Inventory check is bypassed (always available).
-- **`allow_backorder = true`**: Inventory confirmation passes regardless of current on-hand levels.
+- **No Abortions**: A single out-of-stock item in the guest cart does not block the customer from logging in or merging other eligible items.
+- **Accurate Information**: Storefront receives the complete list of `skipped_items` with item titles and reason codes to display helpful notifications to the customer.

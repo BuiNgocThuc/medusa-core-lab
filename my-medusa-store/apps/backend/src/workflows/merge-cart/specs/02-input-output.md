@@ -2,93 +2,99 @@
 
 ## Purpose
 
-Define the input contract and output contract of the `mergeGuestCartIntoCustomerCartWorkflow`.
-
-The workflow handles the complete cart synchronization lifecycle upon customer login:
-1. **Merge Path**: Guest cart items are merged into existing customer cart.
-2. **Transfer Path**: Guest cart is transferred to customer when no customer cart exists.
-3. **Restore Path**: Existing customer cart is restored when user logs in with no guest cart.
+Define the input and output contract of the `mergeGuestCartIntoCustomerCartWorkflow` and its corresponding Store API endpoint `POST /store/carts/:id/merge-customer`.
 
 ---
 
-## Input Contract
+## 1. Workflow Input Contract
 
 ```ts
-export type MergeGuestCartIntoCustomerCartWorkflowInput = {
+export type MergeGuestCartInput = {
   customer_id: string
-  guest_cart_id?: string
+  guest_cart_id: string
   additional_data?: Record<string, unknown>
 }
 ```
 
-### `customer_id` (Required)
-The ID of the authenticated customer who will own the destination cart.
+### Field Descriptions
 
-- **Requirements**:
-  - Must be provided and represent an authenticated customer.
-- **Usage**:
-  - Discover the customer's existing active cart (Cart A).
-  - Transfer Cart B ownership when Cart A does not exist.
-  - Verify customer ownership of Cart A.
+#### `customer_id` (Required)
+- The ID of the authenticated customer (`req.auth_context?.actor_id`).
+- Used to discover whether the customer already possesses an active uncompleted cart (Cart A).
+- Receives ownership of the cart in the transfer path.
 
-### `guest_cart_id` (Optional)
-The ID of the guest cart (Cart B).
+#### `guest_cart_id` (Required)
+- The ID of the guest cart (Cart B) passed via URL param `:id`.
+- The source cart to be transferred or merged and subsequently cleaned up.
 
-- **Scenarios**:
-  - **Present (`guest_cart_id !== undefined`)**: The customer added items to a guest cart before logging in $\rightarrow$ Merge or Transfer path.
-  - **Missing (`guest_cart_id === undefined`)**: The customer logged in without adding any items to a guest cart $\rightarrow$ Restore path.
-
-### `additional_data` (Optional)
-Optional contextual data passed through to underlying Medusa workflows.
+#### `additional_data` (Optional)
+- Optional metadata or extension attributes passed from the client body.
 
 ---
 
-## Output Contract
+## 2. Workflow Output Contract
 
 ```ts
 export type SkippedCartItem = {
   variant_id: string
+  title: string
+  variant_title?: string
   quantity: number
   reason: string
 }
 
-export type MergeGuestCartIntoCustomerCartResult = {
-  cart_id: string | null
-  merged: boolean
+export type MergeGuestCartOutput = {
+  cart_id: string
   skipped_items: SkippedCartItem[]
 }
 ```
 
-### Output Fields
+### Field Descriptions
 
 #### `cart_id`
-The ID of the active customer cart, or `null` if no cart exists:
-- **Merge Path**: `cart_id = cartA.id` (Customer Cart A).
-- **Transfer Path**: `cart_id = guest_cart_id` (Guest Cart B transferred to customer).
-- **Restore Path (Cart A exists)**: `cart_id = cartA.id` (Restored customer cart).
-- **Restore Path (No cart anywhere)**: `cart_id = null` (No cart created yet; lazy creation on first item added).
-
-#### `merged`
-- `true`: Items were merged into an existing Cart A.
-- `false`: Cart B was transferred or Cart A was restored without a merge operation.
+- The ID of the active cart resulting from the operation:
+  - **Transfer Path**: `cart_id = guest_cart_id` (Cart B transferred to customer).
+  - **Merge Path**: `cart_id = cartA.id` (Customer Cart A containing merged items).
 
 #### `skipped_items`
-Array of items from Cart B that were intentionally not merged.
+- An array containing line items from Cart B that were excluded from the merge due to inventory or availability constraints:
+  - In **Transfer Path**: Always empty `[]`.
+  - In **Merge Path**: Contains items that could not be merged, along with machine-readable reasons:
+    - `"OUT_OF_STOCK"`: Inventory is managed and variant has 0 stock.
+    - `"EXCEEDS_AVAILABLE_STOCK"`: Variant has some stock, but Cart A existing quantity + Cart B guest quantity exceeds available inventory.
+    - `"NO_INVENTORY_ITEMS"`: Variant has `manage_inventory = true` but has no inventory item levels linked.
+    - `"VARIANT_NOT_FOUND"`: Variant ID does not exist.
 
 ---
 
-## Output Behavior by Execution Path
+## 3. Store API Endpoint Contract
 
-### Path 1: Restore Path (No Guest Cart)
-- **Input**: `customer_id: "cus_123"`, `guest_cart_id: undefined`.
-- **Behavior**:
-  - If Customer Cart A exists $\rightarrow$ `{ cart_id: cartA.id, merged: false, skipped_items: [] }`.
-  - If Customer Cart A does not exist $\rightarrow$ `{ cart_id: null, merged: false, skipped_items: [] }`.
+* **Endpoint:** `POST /store/carts/:id/merge-customer`
+* **Auth:** Required `Bearer <customer_token>`
 
-### Path 2: Transfer Path (Guest Cart exists, No Customer Cart)
-- **Input**: `customer_id: "cus_123"`, `guest_cart_id: "cart_b"`, Customer has no Cart A.
-- **Behavior**: Cart B transferred to customer $\rightarrow$ `{ cart_id: "cart_b", merged: false, skipped_items: [] }`.
+### Request
+- **URL Param `:id`**: `guest_cart_id`
+- **Body**:
+```json
+{
+  "additional_data": {}
+}
+```
 
-### Path 3: Merge Path (Both Guest Cart and Customer Cart exist)
-- **Input**: `customer_id: "cus_123"`, `guest_cart_id: "cart_b"`, Customer has Cart A.
-- **Behavior**: Cart B items merged into Cart A $\rightarrow$ `{ cart_id: cartA.id, merged: true, skipped_items: [...] }`.
+### Response (`200 OK`)
+```json
+{
+  "cart": {
+    "id": "cart_01M2..."
+  },
+  "skipped_items": [
+    {
+      "variant_id": "variant_01...",
+      "title": "Quần Tây Nam Slimfit",
+      "variant_title": "Size L / Đen",
+      "quantity": 1,
+      "reason": "EXCEEDS_AVAILABLE_STOCK"
+    }
+  ]
+}
+```

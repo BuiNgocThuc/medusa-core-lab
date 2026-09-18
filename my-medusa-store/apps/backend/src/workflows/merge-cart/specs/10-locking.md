@@ -1,4 +1,4 @@
-# 10 — Distributed Locking & Core Sub-Workflow Behavior
+# 10 — Distributed Locking & Concurrency Protection
 
 ## Purpose
 
@@ -6,55 +6,44 @@ Prevent race conditions and concurrent modifications during cart operations by m
 
 ---
 
-## 1. How Medusa Core Handles Locks in Sub-Workflows
+## 1. Why Parent Workflow Manages Locks
 
-An essential architectural behavior discovered directly from Medusa Core (`packages/core/core-flows/src/locking/steps/acquire-lock.ts`):
-
+In Medusa Core (`packages/core/core-flows/src/locking/steps/acquire-lock.ts`):
 ```ts
-// From Medusa Core source code:
 const isSubWorkflow = !!parentStepIdempotencyKey
 if (isSubWorkflow && !data.executeOnSubWorkflow) {
   return StepResponse.skip() as any
 }
 ```
+When `addToCartWorkflow` and `transferCartCustomerWorkflow` run as nested steps (`runAsStep`), their internal lock acquisition is automatically skipped by Medusa Core. 
 
-### Why the Parent Workflow Must Own the Lock:
-- Both `addToCartWorkflow` and `transferCartCustomerWorkflow` have internal `acquireLockStep` calls.
-- **HOWEVER**, when they are executed as nested sub-workflows via `.runAsStep()`, Medusa Core's `acquireLockStep` **automatically skips execution** (`StepResponse.skip()`) because `executeOnSubWorkflow` is not set.
-- **Therefore, the parent workflow (`mergeGuestCartIntoCustomerCartWorkflow`) MUST explicitly acquire and release the lock**, ensuring full concurrency protection throughout the entire workflow execution.
+**Therefore, the parent workflow (`mergeGuestCartIntoCustomerCartWorkflow`) explicitly acquires and releases distributed locks.**
 
 ---
 
 ## 2. Locking by Execution Path
 
-### 2.1 Merge Path (Cart A exists)
-- **Target**: Cart A (`customerCart.id`).
-- **Cart B**: Read-only during merge, so does not require locking.
-- **Sequence**:
-  1. Acquire lock on Cart A before any inspection or mutation.
-  2. Execute `addToCartWorkflow.runAsStep(...)` (its internal lock is safely skipped by Core).
-  3. Release lock on Cart A in the final step or on compensation.
+### 2.1 Merge Path (Dual Locking)
+Both **Cart A** and **Cart B** must be locked simultaneously:
+- **Cart A**: Mutated with incoming line items.
+- **Cart B**: Mutated and deleted at the end of the merge.
 
 ```ts
 acquireLockStep({
-  key: customerCart.id,
-  timeout: 30, // seconds
-  ttl: 120,    // seconds
-})
+  key: [customerCartTransform.id, input.guest_cart_id],
+  timeout: 30, // seconds to wait
+  ttl: 120,    // lock TTL
+}).config({ name: "acquire-merge-locks" })
 
-// ... run addToCartWorkflow ...
+// ... Execute inventory check, addToCartWorkflow, deleteCartStep ...
 
 releaseLockStep({
-  key: customerCart.id,
-})
+  key: [customerCartTransform.id, input.guest_cart_id],
+}).config({ name: "release-merge-locks" })
 ```
 
-### 2.2 Transfer Path (Cart A does not exist)
-- **Target**: Cart B (`input.guest_cart_id`).
-- **Sequence**:
-  1. Acquire lock on Cart B.
-  2. Execute `transferCartCustomerWorkflow.runAsStep(...)`.
-  3. Release lock on Cart B.
+### 2.2 Transfer Path (Single Lock)
+Only **Cart B** is mutated (ownership transferred to customer):
 
 ```ts
 acquireLockStep({
@@ -63,7 +52,7 @@ acquireLockStep({
   ttl: 120,
 })
 
-// ... run transferCartCustomerWorkflow ...
+// ... Execute transferCartCustomerWorkflow ...
 
 releaseLockStep({
   key: input.guest_cart_id,
@@ -72,16 +61,6 @@ releaseLockStep({
 
 ---
 
-## 3. Lock Configuration Parameters
+## 3. Compensation Guarantee
 
-| Parameter | Recommended Value | Rationale |
-| :--- | :---: | :--- |
-| `key` | `cart.id` | Lock key scoped specifically to the cart being mutated. |
-| `timeout` | `30` | Number of seconds to wait if another request is currently holding the lock. |
-| `ttl` | `120` | Distributed lock TTL in seconds (prevents deadlocks if worker crashes). |
-
----
-
-## 4. Automatic Lock Release on Failure
-
-`acquireLockStep` in Medusa Core registers a compensation handler that automatically calls `locking.release(keys)`. If downstream steps throw an error, Medusa's Saga compensation engine guarantees the lock is immediately released.
+`acquireLockStep` registers an automatic compensation handler. If any downstream step fails during execution, Medusa's Saga engine guarantees all acquired locks are released immediately.
