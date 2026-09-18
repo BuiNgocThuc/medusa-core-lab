@@ -18,6 +18,7 @@
 - `Auth Module` <--> `Logical Link (app_metadata.customer_id)` <--> `Customer Module` (Khong sinh bang pivot; nhieu `AuthIdentity` doc lap co the cung tro ve mot `Customer`).
 - `Cart / Order` bam vao `Customer` qua `customer_id` (Read-only link).
 - `Promotion` tuong tac voi `Customer` qua `customer_group_id` (Decoupled: Workflow truyen danh sach Group IDs vao Promotion Rule Engine luc tinh gio hang, khong co Foreign Key truc tiep giua 2 module).
+- `Custom Loyalty Module` <--> `Module Link (Stored Link)` <--> `Customer Module` (Mo hinh Hybrid Reference: `LoyaltyAccount` luu truc tiep `customer_id` unique tren bang du lieu kem stored link table phuc vu Query Graph 2 chieu ma khong tao Foreign Key xuyen module).
 
 ## Customer Module Data & Security Patterns
 - **5 Tables Architecture:**
@@ -68,3 +69,8 @@
   - *Layer 1 (Application Workflow):* Step `maybeUnsetDefaultShippingAddressesStep` tu dong tim va go co `false` cho cac dia chi cu khi them/sua dia chi mac dinh moi.
   - *Layer 2 (PostgreSQL Index):* `IDX_customer_address_unique_customer_shipping/billing` (`UNIQUE(customer_id) WHERE is_default_... = true`) chan dung Race Condition o tang DB.
 - **Soft Delete Pattern:** Tat ca cac bang Customer su dung `deleted_at`. Luu y: xoa mem `customer` khong kich hoat `ON DELETE CASCADE` cua PostgreSQL, can chu y tranh PII Leakage o bang con `customer_address`.
+- **Custom Loyalty Module & Hybrid Reference Pattern (Task 5):**
+  - *Domain Model:* `LoyaltyAccount` dinh nghia tai `src/modules/loyalty/models/loyalty-account.ts` voi `id` (primaryKey), `customer_id` (unique text theo mo hinh Hybrid Reference), `points` (number default 0), `tier` (enum LoyaltyTier BRONZE/SILVER/GOLD default BRONZE).
+  - *Module Service Factory:* `LoyaltyModuleService` ke thua dynamic factory `MedusaService({ LoyaltyAccount })` tu dong sinh 8 ham CRUD chuan ma khong can repository boilerplate.
+  - *Module Definition:* Export qua `Module("loyalty", { service: LoyaltyModuleService })` de Medusa IoC Container resolve dependency voi module key `camelCase`.
+  - *Stored Module Link:* Dinh nghia tai `src/links/customer-loyalty.ts` ket noi `CustomerModule.linkable.customer` va `LoyaltyModule.linkable.loyaltyAccount` cho phep Query Graph `query.graph({ entity: "customer", fields: ["loyalty_account.*"] })`.
