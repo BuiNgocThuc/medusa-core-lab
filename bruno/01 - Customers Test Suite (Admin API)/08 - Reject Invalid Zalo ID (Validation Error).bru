@@ -36,18 +36,18 @@ tests {
   test("400 Bad Request", function () {
     expect(res.getStatus()).to.equal(400);
   });
-  test("error message refers to zalo", function () {
+  test("error message refers to zalo_id", function () {
     const body = res.getBody();
     const msg = typeof body === "string" ? body : JSON.stringify(body);
-    expect(msg.toLowerCase()).to.include("zalo");
+    expect(msg.toLowerCase()).to.include("zalo id");
   });
 }
 
 docs {
   # 08 - Reject Invalid Zalo ID (Validation Error)
-
+  
   Kiểm chứng cơ chế chặn dữ liệu sai định dạng của **Route Middleware (Task 2)** tại cửa ngõ HTTP trước khi dữ liệu đi vào Workflow.
-
+  
   ## Kịch bản kiểm thử:
   - `script:pre-request` sinh một email hợp lệ ngẫu nhiên và dùng `req.setBody()` gán vào payload để bảo đảm request không bao giờ bị lỗi do thiếu hoặc sai định dạng email.
   - Trường `additional_data.zalo_id` được cố tình gửi lên giá trị `"123"` (vi phạm quy tắc regex của Zod: chuỗi số từ 8 đến 20 chữ số `^\d{8,20}$`).
