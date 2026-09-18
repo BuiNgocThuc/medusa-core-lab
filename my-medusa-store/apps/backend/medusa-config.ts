@@ -19,6 +19,25 @@ module.exports = defineConfig({
   },
 
   modules: [
+    {
+      resolve: "@medusajs/medusa/caching",
+
+      options: {
+        ttl: 3600, // TTL mặc định: 1 giờ
+
+        providers: [
+          {
+            resolve: "@medusajs/caching-redis",
+            id: "caching-redis",
+            is_default: true,
+
+            options: {
+              redisUrl: REDIS_URL,
+            },
+          },
+        ],
+      },
+    },
     ...(REDIS_URL
       ? [
         {
