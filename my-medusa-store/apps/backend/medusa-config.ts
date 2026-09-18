@@ -2,6 +2,7 @@ import { loadEnv, defineConfig } from '@medusajs/framework/utils'
 
 import { BANK_TRANSFER_PAYMENT_MODULE } from "./src/modules/bank-transfer-payment"
 import { MOMO_PAYMENT_MODULE } from "./src/modules/momo-payment"
+import { VNPAY_PAYMENT_MODULE } from "./src/modules/vnpay-payment"
 
 loadEnv(process.env.NODE_ENV || 'development', process.cwd())
 
@@ -12,6 +13,11 @@ const MOMO_REAL_CONFIGURED = Boolean(
     process.env.MOMO_SECRET_KEY &&
     process.env.MOMO_REDIRECT_URL &&
     process.env.MOMO_IPN_URL
+)
+const VNPAY_REAL_CONFIGURED = Boolean(
+  process.env.VNPAY_TMN_CODE &&
+    process.env.VNPAY_HASH_SECRET &&
+    process.env.VNPAY_RETURN_URL
 )
 module.exports = defineConfig({
   projectConfig: {
@@ -38,8 +44,15 @@ module.exports = defineConfig({
       resolve: "./src/modules/momo-payment",
     },
     {
+      resolve: "./src/modules/vnpay-payment",
+    },
+    {
       resolve: "@medusajs/medusa/payment",
-      dependencies: [BANK_TRANSFER_PAYMENT_MODULE, MOMO_PAYMENT_MODULE],
+      dependencies: [
+        BANK_TRANSFER_PAYMENT_MODULE,
+        MOMO_PAYMENT_MODULE,
+        VNPAY_PAYMENT_MODULE,
+      ],
       options: {
         providers: [
           {
@@ -88,6 +101,33 @@ module.exports = defineConfig({
                     lang: (process.env.MOMO_LANG || "vi") as "vi" | "en",
                     orderExpireTimeMinutes: Number(
                       process.env.MOMO_ORDER_EXPIRE_MINUTES || 15
+                    ),
+                  },
+                },
+              ]
+            : []),
+          ...(VNPAY_REAL_CONFIGURED
+            ? [
+                {
+                  resolve: "./src/modules/vnpay",
+                  id: "default",
+                  options: {
+                    providerId: "pp_vnpay_default",
+                    tmnCode: process.env.VNPAY_TMN_CODE,
+                    hashSecret: process.env.VNPAY_HASH_SECRET,
+                    paymentUrl:
+                      process.env.VNPAY_PAYMENT_URL ||
+                      "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html",
+                    returnUrl:
+                      process.env.VNPAY_RETURN_URL ||
+                      "http://localhost:8000/api/payment-return/vnpay",
+                    ipnUrl:
+                      process.env.VNPAY_IPN_URL ||
+                      "http://localhost:9001/hooks/payment/vnpay",
+                    locale: (process.env.VNPAY_LOCALE || "vn") as "vn" | "en",
+                    orderType: process.env.VNPAY_ORDER_TYPE || "other",
+                    paymentExpiryMinutes: Number(
+                      process.env.VNPAY_PAYMENT_EXPIRY_MINUTES || 15
                     ),
                   },
                 },

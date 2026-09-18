@@ -41,6 +41,10 @@ export const paymentInfoMap: Record<
     title: "MoMo",
     icon: <CreditCard />,
   },
+  pp_vnpay_default: {
+    title: "VNPay",
+    icon: <CreditCard />,
+  },
   // Add more payment providers here
 }
 
@@ -64,6 +68,10 @@ export const isBankTransfer = (providerId?: string) => {
 
 export const isMomo = (providerId?: string) => {
   return providerId?.startsWith("pp_momo")
+}
+
+export const isVnpay = (providerId?: string) => {
+  return providerId?.startsWith("pp_vnpay")
 }
 
 // Add currencies that don't need to be divided by 100

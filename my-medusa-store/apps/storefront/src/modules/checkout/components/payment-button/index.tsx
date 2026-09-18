@@ -1,6 +1,6 @@
 "use client"
 
-import { isBankTransfer, isManual, isMomo, isStripeLike } from "@lib/constants"
+import { isBankTransfer, isManual, isMomo, isStripeLike, isVnpay } from "@lib/constants"
 import { placeOrder } from "@lib/data/cart"
 import { HttpTypes } from "@medusajs/types"
 import { Button } from "@modules/common/components/ui"
@@ -54,6 +54,14 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
     case isMomo(paymentSession?.provider_id):
       return (
         <MomoPaymentButton
+          notReady={notReady}
+          cart={cart}
+          data-testid={dataTestId}
+        />
+      )
+    case isVnpay(paymentSession?.provider_id):
+      return (
+        <VnpayPaymentButton
           notReady={notReady}
           cart={cart}
           data-testid={dataTestId}
@@ -328,4 +336,46 @@ function withReturnContext(
   } catch {
     return paymentUrl
   }
+}
+
+const VnpayPaymentButton = ({
+  cart,
+  notReady,
+  "data-testid": dataTestId,
+}: {
+  cart: HttpTypes.StoreCart
+  notReady: boolean
+  "data-testid"?: string
+}) => {
+  const [submitting, setSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const paymentSession = cart.payment_collection?.payment_sessions?.find(
+    (session) => isVnpay(session.provider_id)
+  )
+  const paymentUrl = paymentSession?.data?.payment_url as string | undefined
+
+  const handlePayment = () => {
+    if (!paymentUrl) {
+      setErrorMessage("VNPay payment URL is not available")
+      return
+    }
+
+    setSubmitting(true)
+    window.location.href = paymentUrl
+  }
+
+  return (
+    <>
+      <Button
+        disabled={notReady || !paymentUrl}
+        isLoading={submitting}
+        onClick={handlePayment}
+        size="large"
+        data-testid={dataTestId}
+      >
+        Pay with VNPay
+      </Button>
+      <ErrorMessage error={errorMessage} data-testid="vnpay-payment-error-message" />
+    </>
+  )
 }

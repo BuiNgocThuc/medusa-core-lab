@@ -1,6 +1,6 @@
 "use client"
 import { RadioGroup } from "@headlessui/react"
-import { isBankTransfer, isMomo, isStripeLike, paymentInfoMap } from "@lib/constants"
+import { isBankTransfer, isMomo, isStripeLike, isVnpay, paymentInfoMap } from "@lib/constants"
 import { initiatePaymentSession } from "@lib/data/cart"
 import { convertToLocale } from "@lib/util/money"
 import { CheckCircleSolid, CreditCard } from "@medusajs/icons"
@@ -45,6 +45,14 @@ type MomoSessionData = {
   message?: string
 }
 
+type VnpaySessionData = {
+  vnp_txn_ref?: string
+  amount?: number
+  currency_code?: string
+  payment_url?: string
+  expires_at?: string
+}
+
 const Payment = ({
   cart,
   availablePaymentMethods,
@@ -74,15 +82,15 @@ const Payment = ({
   const setPaymentMethod = async (method: string) => {
     setError(null)
     setSelectedPaymentMethod(method)
-    if (
-      (isStripeLike(method) || isBankTransfer(method) || isMomo(method)) &&
+      if (
+      (isStripeLike(method) || isBankTransfer(method) || isMomo(method) || isVnpay(method)) &&
       activeSession?.provider_id !== method
     ) {
       await initiatePaymentSession(cart, {
         provider_id: method,
       })
 
-      if (isBankTransfer(method) || isMomo(method)) {
+      if (isBankTransfer(method) || isMomo(method) || isVnpay(method)) {
         router.refresh()
       }
     }
@@ -213,6 +221,13 @@ const Payment = ({
                               data={activeSession.data as MomoSessionData}
                             />
                           )}
+                        {isVnpay(paymentMethod.id) &&
+                          selectedPaymentMethod === paymentMethod.id &&
+                          activeSession?.provider_id === paymentMethod.id && (
+                            <VnpayDetails
+                              data={activeSession.data as VnpaySessionData}
+                            />
+                          )}
                       </PaymentContainer>
                     )}
                   </div>
@@ -291,6 +306,8 @@ const Payment = ({
                           activeSession.data as BankTransferSessionData
                         )?.payment_reference
                       : isMomo(activeSession.provider_id)
+                      ? "Pay on the next step"
+                      : isVnpay(activeSession.provider_id)
                       ? "Pay on the next step"
                       : "Another step will appear"}
                   </Text>
@@ -372,6 +389,34 @@ const MomoDetails = ({ data }: { data?: MomoSessionData }) => {
       <BankTransferRow label="Amount" value={amount} />
       <BankTransferRow label="Expires" value={expiresAt} />
       <BankTransferRow label="Method" value="MoMo wallet" strong />
+    </div>
+  )
+}
+
+const VnpayDetails = ({ data }: { data?: VnpaySessionData }) => {
+  if (!data?.payment_url) {
+    return null
+  }
+
+  const amount =
+    typeof data.amount === "number" && data.currency_code
+      ? convertToLocale({
+          amount: data.amount,
+          currency_code: data.currency_code,
+        })
+      : undefined
+  const expiresAt = data.expires_at
+    ? new Intl.DateTimeFormat("en-US", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(new Date(data.expires_at))
+    : undefined
+
+  return (
+    <div className="grid grid-cols-1 small:grid-cols-2 gap-3 rounded-rounded border border-ui-border-base bg-ui-bg-subtle p-4">
+      <BankTransferRow label="Amount" value={amount} />
+      <BankTransferRow label="Expires" value={expiresAt} />
+      <BankTransferRow label="Method" value="VNPay gateway" strong />
     </div>
   )
 }
