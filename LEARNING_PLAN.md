@@ -2,8 +2,8 @@
 
 > **Muc tieu Trong tam:** Nghien cuu sau ve **Customer Module** trong MedusaJS v2 (v2.20.1). Hieu ro cau truc du lieu mac dinh, co che cach ly (isolation), muc do anh huong (impact) khi tuong tac voi cac module khac (Auth, Order, Cart), ky thuat mo rong qua Metadata / Custom Module + Module Link, va xu ly toan ven du lieu (Data Integrity) giua Guest va Registered Customer khi trien khai Social Login.
 >
-> **Cap nhat lan cuoi:** 2026-09-17
-> **Trang thai:** Dang thuc thi (Hoan thanh Task 1, Task 2, Task 3 - San sang Task 4)
+> **Cap nhat lan cuoi:** 2026-09-18
+> **Trang thai:** Dang thuc thi (Hoan thanh Cum 1: Task 1 - Task 4; San sang Cum 2: Task 5 - Task 6)
 
 ---
 
@@ -12,10 +12,10 @@
 | Phase | Noi dung | Trong tam | Trang thai |
 |---|---|---|---|
 | Phase 1 | Cai dat & Hieu kien truc tong quan | Set up base project, cau hinh Medusa v2 monorepo | [Hoan thanh] |
-| Phase 2 | Deep Dive Customer Module Mac dinh | Data models, co che `has_account`, CRUD API | [Chua bat dau] |
-| Phase 3 | Tuong tac & Impact voi cac Module khac | Cart, Order, Promotion, Auth Identity mapping | [Chua bat dau] |
-| Phase 4 | Mo rong Customer Module (Extend) | Admin API Validation (`additionalDataValidator`), Workflow Hook, Admin Widget | [Chua bat dau] |
-| Phase 5 | Custom Module, Module Link & Saga Workflow | Loyalty Module, Module Link, 4-Step Compensation Rollback, DB Idempotency | [Chua bat dau] |
+| Phase 2 | Deep Dive Customer Module Mac dinh | Data models, co che `has_account`, CRUD API | [Hoan thanh] |
+| Phase 3 | Tuong tac & Impact voi cac Module khac | Cart, Order, Promotion, Auth Identity mapping | [Hoan thanh] |
+| Phase 4 | Mo rong Customer Module (Extend) | Admin API Validation (`additionalDataValidator`), Workflow Hook, Admin Widget | [Hoan thanh] |
+| Phase 5 | Custom Module, Module Link & Saga Workflow | Loyalty Module, Module Link, 4-Step Compensation Rollback, DB Idempotency | [San sang / Tiep theo] |
 | Phase 6 | Quan ly Tinh trang Tai khoan & Chuyen giao Don | Guest vs Registered, Order Transfer Workflows, Research Spike Upgrade | [Chua bat dau] |
 | Phase 7 | Thuc chien: Social Login & Identity Linking | Application-layer orchestration, 3 nhanh OAuth callback, JWT refresh (`/auth/token/refresh`) | [Chua bat dau] |
 
@@ -90,19 +90,19 @@ Khi nhan yeu cau luu them thong tin (Avatar, Zalo ID, Ngay sinh) hoac tich hop d
 ## 5. Lo trinh 8 Tasks Thuc hanh (Tu Easy den Expert)
 
 ```text
-Cluster 1: Foundation & Extensions (Easy - Medium)
-Task 1 [Easy]       : Customer Welcome Subscriber (Event & Notification)
-Task 2 [Easy]       : Admin Request Validation Middleware (additionalDataValidator & Zod)
-Task 3 [Medium]     : Workflow Hook Customization (createCustomersWorkflow Hook)
-Task 4 [Medium]     : Admin Dashboard Extension (customer.details UI Widget)
+Cluster 1: Foundation & Extensions (Easy - Medium) [Hoan thanh]
+Task 1 [Easy]       : Customer Welcome Subscriber (Event & Notification) [Hoan thanh]
+Task 2 [Easy]       : Admin Request Validation Middleware (additionalDataValidator & Zod) [Hoan thanh]
+Task 3 [Medium]     : Workflow Hook Customization (createCustomersWorkflow Hook) [Hoan thanh]
+Task 4 [Medium]     : Admin Dashboard Extension (customer.details UI Widget) [Hoan thanh]
 
-Cluster 2: Custom Module & Distributed Transactions (Medium - Hard)
-Task 5 [Med-Hard]   : Custom Loyalty Module & Module Link (Data Model, Migration, Link)
-Task 6 [Hard]       : Multi-Step Saga Workflow with Compensation (4-Step Rollback & DB Idempotency)
+Cluster 2: Custom Module & Distributed Transactions (Medium - Hard) [San sang]
+Task 5 [Med-Hard]   : Custom Loyalty Module & Module Link (Data Model, Migration, Link) [San sang / Tiep theo]
+Task 6 [Hard]       : Multi-Step Saga Workflow with Compensation (4-Step Rollback & DB Idempotency) [Chua bat dau]
 
-Cluster 3: Identity, Account Reconciliation & Social Auth (Hard - Expert)
-Task 7 [Hard]       : Account Reconciliation & Order Transfer (Production Flow & Upgrade Spike)
-Task 8 [Expert]     : Social Login & Multi-Identity Orchestration (OAuth Callback, 3 Branches, JWT Refresh)
+Cluster 3: Identity, Account Reconciliation & Social Auth (Hard - Expert) [Chua bat dau]
+Task 7 [Hard]       : Account Reconciliation & Order Transfer (Production Flow & Upgrade Spike) [Chua bat dau]
+Task 8 [Expert]     : Social Login & Multi-Identity Orchestration (OAuth Callback, 3 Branches, JWT Refresh) [Chua bat dau]
 ```
 
 ### Chi tiet cac Tasks:
@@ -137,6 +137,7 @@ Task 8 [Expert]     : Social Login & Multi-Identity Orchestration (OAuth Callbac
 
 #### Task 5 [Medium - Hard] - Custom Loyalty Module & Module Link
 - **Muc tieu:** Xay dung module quan ly diem thuong doc lap theo chuan kien truc Module cua Medusa v2.
+- **Trang thai:** [San sang / Tiep theo]
 - **Kien truc:** 
   - Module `loyalty`: Dinh nghia model `LoyaltyAccount` (point balance, tier) tai `src/modules/loyalty`.
   - Module Link: Dinh nghia lien ket giua `customer` va `loyalty_account` qua `defineLink` tai `src/links/customer-loyalty.ts`.
@@ -144,6 +145,7 @@ Task 8 [Expert]     : Social Login & Multi-Identity Orchestration (OAuth Callbac
 
 #### Task 6 [Hard] - Multi-Step Saga Workflow voi Compensation & DB Idempotency
 - **Muc tieu:** Xay dung workflow phuc hop cap diem thuong khi dang ky hoac mua hang, bao dam tinh toan ven theo mo hinh Saga va co che retry an toan.
+- **Trang thai:** [Chua bat dau]
 - **Kien truc:** Dinh nghia custom workflow voi `createStep`, co step thuc thi va compensation function tuong ung.
 - **Thiet ke 4 Buoc An toan (Safe Step Order):**
   - **Step 1:** Kiem tra dieu kien nhan thuong (Validate eligibility).
@@ -159,6 +161,7 @@ Task 8 [Expert]     : Social Login & Multi-Identity Orchestration (OAuth Callbac
 
 #### Task 7 [Hard] - Account Reconciliation & Order Transfer
 - **Muc tieu:** Nam vung co che quan ly Customer khi Guest dang ky tai khoan, chuyen don hang an toan theo kien truc Medusa chuan, va danh gia gioi han cua in-place upgrade.
+- **Trang thai:** [Chua bat dau]
 - **Kien truc:** 
   - Kiem chung tinh hop le cua Partial Unique Index tren database: 1 Guest va 1 Registered cung email ton tai song song.
   - **Luong Production Mac dinh:** Su dung `createCustomerAccountWorkflow` de tao Registered Customer moi, sau do thuc hien chuyen giao don hang tu Guest sang Registered bang cap workflow: `requestOrderTransferWorkflow` (sinh token chuyen don) -> `acceptOrderTransferWorkflow` (xac nhan token va chuyen quyen so huu don sang customer dich).
@@ -167,6 +170,7 @@ Task 8 [Expert]     : Social Login & Multi-Identity Orchestration (OAuth Callbac
 
 #### Task 8 [Expert] - Social Login & Multi-Identity Orchestration
 - **Muc tieu:** Dieu phoi luong dang nhap mang xa hoi (Google OAuth) o tang Application Layer, xu ly day du 3 nhanh sau callback va thuc hien JWT refresh.
+- **Trang thai:** [Chua bat dau]
 - **Kien truc:**
   - Logic dieu phoi khach hang nam tai Store API / Workflow cua Application Layer, tuyet doi khong dua vao provider implementation.
   - Xu ly 3 nhanh sau khi OAuth callback duoc xac thuc:
@@ -181,11 +185,11 @@ Task 8 [Expert]     : Social Login & Multi-Identity Orchestration (OAuth Callbac
 
 Tung cum task chi duoc danh gia la dat yeu cau khi vuot qua day du cac tieu chi kiem chung thuc te duoi day:
 
-| Cum Task | Pham vi | Bang chung Hoan thanh Bat buoc (Evidence) |
-|---|---|---|
-| **Cum 1 (Task 2 - 4)** | Validation, Hook, Widget | - Input sai format gui toi `POST /admin/customers` (Zalo ID khong dung regex, URL hong) bi Middleware chan va tra ve loi 400.<br>- Input dung duoc luu thanh cong vao `metadata`.<br>- Workflow hook khong ghi de hoac lam mat cac truong `metadata` co san truoc do.<br>- Admin Widget tai `customer.details` render dung du lieu va xu ly fallback muot ma khi thieu du lieu. |
-| **Cum 2 (Task 5 - 6)** | Custom Module, Link, Saga | - Database table cua Loyalty Module va Link table duoc tao dung schema qua Medusa migration.<br>- Query Graph truy van thanh cong Customer kem LoyaltyAccount.<br>- Database unique constraint tren ledger/claim ngan chan thanh cong retry cap diem 2 lan tu hai execution doc lap truoc khi balance bi thay doi.<br>- Khi inject loi chu dong o Step 4 cua Workflow, Saga Compensation thuc thi thanh cong rollback sach se ca atomic decrement (Step 3) va xoa ledger claim (Step 2) ve trang thai ban dau. |
-| **Cum 3 (Task 7 - 8)** | Reconciliation, Order Transfer, Social Auth | - Kiem thu thanh cong ca 4 trang thai tai khoan: Guest-only, Registered-only, ca hai cung ton tai mot email, va nhieu AuthIdentity cung lien ket ve mot Customer.<br>- Luong production chuyen don hang an toan qua `requestOrderTransferWorkflow` -> `acceptOrderTransferWorkflow` co xac minh token ma khong can can thiep trai phep vao `has_account`.<br>- Bao cao ro gioi han va rui ro cua In-place Upgrade so voi public Customer contract trong Research Spike.<br>- Xac thuc OAuth phan nhanh chinh xac vao 3 luong va client nhan JWT hop le chua `actor_id` sau khi goi `POST /auth/token/refresh`. |
+| Cum Task | Pham vi | Bang chung Hoan thanh Bat buoc (Evidence) | Trang thai Kiem chung |
+|---|---|---|---|
+| **Cum 1 (Task 2 - 4)** | Validation, Hook, Widget | - Input sai format gui toi `POST /admin/customers` (Zalo ID khong dung regex, URL hong) bi Middleware chan va tra ve loi 400.<br>- Input dung duoc luu thanh cong vao `metadata`.<br>- Workflow hook khong ghi de hoac lam mat cac truong `metadata` co san truoc do.<br>- Admin Widget tai `customer.details` render dung du lieu va xu ly fallback muot ma khi thieu du lieu. | [Hoan thanh & Da xac thuc 100%] |
+| **Cum 2 (Task 5 - 6)** | Custom Module, Link, Saga | - Database table cua Loyalty Module va Link table duoc tao dung schema qua Medusa migration.<br>- Query Graph truy van thanh cong Customer kem LoyaltyAccount.<br>- Database unique constraint tren ledger/claim ngan chan thanh cong retry cap diem 2 lan tu hai execution doc lap truoc khi balance bi thay doi.<br>- Khi inject loi chu dong o Step 4 cua Workflow, Saga Compensation thuc thi thanh cong rollback sach se ca atomic decrement (Step 3) va xoa ledger claim (Step 2) ve trang thai ban dau. | [San sang / Tiep theo] |
+| **Cum 3 (Task 7 - 8)** | Reconciliation, Order Transfer, Social Auth | - Kiem thu thanh cong ca 4 trang thai tai khoan: Guest-only, Registered-only, ca hai cung ton tai mot email, va nhieu AuthIdentity cung lien ket ve mot Customer.<br>- Luong production chuyen don hang an toan qua `requestOrderTransferWorkflow` -> `acceptOrderTransferWorkflow` co xac minh token ma khong can can thiep trai phep vao `has_account`.<br>- Bao cao ro gioi han va rui ro cua In-place Upgrade so voi public Customer contract trong Research Spike.<br>- Xac thuc OAuth phan nhanh chinh xac vao 3 luong va client nhan JWT hop le chua `actor_id` sau khi goi `POST /auth/token/refresh`. | [Chua bat dau] |
 
 ---
 
