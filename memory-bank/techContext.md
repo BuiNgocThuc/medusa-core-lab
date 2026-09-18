@@ -22,7 +22,7 @@
 - Lenh Docker: `docker compose up -d` (PostgreSQL port 5434, Redis port 6381).
 - Lenh chay Backend: `cd my-medusa-store/apps/backend && pnpm dev` (lang nghe tai port 9000, Admin UI tai `http://localhost:9000/app`).
 - Lenh chay Storefront: `cd my-medusa-store/apps/storefront && pnpm dev` (lang nghe tai port 8000).
-- Lenh DB: `cd my-medusa-store/apps/backend && pnpm seed` (hoac `pnpm exec medusa db:migrate`).
+- Lenh DB: `cd my-medusa-store/apps/backend && pnpm seed` (hoac `pnpm exec medusa db:migrate`, sinh migration custom module qua `pnpm exec medusa db:generate <module-name>`).
 - Tai lieu hoc tap: `LEARNING_PLAN.md`, `notes/ai-tools-guide.md`, `notes/question.md`, va `notes/customer-module-extension-plan.md`.
 
 ## Constraints & Gotchas
