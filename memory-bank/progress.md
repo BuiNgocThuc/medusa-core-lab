@@ -26,9 +26,9 @@
   - Task 1 [Easy]: Customer Welcome Subscriber -> [Completed] (code + 4/4 unit tests).
   - Task 2 [Easy]: Admin Request Validation Middleware (`additionalDataValidator` & Zod tren `POST /admin/customers`) -> [Completed] (code + 7/7 unit tests + pass lint).
   - Task 3 [Medium]: Workflow Hook Customization (`createCustomersWorkflow.hooks.customersCreated`) -> [Completed] (code + 8/8 unit tests + 2/2 HTTP integration tests + Bruno Black-box 10/10 requests PASS 27/27 assertions + Notion docs + git pushed).
-  - Task 4 [Medium]: Admin Dashboard UI Widget (`customer.details` zone) -> [Ready / Next Up].
+  - Task 4 [Medium]: Admin Dashboard UI Widget (`customer.details` zone) -> [Completed] (code + 0 tsc errors + 0 lint errors + verified live on Medusa Admin UI with dark mode and fallbacks).
 - **Cluster 2: Custom Module & Distributed Transactions (Medium - Hard)**
-  - Task 5 [Med-Hard]: Custom Loyalty Module & Module Link (`defineLink`, migration) -> [Pending].
+  - Task 5 [Med-Hard]: Custom Loyalty Module & Module Link (`defineLink`, migration) -> [Ready / Next Up].
   - Task 6 [Hard]: Multi-Step Saga Workflow with Compensation (4-step rollback & DB unique idempotency) -> [Pending].
 - **Cluster 3: Identity, Account Reconciliation & Social Auth (Hard - Expert)**
   - Task 7 [Hard]: Account Reconciliation & Order Transfer (`createCustomerAccountWorkflow` + `requestOrderTransferWorkflow` / `acceptOrderTransferWorkflow` vs In-place Upgrade Spike) -> [Pending].

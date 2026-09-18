@@ -131,6 +131,7 @@ Task 8 [Expert]     : Social Login & Multi-Identity Orchestration (OAuth Callbac
 
 #### Task 4 [Medium] - Admin Dashboard UI Widget
 - **Muc tieu:** Hien thi thong tin mo rong (Avatar, Zalo ID) truc quan tren trang chi tiet khach hang trong Medusa Admin.
+- **Trang thai:** Da hoan thanh ma nguon tai `src/admin/widgets/customer-extra-details.tsx`, pass 0 tsc errors, pass 0 lint errors, va da xac thuc truc quan (Runtime Verification) tren live Medusa Admin UI dat 100% yeu cau ve layout, badge, copy va fallback an toan.
 - **Kien truc:** Su dung Widget Injection Zone `customer.details` tai `src/admin/widgets/customer-extra-details.tsx`.
 - **Dac ta:** Render Avatar image, Zalo ID badge; xu ly fallback an toan khi du lieu metadata bi trong hoac chua co du lieu.
 

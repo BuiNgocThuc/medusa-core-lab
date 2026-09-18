@@ -60,6 +60,10 @@
   - *Black-Box Testing & Runner Guard Pattern:* Bo test suite Bruno API (`bruno/`) su dung chot chan `if (req.getExecutionMode() === "runner") { bru.runner.skipRequest(); }` de tu dong bo qua cac request DELETE khi chay Runner tu dong, chi thuc thi khi bam nut Send thu cong.
   - *Storefront API (`POST /store/customers`):* Dung `StoreCreateCustomer`, khong nhan `additional_data`. Storefront truyen du lieu tuy bien qua `metadata` hoac tao custom Store route + workflow neu can contract chat che.
   - *Event Subscriber (`src/subscribers/*`):* Chay ngam async sau khi DB commit; danh rieng cho tac vu Irreversible (Email, SMS, thong bao).
+  - *Admin Dashboard UI Widget Pattern (`src/admin/widgets/*`):*
+    - *Discovery & Registration:* Vite bundler (`@medusajs/admin-vite-plugin`) tu dong crawl thu muc `src/admin/widgets/**/*.tsx`, trich xuat `export const config = defineWidgetConfig({ zone: "customer.details" })` va nap component `export default` vao `DashboardApp.populateWidgets`.
+    - *Layout Composer Handshake:* Core dashboard tai `customer-detail.tsx` goi `<LayoutComposer widgetsZonePrefix="customer.details" data={customer} />`, tu dong khop prefix voi widget zone va truyen prop `data` kieu `DetailWidgetProps<HttpTypes.AdminCustomer>`.
+    - *Defensive UI Fallback:* Widget trien khai cac ham helper doc lap (`parseHttpUrl`, `getValidZaloId`, `getCustomerInitials`) de xu ly phong thu da tang: tu dong fallback ve Initials khi URL anh loi 404 hoac metadata rong; chan du lieu xau ma khong lam vo layout hay giat man hinh; dong bo toan dien voi he thong component `@medusajs/ui` trong ca hai che do Light va Dark mode.
 - **2-Layer Defense Pattern (Default Address):**
   - *Layer 1 (Application Workflow):* Step `maybeUnsetDefaultShippingAddressesStep` tu dong tim va go co `false` cho cac dia chi cu khi them/sua dia chi mac dinh moi.
   - *Layer 2 (PostgreSQL Index):* `IDX_customer_address_unique_customer_shipping/billing` (`UNIQUE(customer_id) WHERE is_default_... = true`) chan dung Race Condition o tang DB.

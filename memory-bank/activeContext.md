@@ -1,9 +1,17 @@
 # Active Context
 
 ## Current Focus
-Chinh thuc hoan thanh va xac thuc toan dien 100% **Task 3: Workflow Hook Customization** qua bo kiem thu Black-box Bruno API Collection dat 10/10 requests PASS (27/27 assertions PASS) tren live backend. He thong backend (port 9000), storefront (port 8000), database `medusa_core_lab_db` (port 5434), va redis (port 6381) da hoat dong on dinh. MCP Server `medusa_core_lab_db` da ket noi thanh cong. San sang 100% buoc vao **Task 4: Admin Dashboard UI Widget** (`customer.details`).
+Chinh thuc hoan thanh va xac thuc toan dien 100% **Task 4: Admin Dashboard UI Widget** (`customer.details`), khep lai thanh cong tron ven 100% **Cum 1: Foundation & Extensions (Task 1 -> Task 4)**. San sang 100% buoc vao **Cum 2: Custom Module & Distributed Transactions (Task 5: Custom Loyalty Module & Module Link)**.
 
 ## Recent Changes
+- Hoan thanh tron ven 100% **Task 4: Admin Dashboard UI Widget** (`customer.details`):
+  - Trien khai widget component tai `my-medusa-store/apps/backend/src/admin/widgets/customer-extra-details.tsx` gan vao injection zone `customer.details`.
+  - Tich hop chat che he thong Medusa UI (`@medusajs/ui`): `Container`, `Heading`, `Text`, `Avatar`, `Badge`, `Copy` tuong thich 100% ca Dark va Light mode.
+  - Xay dung 3 ham defensive helpers doc lap: `parseHttpUrl` (validate giao thuc http/https, chiet xuat hostname), `getValidZaloId` (regex 8-20 chu so), `getCustomerInitials` (fallback da tang: Full Name -> First -> Last -> Email -> "?").
+  - Loai bo triet de 100% chi thi `@ts-ignore` va type warnings, tuan thu nghiem ngat `noUnusedLocals` va `noUnusedParameters`.
+  - Kiem dinh tinh (Static Verification): `tsc --noEmit -p src/admin/tsconfig.json` dat 0 loi; `medusa lint` dat 0 loi tren ma nguon moi.
+  - Kiem dinh thuc te (Runtime Verification) tren live Medusa Admin (`http://localhost:9000/app`): Xac thuc truc quan qua trinh duyet tai trang chi tiet khach hang `Nguyen Van A` (`cus_01M2PRBFEAR0KG4TNT1ST0EXRZ`), avatar fallback ve "NV" khi link anh dummy 404, hostname va Zalo ID hien thi chuan kem nut Copy.
+  - Doi chieu sau kien truc Core Medusa v2: Lam ro 4 vi tri cot loi tu Vite bundler (`helpers.ts`, `generate-widgets.ts`), `DashboardApp.populateWidgets`, `customer-detail.tsx`, den `LayoutComposer`.
 - Hoan thanh tron ven 100% **Task 3: Workflow Hook Customization** va Black-box API Verification:
   - Trien khai hook registration tai `src/workflows/hooks/customer-created.ts` va isolated handler tai `src/workflows/hooks/handlers/handle-customers-created.ts`.
   - Tuyen bo `customerAdditionalDataSchema` tai `src/utils/customer-additional-data.ts` lam Single Source of Truth cho ca Middleware va Hook.
@@ -62,9 +70,12 @@ Chinh thuc hoan thanh va xac thuc toan dien 100% **Task 3: Workflow Hook Customi
 - Tuan thu Antigravity CLI Delegation Rule: IDE khong tu dong chay cac lenh commit, push, build, test; cung cap CLI task blocks day du de user thuc thi qua terminal ngoai.
 
 ## Next Steps
-1. Pair-programming Task 4: Xay dung Admin Dashboard UI Widget (`src/admin/widgets/customer-extra-details.tsx`) tai Injection Zone `customer.details`.
-2. Render truc quan cac truong `avatar_url` va `zalo_id` lay tu `metadata` cua khach hang tren trang quan tri Medusa Admin.
-3. Xu ly an toan fallback khi khach hang chua co `metadata` hoac khong co du lieu mo rong.
+1. Thuc thi cac commit tach biet va day len branch `feature/MEDUSA-001-extendsion-customer-module` theo Antigravity CLI Delegation Rule.
+2. Bat dau Task 5 [Med-Hard]: Custom Loyalty Module & Module Link:
+   - Dinh nghia model `LoyaltyAccount` (point balance, tier) tai `src/modules/loyalty`.
+   - Sinh migration tao bang du lieu qua Medusa CLI.
+   - Thiet lap Module Link (`defineLink`) giua `CustomerModule` va `LoyaltyModule`.
+3. Kiem chung truy van thong qua Query Graph v2 de lay Customer kem LoyaltyAccount.
 
 ## Known Issues / Blockers
-- Khong co. Task 1, Task 2 va Task 3 da hoan thanh 100%, he thong san sang cho Task 4.
+- Khong co. Cum 1 (Task 1, 2, 3, 4) da hoan thanh 100%, he thong san sang cho Task 5.
