@@ -1,9 +1,23 @@
 # Active Context
 
 ## Current Focus
-Chinh thuc hoan thanh va xac thuc toan dien 100% **Task 4: Admin Dashboard UI Widget** (`customer.details`), khep lai thanh cong tron ven 100% **Cum 1: Foundation & Extensions (Task 1 -> Task 4)**. San sang 100% buoc vao **Cum 2: Custom Module & Distributed Transactions (Task 5: Custom Loyalty Module & Module Link)**.
+Dang trien khai **Task 5: Custom Loyalty Module & Module Link** theo ke hoach chi tiet da luu tai `memory-bank/task-5-implementation-plan.md`. Da hoan thanh xong **Buoc 1** (Xay dung Data Model `LoyaltyAccount`, Service `LoyaltyModuleService` ke thua `MedusaService`, va Module definition `index.ts` tai `apps/backend/src/modules/loyalty`). Tam dung phien lam viec tai vi tri `service.ts`, san sang tiep tuc Buoc 2 (Dang ky module vao `medusa-config.ts` va sinh database migration).
 
 ## Recent Changes
+- Hoan thanh **Buoc 1 cua Task 5: Custom Loyalty Module (Domain & Service Layer)**:
+  - Trien khai model `LoyaltyAccount` tai `apps/backend/src/modules/loyalty/models/loyalty-account.ts` voi cac truong `id` (primaryKey), `customer_id` (unique text theo mo hinh Hybrid Reference), `points` (number default 0), `tier` (enum LoyaltyTier BRONZE/SILVER/GOLD default BRONZE).
+  - Trien khai service `LoyaltyModuleService` tai `apps/backend/src/modules/loyalty/service.ts` ke thua factory function `MedusaService({ LoyaltyAccount })`.
+  - Trien khai module definition tai `apps/backend/src/modules/loyalty/index.ts` export default `Module("loyalty", { service: LoyaltyModuleService })`.
+  - Nghien cuu va doi chieu co che van hanh noi bo cua `MedusaService` truc tiep trong `medusa-core-source`:
+    - Runtime: `packages/core/utils/src/modules-sdk/medusa-service.ts` (Dynamic prototype injection cho 8 phuong thuc CRUD, tu dong dinh kem cac decorators `@MedusaContext`, `@EmitEvents`, `@InjectManager`).
+    - Compile-time: `packages/core/utils/src/modules-sdk/types/medusa-service.ts` (Template Literal Mapped Types tu dong suy dien chu ky ham type-safe theo so it/so nhieu cho IDE autocomplete).
+- Hoan thanh thiet ke kien truc & dong bo tai lieu cho **Task 5: Custom Loyalty Module & Module Link**:
+  - Chot mo hinh Hybrid Reference: `LoyaltyAccount` model voi `customer_id` (unique), `tier` (enum BRONZE/SILVER/GOLD), `points` (default 0) va Stored Link 1–1 toi Customer Module.
+  - Doi chieu ma nguon Medusa Core (`link.ts`, `delete-customers.ts`): Loai bo `deleteCascade` khoi Task 5 vi core khong tu dong cascade custom links khi xoa Customer; xac nhan bang link doc lap khong co Foreign Key xuyen module.
+  - Thiet ke bo 6 ca kiem thu tich hop su dung `medusaIntegrationTestRunner` tren runtime Medusa 2.20.1 va script CLI chi doc (`verify-loyalty.ts`) theo hop dong `ExecArgs`.
+  - Dong bo hang muc don dep Customer deletion vao pham vi Task 6 tai `LEARNING_PLAN.md` (line 161).
+  - Xuat ban tai lieu ky thuat chi tiet len Notion page `Task 5: Triển Khai Loyalty Module & Module Link (Kiến Trúc Hybrid Reference & Stored Link)` (`3dfb526d-69e7-819d-a67d-d916d2dd7161`).
+  - Cap nhat task tren LarkSuite Base (`recvvyyuLcss2n`) theo dung triet ly Understated Rigor va Zero-Emoji Policy.
 - Hoan thanh tron ven 100% **Task 4: Admin Dashboard UI Widget** (`customer.details`):
   - Trien khai widget component tai `my-medusa-store/apps/backend/src/admin/widgets/customer-extra-details.tsx` gan vao injection zone `customer.details`.
   - Tich hop chat che he thong Medusa UI (`@medusajs/ui`): `Container`, `Heading`, `Text`, `Avatar`, `Badge`, `Copy` tuong thich 100% ca Dark va Light mode.
@@ -70,12 +84,19 @@ Chinh thuc hoan thanh va xac thuc toan dien 100% **Task 4: Admin Dashboard UI Wi
 - Tuan thu Antigravity CLI Delegation Rule: IDE khong tu dong chay cac lenh commit, push, build, test; cung cap CLI task blocks day du de user thuc thi qua terminal ngoai.
 
 ## Next Steps
-1. Thuc thi cac commit tach biet va day len branch `feature/MEDUSA-001-extendsion-customer-module` theo Antigravity CLI Delegation Rule.
-2. Bat dau Task 5 [Med-Hard]: Custom Loyalty Module & Module Link:
-   - Dinh nghia model `LoyaltyAccount` (point balance, tier) tai `src/modules/loyalty`.
-   - Sinh migration tao bang du lieu qua Medusa CLI.
-   - Thiet lap Module Link (`defineLink`) giua `CustomerModule` va `LoyaltyModule`.
-3. Kiem chung truy van thong qua Query Graph v2 de lay Customer kem LoyaltyAccount.
+1. Tiep tuc Task 5 - Buoc 2:
+   - Dang ky module `loyalty` vao `apps/backend/medusa-config.ts`.
+   - Sinh migration cho module `loyalty`: `pnpm exec medusa db:generate loyalty`.
+   - Chay migration cap nhat database: `pnpm exec medusa db:migrate`.
+2. Task 5 - Buoc 3:
+   - Dinh nghia Stored Module Link tai `apps/backend/src/links/customer-loyalty.ts` (`defineLink` giua `CustomerModule.linkable.customer` va `LoyaltyModule.linkable.loyaltyAccount`).
+   - Dong bo link table vao PostgreSQL qua `pnpm exec medusa db:migrate`.
+3. Task 5 - Buoc 4:
+   - Xay dung bo Integration Test tai `apps/backend/src/modules/loyalty/__tests__/link.spec.ts` (6 test cases kiem tra default values, unique customer_id, query.graph, link isolation, 1-1 constraint rejection, va hybrid drift).
+4. Task 5 - Buoc 5:
+   - Xay dung script CLI `apps/backend/src/scripts/verify-loyalty.ts` tuan thu contract `ExecArgs`.
+   - Chay `pnpm exec medusa lint` va `pnpm run build` kiem tra type safety.
+5. Ban giao va chuyen tiep sang Task 6 (Saga Workflow).
 
 ## Known Issues / Blockers
 - Khong co. Cum 1 (Task 1, 2, 3, 4) da hoan thanh 100%, he thong san sang cho Task 5.
