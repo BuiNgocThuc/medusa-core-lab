@@ -14,11 +14,13 @@ export async function POST(
 ) {
   const guest_cart_id = req.params.id
   const customer_id = req.auth_context?.actor_id
+  const sales_channel_id = (req as any).publishable_key_context.sales_channel_ids[0]
 
   const { result } = await mergeGuestCartIntoCustomerCartWorkflow(req.scope).run({
     input: {
       guest_cart_id,
       customer_id,
+      sales_channel_id,
       additional_data: req.validatedBody?.additional_data,
     },
   })

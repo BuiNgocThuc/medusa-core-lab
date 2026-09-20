@@ -1,6 +1,7 @@
 export type MergeGuestCartInput = {
   customer_id: string
   guest_cart_id: string
+  sales_channel_id: string
   additional_data?: Record<string, unknown>
 }
 

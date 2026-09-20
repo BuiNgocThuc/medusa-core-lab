@@ -8,6 +8,7 @@ import {
   WorkflowData,
   WorkflowResponse,
 } from "@medusajs/framework/workflows-sdk"
+import { MedusaError } from "@medusajs/framework/utils"
 import {
   acquireLockStep,
   addToCartWorkflow,
@@ -30,6 +31,19 @@ const logStep = createStep(
   }
 )
 
+const validateSalesChannelMismatchStep = createStep(
+  "validate-sales-channel-mismatch",
+  async (data: { guest_sales_channel_id: string | null; expected_sales_channel_id: string }) => {
+    if (data.guest_sales_channel_id && data.guest_sales_channel_id !== data.expected_sales_channel_id) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        `SALES_CHANNEL_MISMATCH: Guest cart belongs to sales channel '${data.guest_sales_channel_id}' but request targets '${data.expected_sales_channel_id}'`
+      )
+    }
+    return new StepResponse(true)
+  }
+)
+
 export const mergeGuestCartIntoCustomerCartWorkflow = createWorkflow(
   {
     name: "merge-guest-cart-into-customer-cart",
@@ -47,6 +61,7 @@ export const mergeGuestCartIntoCustomerCartWorkflow = createWorkflow(
       entity: "cart",
       filters: {
         customer_id: input.customer_id,
+        sales_channel_id: input.sales_channel_id,
         completed_at: null,
       },
       fields: [
@@ -168,10 +183,21 @@ export const mergeGuestCartIntoCustomerCartWorkflow = createWorkflow(
         },
       }).config({ name: "get-guest-cart" })
 
+      // Validate: Guest cart phải cùng Sales Channel với request hiện tại
+      const mismatchInput = transform(
+        { guestCart, input },
+        ({ guestCart, input }) => ({
+          guest_sales_channel_id: guestCart.data?.sales_channel_id ?? null,
+          expected_sales_channel_id: input.sales_channel_id,
+        })
+      )
+
+      validateSalesChannelMismatchStep(mismatchInput).config({ name: "validate-sales-channel-mismatch" })
+
       // Chuan bi input de validate inventory (gom ca Cart A va Cart B)
       const validationInput = transform(
-        { customerCartTransform, guestCart },
-        ({ customerCartTransform, guestCart }) => {
+        { customerCartTransform, guestCart, input },
+        ({ customerCartTransform, guestCart, input }) => {
           const guestItems = (guestCart.data?.items ?? [])
             .filter((item) => Boolean(item?.variant_id))
             .map((item) => ({
@@ -194,7 +220,7 @@ export const mergeGuestCartIntoCustomerCartWorkflow = createWorkflow(
             }))
 
           return {
-            sales_channel_id: customerCartTransform?.sales_channel_id,
+            sales_channel_id: input.sales_channel_id,
             guest_items: guestItems,
             existing_items: existingItems,
           }

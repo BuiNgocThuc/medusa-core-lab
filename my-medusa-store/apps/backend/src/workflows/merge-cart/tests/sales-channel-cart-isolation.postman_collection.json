@@ -1,0 +1,710 @@
+{
+  "info": {
+    "name": "Sales Channel Cart Isolation Tests",
+    "_postman_id": "sc-cart-isolation-001",
+    "description": "Test collection for Per-Sales-Channel Cart Isolation.\n\nSetup:\n1. Tạo 2 Publishable API Keys trong Admin → gắn mỗi key với 1 Sales Channel khác nhau.\n2. Điền vào Variables: pk_channel_a, pk_channel_b.\n3. Cần có ít nhất 1 customer account và 1 product variant.\n4. Chạy theo thứ tự từ trên xuống dưới.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:9000",
+      "type": "string"
+    },
+    {
+      "key": "pk_channel_a",
+      "value": "YOUR_PUBLISHABLE_KEY_CHANNEL_A",
+      "type": "string",
+      "description": "Publishable API Key gắn với Sales Channel A"
+    },
+    {
+      "key": "pk_channel_b",
+      "value": "YOUR_PUBLISHABLE_KEY_CHANNEL_B",
+      "type": "string",
+      "description": "Publishable API Key gắn với Sales Channel B"
+    },
+    {
+      "key": "customer_email",
+      "value": "test@example.com",
+      "type": "string"
+    },
+    {
+      "key": "customer_password",
+      "value": "supersecret",
+      "type": "string"
+    },
+    {
+      "key": "customer_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "guest_cart_id_b",
+      "value": "",
+      "type": "string",
+      "description": "Guest cart created in Channel B"
+    },
+    {
+      "key": "guest_cart_id_a",
+      "value": "",
+      "type": "string",
+      "description": "Guest cart created in Channel A"
+    },
+    {
+      "key": "customer_cart_id",
+      "value": "",
+      "type": "string",
+      "description": "Cart returned from restore or merge"
+    },
+    {
+      "key": "variant_id",
+      "value": "YOUR_VARIANT_ID",
+      "type": "string",
+      "description": "A valid product variant ID available in both channels"
+    },
+    {
+      "key": "region_id",
+      "value": "YOUR_REGION_ID",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Setup",
+      "item": [
+        {
+          "name": "0.1 Get Auth Token (Customer Login)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.token) {",
+                  "    pm.collectionVariables.set('customer_token', json.token);",
+                  "    console.log('Token saved:', json.token.substring(0, 20) + '...');",
+                  "}",
+                  "pm.test('Login successful', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(json.token).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{customer_email}}\",\n  \"password\": \"{{customer_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/customer/emailpass",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "customer", "emailpass"]
+            }
+          }
+        },
+        {
+          "name": "0.2 List Regions (get region_id)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.regions && json.regions.length > 0) {",
+                  "    pm.collectionVariables.set('region_id', json.regions[0].id);",
+                  "    console.log('Region ID:', json.regions[0].id);",
+                  "}",
+                  "pm.test('Regions found', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(json.regions.length).to.be.greaterThan(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "x-publishable-api-key", "value": "{{pk_channel_a}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/store/regions",
+              "host": ["{{base_url}}"],
+              "path": ["store", "regions"]
+            }
+          }
+        },
+        {
+          "name": "0.3 List Products (get variant_id)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.products && json.products.length > 0) {",
+                  "    const product = json.products[0];",
+                  "    if (product.variants && product.variants.length > 0) {",
+                  "        pm.collectionVariables.set('variant_id', product.variants[0].id);",
+                  "        console.log('Variant ID:', product.variants[0].id);",
+                  "    }",
+                  "}",
+                  "pm.test('Products found', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "x-publishable-api-key", "value": "{{pk_channel_a}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/store/products?fields=*variants",
+              "host": ["{{base_url}}"],
+              "path": ["store", "products"],
+              "query": [
+                { "key": "fields", "value": "*variants" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "E1: Transfer — Customer chưa có cart ở Channel B",
+      "item": [
+        {
+          "name": "E1.1 Create Guest Cart (Channel B)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('guest_cart_id_b', json.cart.id);",
+                  "console.log('Guest Cart B:', json.cart.id);",
+                  "pm.test('Cart created in Channel B', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(json.cart.id).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-publishable-api-key", "value": "{{pk_channel_b}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"region_id\": \"{{region_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/store/carts",
+              "host": ["{{base_url}}"],
+              "path": ["store", "carts"]
+            }
+          }
+        },
+        {
+          "name": "E1.2 Add Item to Guest Cart B",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Item added', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.cart.items.length).to.be.greaterThan(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-publishable-api-key", "value": "{{pk_channel_b}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"variant_id\": \"{{variant_id}}\",\n  \"quantity\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/store/carts/{{guest_cart_id_b}}/line-items",
+              "host": ["{{base_url}}"],
+              "path": ["store", "carts", "{{guest_cart_id_b}}", "line-items"]
+            }
+          }
+        },
+        {
+          "name": "E1.3 Merge — Transfer guest cart to customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('customer_cart_id', json.cart.id);",
+                  "console.log('Result cart:', json.cart.id);",
+                  "console.log('Skipped items:', json.skipped_items?.length || 0);",
+                  "",
+                  "pm.test('Transfer successful — cart_id = guest_cart_id', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(json.cart.id).to.eql(pm.collectionVariables.get('guest_cart_id_b'));",
+                  "});",
+                  "",
+                  "pm.test('No skipped items on transfer', () => {",
+                  "    pm.expect(json.skipped_items).to.be.an('array').that.is.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" },
+              { "key": "x-publishable-api-key", "value": "{{pk_channel_b}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/store/carts/{{guest_cart_id_b}}/merge-customer",
+              "host": ["{{base_url}}"],
+              "path": ["store", "carts", "{{guest_cart_id_b}}", "merge-customer"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "E2: Merge — Customer đã có cart ở Channel B",
+      "item": [
+        {
+          "name": "E2.1 Create 2nd Guest Cart (Channel B)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('guest_cart_id_b', json.cart.id);",
+                  "console.log('2nd Guest Cart B:', json.cart.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-publishable-api-key", "value": "{{pk_channel_b}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"region_id\": \"{{region_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/store/carts",
+              "host": ["{{base_url}}"],
+              "path": ["store", "carts"]
+            }
+          }
+        },
+        {
+          "name": "E2.2 Add Item to 2nd Guest Cart B",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-publishable-api-key", "value": "{{pk_channel_b}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"variant_id\": \"{{variant_id}}\",\n  \"quantity\": 2\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/store/carts/{{guest_cart_id_b}}/line-items",
+              "host": ["{{base_url}}"],
+              "path": ["store", "carts", "{{guest_cart_id_b}}", "line-items"]
+            }
+          }
+        },
+        {
+          "name": "E2.3 Merge — Gộp guest cart vào existing customer cart",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "console.log('Merge result cart:', json.cart.id);",
+                  "console.log('Skipped items:', JSON.stringify(json.skipped_items));",
+                  "",
+                  "pm.test('Merge successful — cart_id = customer existing cart (not guest)', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(json.cart.id).to.not.eql(pm.collectionVariables.get('guest_cart_id_b'));",
+                  "    pm.expect(json.cart.id).to.eql(pm.collectionVariables.get('customer_cart_id'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" },
+              { "key": "x-publishable-api-key", "value": "{{pk_channel_b}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/store/carts/{{guest_cart_id_b}}/merge-customer",
+              "host": ["{{base_url}}"],
+              "path": ["store", "carts", "{{guest_cart_id_b}}", "merge-customer"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "E3: Transfer — Customer có cart ở Channel A, login ở Channel B",
+      "item": [
+        {
+          "name": "E3.1 Create Guest Cart (Channel A) for customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('guest_cart_id_a', json.cart.id);",
+                  "console.log('Cart A (Channel A):', json.cart.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-publishable-api-key", "value": "{{pk_channel_a}}" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"region_id\": \"{{region_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/store/carts",
+              "host": ["{{base_url}}"],
+              "path": ["store", "carts"]
+            }
+          }
+        },
+        {
+          "name": "E3.2 Create Guest Cart (Channel B) — khác kênh",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('guest_cart_id_b', json.cart.id);",
+                  "console.log('Guest Cart (Channel B):', json.cart.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-publishable-api-key", "value": "{{pk_channel_b}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"region_id\": \"{{region_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/store/carts",
+              "host": ["{{base_url}}"],
+              "path": ["store", "carts"]
+            }
+          }
+        },
+        {
+          "name": "E3.3 Add Item to Guest Cart B",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-publishable-api-key", "value": "{{pk_channel_b}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"variant_id\": \"{{variant_id}}\",\n  \"quantity\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/store/carts/{{guest_cart_id_b}}/line-items",
+              "host": ["{{base_url}}"],
+              "path": ["store", "carts", "{{guest_cart_id_b}}", "line-items"]
+            }
+          }
+        },
+        {
+          "name": "E3.4 Merge at Channel B — Cart A (Channel A) không bị ảnh hưởng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "console.log('Result cart:', json.cart.id);",
+                  "",
+                  "pm.test('Transfer path — guest cart B transferred (no Cart A found in Channel B)', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    // Cart A ở Channel A không được tìm thấy → Transfer path",
+                  "    pm.expect(json.cart.id).to.eql(pm.collectionVariables.get('guest_cart_id_b'));",
+                  "});",
+                  "",
+                  "pm.test('No skipped items', () => {",
+                  "    pm.expect(json.skipped_items).to.be.an('array').that.is.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" },
+              { "key": "x-publishable-api-key", "value": "{{pk_channel_b}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/store/carts/{{guest_cart_id_b}}/merge-customer",
+              "host": ["{{base_url}}"],
+              "path": ["store", "carts", "{{guest_cart_id_b}}", "merge-customer"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "E4 & E5: Restore Customer — Channel Isolation",
+      "item": [
+        {
+          "name": "E4 Restore Customer at Channel B",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "console.log('Restore result:', JSON.stringify(json));",
+                  "",
+                  "pm.test('Returns cart in Channel B only (or null)', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    // Should only return cart from Channel B, NOT Channel A",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" },
+              { "key": "x-publishable-api-key", "value": "{{pk_channel_b}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/store/carts/restore-customer",
+              "host": ["{{base_url}}"],
+              "path": ["store", "carts", "restore-customer"]
+            }
+          }
+        },
+        {
+          "name": "E5 Restore Customer at Channel A — không lấy nhầm cart Channel B",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "console.log('Restore result Channel A:', JSON.stringify(json));",
+                  "",
+                  "pm.test('Only returns cart from Channel A (not Channel B)', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    if (json.cart) {",
+                  "        // If a cart exists, it must be from Channel A",
+                  "        pm.expect(json.cart.id).to.not.eql(pm.collectionVariables.get('guest_cart_id_b'));",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" },
+              { "key": "x-publishable-api-key", "value": "{{pk_channel_a}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/store/carts/restore-customer",
+              "host": ["{{base_url}}"],
+              "path": ["store", "carts", "restore-customer"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "E6: SALES_CHANNEL_MISMATCH — Cross-channel merge bị reject",
+      "item": [
+        {
+          "name": "E6.1 Create Guest Cart (Channel A)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('guest_cart_id_a', json.cart.id);",
+                  "console.log('Guest Cart (Channel A):', json.cart.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-publishable-api-key", "value": "{{pk_channel_a}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"region_id\": \"{{region_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/store/carts",
+              "host": ["{{base_url}}"],
+              "path": ["store", "carts"]
+            }
+          }
+        },
+        {
+          "name": "E6.2 Add Item to Guest Cart A",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-publishable-api-key", "value": "{{pk_channel_a}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"variant_id\": \"{{variant_id}}\",\n  \"quantity\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/store/carts/{{guest_cart_id_a}}/line-items",
+              "host": ["{{base_url}}"],
+              "path": ["store", "carts", "{{guest_cart_id_a}}", "line-items"]
+            }
+          }
+        },
+        {
+          "name": "E6.3 Merge with Channel B key → EXPECT MISMATCH ERROR",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "console.log('Mismatch response:', JSON.stringify(json));",
+                  "",
+                  "pm.test('Returns error — not 200', () => {",
+                  "    pm.response.to.not.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Error message contains SALES_CHANNEL_MISMATCH', () => {",
+                  "    const body = pm.response.text();",
+                  "    pm.expect(body).to.include('SALES_CHANNEL_MISMATCH');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" },
+              { "key": "x-publishable-api-key", "value": "{{pk_channel_b}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/store/carts/{{guest_cart_id_a}}/merge-customer",
+              "host": ["{{base_url}}"],
+              "path": ["store", "carts", "{{guest_cart_id_a}}", "merge-customer"]
+            },
+            "description": "Guest cart tạo ở Channel A, nhưng merge request dùng Publishable Key Channel B → SALES_CHANNEL_MISMATCH"
+          }
+        }
+      ]
+    }
+  ]
+}

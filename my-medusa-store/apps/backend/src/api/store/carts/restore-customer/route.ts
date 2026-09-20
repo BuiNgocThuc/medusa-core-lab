@@ -11,13 +11,15 @@ export async function POST(
 ) {
     const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
     const customerId = req.auth_context?.actor_id
+    const salesChannelId = (req as any).publishable_key_context.sales_channel_ids[0]
 
-    // 1. Chỉ query lấy id và created_at của các cart chưa checkout
+    // 1. Chỉ query lấy id và created_at của các cart chưa checkout trong cùng Sales Channel
     const { data: carts } = await query.graph({
         entity: "cart",
-        fields: ["id", "created_at"],
+        fields: ["id", "created_at", "sales_channel_id"],
         filters: {
             customer_id: customerId,
+            sales_channel_id: salesChannelId,
             completed_at: null,
         },
     })

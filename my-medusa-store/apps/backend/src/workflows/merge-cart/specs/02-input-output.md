@@ -12,6 +12,7 @@ Define the input and output contract of the `mergeGuestCartIntoCustomerCartWorkf
 export type MergeGuestCartInput = {
   customer_id: string
   guest_cart_id: string
+  sales_channel_id: string
   additional_data?: Record<string, unknown>
 }
 ```
@@ -26,6 +27,12 @@ export type MergeGuestCartInput = {
 #### `guest_cart_id` (Required)
 - The ID of the guest cart (Cart B) passed via URL param `:id`.
 - The source cart to be transferred or merged and subsequently cleaned up.
+
+#### `sales_channel_id` (Required)
+- The Sales Channel ID extracted from `req.publishable_key_context.sales_channel_ids[0]`.
+- On `/store` routes, the `x-publishable-api-key` header is **mandatory**, so this value is always available.
+- Used to scope Cart Discovery to the current Sales Channel (ensuring per-channel cart isolation).
+- Used to validate that the guest cart belongs to the same Sales Channel as the request (cross-channel merge is rejected with `SALES_CHANNEL_MISMATCH`).
 
 #### `additional_data` (Optional)
 - Optional metadata or extension attributes passed from the client body.
@@ -71,9 +78,11 @@ export type MergeGuestCartOutput = {
 
 * **Endpoint:** `POST /store/carts/:id/merge-customer`
 * **Auth:** Required `Bearer <customer_token>`
+* **Header:** Required `x-publishable-api-key: <publishable_key>` (standard for all `/store` routes)
 
 ### Request
 - **URL Param `:id`**: `guest_cart_id`
+- **Header**: `x-publishable-api-key` — determines `sales_channel_id`
 - **Body**:
 ```json
 {
@@ -98,3 +107,11 @@ export type MergeGuestCartOutput = {
   ]
 }
 ```
+
+### Error Response (`400 Bad Request` — Cross-Channel Mismatch)
+```json
+{
+  "type": "invalid_data",
+  "message": "SALES_CHANNEL_MISMATCH: Guest cart belongs to sales channel 'sc_A' but request targets 'sc_B'"
+}
+```

@@ -2,19 +2,20 @@
 
 ## Purpose
 
-Discover and resolve whether the authenticated customer has an existing active cart (Cart A) prior to executing merge or transfer logic.
+Discover and resolve whether the authenticated customer has an existing active cart (Cart A) **within the current Sales Channel** prior to executing merge or transfer logic.
 
 ---
 
 ## 1. Discovering Customer Cart A
 
-The workflow searches for uncompleted carts associated with `customer_id`:
+The workflow searches for uncompleted carts associated with `customer_id` **scoped to the current Sales Channel**:
 
 ```ts
 const customerCart = useQueryGraphStep({
   entity: "cart",
   filters: {
     customer_id: input.customer_id,
+    sales_channel_id: input.sales_channel_id,
     completed_at: null,
   },
   fields: [
@@ -35,6 +36,14 @@ const customerCart = useQueryGraphStep({
   ],
 }).config({ name: "get-customer-cart" })
 ```
+
+### Why filter by `sales_channel_id`?
+
+> **Invariant: Mỗi Customer tại mỗi Sales Channel chỉ có TỐI ĐA 1 cart uncompleted.**
+
+- `sales_channel_id` is **required** — it comes from `req.publishable_key_context.sales_channel_ids[0]`, which is always present on `/store` routes.
+- This ensures carts from different Sales Channels are completely independent: logging in at Channel B never affects carts at Channel A.
+- Without this filter, the query would return carts from all channels, leading to cross-channel merge bugs.
 
 ---
 
@@ -65,4 +74,4 @@ Among the filtered candidate carts (`otherCarts`):
 | Active Cart A in DB (Excluding Guest Cart)? | Selected Path | Action Taken |
 | :---: | :---: | :--- |
 | **No (`Cart A === null`)** | **Transfer Path** | Transfer ownership of `guest_cart_id` to customer via `transferCartCustomerWorkflow`. |
-| **Yes (`Cart A !== null`)** | **Merge Path** | Acquire dual locks, validate inventory (A + B), add `valid_items` to Cart A, delete Cart B via `deleteCartStep`. |
+| **Yes (`Cart A !== null`)** | **Merge Path** | Acquire dual locks, validate sales channel match, validate inventory (A + B), add `valid_items` to Cart A, delete Cart B via `deleteCartStep`. |
