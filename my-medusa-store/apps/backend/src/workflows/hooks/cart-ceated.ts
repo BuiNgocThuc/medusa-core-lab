@@ -1,24 +1,20 @@
-import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 import { createCartWorkflow } from "@medusajs/medusa/core-flows"
-import { HELLO_MODULE } from "../../modules/hello"
-import HelloModuleService from "../../modules/hello/service"
-import { Link } from "@medusajs/framework/modules-sdk"
+import { onCartCreatedWorkflow } from "../on-cart-created"
 
+/**
+ * Hook handler cho `createCartWorkflow.hooks.cartCreated`.
+ *
+ * Delegate toàn bộ logic sang `onCartCreatedWorkflow` để đảm bảo:
+ * - Compensation tự động nếu một step thất bại (atomicity)
+ * - Dễ test và mở rộng thêm steps về sau
+ */
 createCartWorkflow.hooks.cartCreated(
   async ({ cart, additional_data }, { container }) => {
-    const helloModuleService: HelloModuleService = container.resolve(HELLO_MODULE)
-    
-    const link = container.resolve<Link>(  // ← dùng Link type
-      ContainerRegistrationKeys.LINK
-    )
-
-    const custom = await helloModuleService.createCustoms({
-      custom_name: additional_data?.custom_name as string ?? "default",
-    })
-
-    await link.create({
-      [Modules.CART]: { cart_id: cart.id },
-      [HELLO_MODULE]: { custom_id: custom.id || "sdasdasd"},
+    await onCartCreatedWorkflow(container).run({
+      input: {
+        cart_id: cart.id,
+        custom_name: additional_data?.custom_name as string | undefined,
+      },
     })
   }
 )
