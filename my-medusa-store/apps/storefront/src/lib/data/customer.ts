@@ -7,18 +7,55 @@ import { FetchError } from "@medusajs/js-sdk"
 import { revalidateTag } from "next/cache"
 import { redirect } from "next/navigation"
 import {
-  getAuthHeaders,
-  getCacheOptions,
-  getCacheTag,
-  getCartId,
-  getPendingCustomer,
-  removeAuthToken,
-  removeCartId,
-  removePendingCustomer,
-  setAuthToken,
-  setCartId,
-  setPendingCustomer,
-} from "./cookies"
+    getAuthHeaders,
+    getCacheOptions,
+    getCacheTag,
+    getCartId,
+    getPendingCustomer,
+    removeAuthToken,
+    removeCartId,
+    removePendingCustomer,
+    setAuthToken,
+    setCartId,
+    setPendingCustomer,
+} from './cookies'
+import { CustomerNextTier } from 'types/tier'
+import { getRegion } from '@lib/data/regions'
+
+export const retrieveCustomerNextTier = async (
+    countryCode: string
+): Promise<CustomerNextTier | null> => {
+    const authHeaders = await getAuthHeaders()
+    const region = await getRegion(countryCode)
+
+    if (!region) {
+        return null
+    }
+
+    if (!authHeaders) {
+        return null
+    }
+
+    const headers = {
+        ...authHeaders,
+    }
+
+    const next = {
+        ...(await getCacheOptions('customers')),
+    }
+
+    return await sdk.client
+        .fetch<CustomerNextTier>(`/store/customers/me/next-tier`, {
+            method: 'GET',
+            headers,
+            next,
+            query: {
+                region_id: region.id,
+            },
+        })
+        .then((data) => data)
+        .catch(() => null)
+}
 
 export type CustomerAuthState =
   | { state: "error"; error: string }
@@ -138,10 +175,6 @@ export async function login(
 // Logs the customer in and reconciles the customer record. The behavior is
 // driven entirely by the backend's login response, so it works whether or not
 // email verification is enabled.
-
-// Đăng nhập khách hàng và đối chiếu hồ sơ khách hàng. Hành vi này 
-// hoàn toàn phụ thuộc vào phản hồi đăng nhập của máy chủ, 
-// vì vậy nó hoạt động bất kể  việc xác minh email có được bật hay không.
 async function completeLogin(
   email: string,
   password: string
@@ -154,18 +187,14 @@ async function completeLogin(
     return { state: "error", error: String(error) }
   }
 
-  // Lightweight debug logs to trace login/cart interaction
-  // eslint-disable-next-line no-console
-  console.log("completeLogin:start", { email })
-
-  // A `location` is returned by third-party auth providers, which this flow
-  // doesn't support.
-  if (typeof result === "object" && "location" in result) {
-    return {
-      state: "error",
-      error: "This login method isn't supported by the storefront.",
+    // A `location` is returned by third-party auth providers, which this flow
+    // doesn't support.
+    if (typeof result === 'object' && 'location' in result) {
+        return {
+            state: 'error',
+            error: "This login method isn't supported by the storefront.",
+        }
     }
-  }
 
   // The backend requires email verification and the customer hasn't verified
   // yet. Send the verification email and ask them to check their inbox.
@@ -191,24 +220,18 @@ async function completeLogin(
 
   let token = result
 
-  // eslint-disable-next-line no-console
-  console.log("completeLogin:got-token", { hasToken: !!token })
+    // The token may not be tied to a customer record yet — right after
+    // registration, or after verifying a brand-new account. Ask the backend:
+    // `/store/customers/me` rejects tokens without a registered actor, so a
+    // failed retrieve means we still need to create the customer, then log in
+    // again to obtain a customer-bound token.
+    const customerExists = await sdk.store.customer
+        .retrieve({}, { authorization: `Bearer ${token}` })
+        .then(() => true)
+        .catch(() => false)
 
-  // The token may not be tied to a customer record yet — right after
-  // registration, or after verifying a brand-new account. Ask the backend:
-  // `/store/customers/me` rejects tokens without a registered actor, so a
-  // failed retrieve means we still need to create the customer, then log in
-  // again to obtain a customer-bound token.
-  const customerExists = await sdk.store.customer
-    .retrieve({}, { authorization: `Bearer ${token}` })
-    .then(() => true)
-    .catch(() => false)
-
-  // eslint-disable-next-line no-console
-  console.log("completeLogin:customerExists", { customerExists })
-
-  if (!customerExists) {
-    const pending = await getPendingCustomer()
+    if (!customerExists) {
+        const pending = await getPendingCustomer()
 
     try {
       await sdk.store.customer.create(
@@ -336,7 +359,22 @@ export async function signout(countryCode: string) {
 }
 
 export async function transferCart() {
-  const cartId = await getCartId()
+    const cartId = await getCartId()
+    const headers = await getAuthHeaders()
+
+    const { cart: customerCart } = await sdk.client.fetch<{
+        cart: { id: string } | null
+    }>('/store/customers/me/cart', {
+        method: 'GET',
+        headers,
+    })
+
+    if (customerCart) {
+        await setCartId(customerCart.id)
+        const cartCacheTag = await getCacheTag('carts')
+        revalidateTag(cartCacheTag)
+        return
+    }
 
   if (!cartId) {
     return
@@ -450,4 +488,18 @@ export const updateCustomerAddress = async (
     .catch((err) => {
       return { success: false, error: err.toString() }
     })
+}
+
+export const getLoyaltyPoints = async () => {
+    const headers = {
+        ...(await getAuthHeaders()),
+    }
+
+    return sdk.client
+        .fetch<{ points: number }>(`/store/customers/me/loyalty-points`, {
+            method: 'GET',
+            headers,
+        })
+        .then(({ points }) => points)
+        .catch(() => null)
 }

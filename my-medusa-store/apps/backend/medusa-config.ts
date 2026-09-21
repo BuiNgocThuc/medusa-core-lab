@@ -18,69 +18,78 @@ module.exports = defineConfig({
     }
   },
 
-  modules: [
-    {
-      resolve: "@medusajs/medusa/caching",
-
-      options: {
-        ttl: 3600, // TTL mặc định: 1 giờ
-
-        providers: [
-          {
-            resolve: "@medusajs/caching-redis",
-            id: "caching-redis",
-            is_default: true,
-
+    modules: [
+        {
+            resolve: "./src/modules/tier",
+        },
+        {
+            resolve: "@medusajs/index",
+        },
+        {
+            resolve: "./src/modules/loyalty",
+        },
+        {
+            resolve: "./src/modules/promotion-entitlement",
+        },
+        {
+            resolve: "@medusajs/medusa/caching",
+            
             options: {
-              redisUrl: REDIS_URL,
+                ttl: 3600, // TTL mặc định: 1 giờ
+                
+                providers: [
+                    {
+                        resolve: "@medusajs/caching-redis",
+                        id: "caching-redis",
+                        is_default: true,
+                        
+                        options: {
+                            redisUrl: REDIS_URL,
+                        },
+                    },
+                ],
             },
-          },
-        ],
-      },
-    },
-    ...(REDIS_URL
-      ? [
-        {
-          resolve: "@medusajs/medusa/workflow-engine-redis",
-          options: {
-            redis: {
-              redisUrl: REDIS_URL,
-            },
-          },
         },
-      ]
-      : []),
-    // --- STORAGE: Dùng Cloudflare R2 để lưu ảnh sản phẩm ---- Bỏ vào modules[]
-    ...(process.env.S3_BUCKET
-      ? [
-        {
-          resolve: "@medusajs/medusa/file",
-          options: {
-            providers: [
-              {
-                resolve: "@medusajs/medusa/file-s3",
-                id: "s3",
-                options: {
-                  file_url: process.env.S3_FILE_URL,
-                  access_key_id: process.env.S3_ACCESS_KEY_ID,
-                  secret_access_key: process.env.S3_SECRET_ACCESS_KEY,
-                  region: process.env.S3_REGION,
-                  bucket: process.env.S3_BUCKET,
-                  endpoint: process.env.S3_ENDPOINT,
-                  additional_client_config: {
-                    forcePathStyle: true,
-                  },
+        ...(REDIS_URL
+            ? [
+                {
+                    resolve: "@medusajs/medusa/workflow-engine-redis",
+                    options: {
+                        redis: {
+                            redisUrl: REDIS_URL,
+                        },
+                    },
                 },
-              },
-            ],
-          },
-        },
-      ]
-      : []),
-    {
-      resolve: "./src/modules/hello",
-    }
-  ]
-})
+            ]
+            : []),
+        // --- STORAGE: Dùng Cloudflare R2 để lưu ảnh sản phẩm ---- Bỏ vào modules[]
+        ...(process.env.S3_BUCKET
+            ? [
+                  {
+                      resolve: "@medusajs/medusa/file",
+                      options: {
+                          providers: [
+                              {
+                                  resolve: "@medusajs/medusa/file-s3",
+                                  id: "s3",
+                                  options: {
+                                      file_url: process.env.S3_FILE_URL,
+                                      access_key_id: process.env.S3_ACCESS_KEY_ID,
+                                      secret_access_key: process.env.S3_SECRET_ACCESS_KEY,
+                                      region: process.env.S3_REGION,
+                                      bucket: process.env.S3_BUCKET,
+                                      endpoint: process.env.S3_ENDPOINT,
+                                      additional_client_config: {
+                                          forcePathStyle: true,
+                                      },
+                                  },
+                              },
+                          ],
+                      },
+                  },
+              ]
+            : []),
+    ],
+});
 
 
