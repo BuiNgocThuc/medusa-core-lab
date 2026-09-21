@@ -1,3 +1,5 @@
+import { placeOrder } from "@lib/data/cart"
+import { unstable_rethrow } from "next/navigation"
 import { NextRequest, NextResponse } from "next/server"
 
 export async function GET(req: NextRequest) {
@@ -6,10 +8,18 @@ export async function GET(req: NextRequest) {
   const prefix = countryCode ? `/${countryCode}` : ""
   const resultCode = searchParams.get("resultCode")
 
-  const target =
-    resultCode === "0"
-      ? `${origin}${prefix}/checkout?step=review&momo_return=success`
-      : `${origin}${prefix}/checkout?step=payment&momo_return=failed`
+  if (resultCode === "0") {
+    try {
+      await placeOrder()
+    } catch (error) {
+      unstable_rethrow(error)
+      return NextResponse.redirect(
+        `${origin}${prefix}/checkout?step=review&momo_return=success`
+      )
+    }
+  }
 
-  return NextResponse.redirect(target)
+  return NextResponse.redirect(
+    `${origin}${prefix}/checkout?step=payment&momo_return=failed`
+  )
 }

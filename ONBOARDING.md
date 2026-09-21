@@ -64,6 +64,7 @@ Repo hiện có 3 payment paths chính:
 - `pp_system_default`: Manual Payment mặc định để test nhanh.
 - `pp_bank-transfer_default`: custom Bank Transfer provider, luôn được đăng ký.
 - `pp_momo_default`: custom MoMo provider, chỉ được đăng ký khi đủ biến MoMo thật.
+- `pp_vnpay_default`: custom VNPay provider, chỉ được đăng ký khi đủ biến VNPay thật.
 
 Bank Transfer chạy được ngay với cấu hình local trong `.env`:
 
@@ -101,6 +102,29 @@ MOMO_ORDER_EXPIRE_MINUTES=15
 ```
 
 `MOMO_IPN_URL` phải là public HTTPS URL để MoMo gọi được. Khi dev local, dùng tunnel như ngrok hoặc Cloudflare Tunnel trỏ về backend `http://localhost:9001`, rồi dùng URL public trong `MOMO_IPN_URL`.
+
+VNPay cũng cần credentials sandbox/production thật. Nếu chưa có, để trống:
+
+```env
+VNPAY_TMN_CODE=
+VNPAY_HASH_SECRET=
+VNPAY_RETURN_URL=
+```
+
+Khi có sandbox credentials, đặt tối thiểu:
+
+```env
+VNPAY_PAYMENT_URL=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+VNPAY_TMN_CODE=<sandbox-tmn-code>
+VNPAY_HASH_SECRET=<sandbox-hash-secret>
+VNPAY_RETURN_URL=http://localhost:8000/api/payment-return/vnpay
+VNPAY_IPN_URL=https://<public-backend>/hooks/payment/vnpay
+VNPAY_LOCALE=vn
+VNPAY_ORDER_TYPE=other
+VNPAY_PAYMENT_EXPIRY_MINUTES=15
+```
+
+`VNPAY_IPN_URL` nên là public HTTPS URL trỏ về backend. VNPay IPN hiện dùng custom route `GET /hooks/payment/vnpay` vì VNPay gửi kết quả bằng query params.
 
 ## 3. Migrate và seed dữ liệu
 
@@ -142,6 +166,15 @@ pnpm --filter @dtc/backend exec medusa exec ./src/migration-scripts/enable-momo-
 ```
 
 Nếu thiếu biến MoMo, script sẽ báo rõ biến nào thiếu. Đây là hành vi đúng vì provider MoMo không được đăng ký khi credentials chưa đủ.
+
+Nếu đã cấu hình đủ VNPay sandbox credentials, bật thêm VNPay:
+
+```bash
+cd my-medusa-store
+pnpm --filter @dtc/backend exec medusa exec ./src/migration-scripts/enable-vnpay-provider.ts
+```
+
+Nếu thiếu biến VNPay, script sẽ báo rõ biến nào thiếu.
 
 ## 4. Tạo tài khoản admin
 
@@ -201,11 +234,20 @@ Không tự gọi route này bằng payload tự chế trừ khi bạn build đ�
 
 Job `reconcile-momo-payments` chạy mỗi 5 phút. Khi MoMo đã cấu hình thật, job query lại MoMo cho các payment `initiated`, `pending`, `authorized`; nếu MoMo báo thành công có `transId`, job ghi event vào ledger và repair Medusa payment bằng workflow `authorized` + `captured`.
 
+VNPay IPN dùng route:
+
+```text
+GET /hooks/payment/vnpay
+```
+
+Không tự gọi route này bằng query tự chế trừ khi bạn build đúng `vnp_SecureHash`. Provider sẽ verify `vnp_TmnCode`, `vnp_TxnRef`, amount và checksum trước khi mark payment.
+
 ## Xử lý sự cố nhanh
 
 - Nếu database hoặc Redis không kết nối được, chạy `docker compose ps` rồi kiểm tra `DATABASE_URL` và `REDIS_URL` trong `apps/backend/.env`.
 - Nếu backend không thấy Bank Transfer ở checkout, chạy lại script `enable-bank-transfer-provider.ts` và đảm bảo cart dùng VND region.
 - Nếu backend không thấy MoMo ở checkout, kiểm tra đủ 5 biến `MOMO_PARTNER_CODE`, `MOMO_ACCESS_KEY`, `MOMO_SECRET_KEY`, `MOMO_REDIRECT_URL`, `MOMO_IPN_URL`, restart backend rồi chạy `enable-momo-provider.ts`.
+- Nếu backend không thấy VNPay ở checkout, kiểm tra đủ `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET`, `VNPAY_RETURN_URL`, restart backend rồi chạy `enable-vnpay-provider.ts`.
 - Nếu copy nguyên `.env.template`, đừng để placeholder MoMo dạng `<your-...>` trong `.env` khi chưa có sandbox thật; code sẽ coi đó là cấu hình MoMo đã đủ.
 - Nếu seed báo `Cannot find module '@/src/migration-scripts/data'`, import trong `apps/backend/src/migration-scripts/seed/products.ts` phải dùng đường dẫn tương đối: `../data`.
 - Cảnh báo `Calling client.query() when the client is already executing a query is deprecated` là warning từ driver PostgreSQL, không phải lỗi seed.
