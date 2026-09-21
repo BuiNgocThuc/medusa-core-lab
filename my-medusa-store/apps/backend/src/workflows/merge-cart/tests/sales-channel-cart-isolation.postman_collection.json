@@ -2,7 +2,7 @@
   "info": {
     "name": "Sales Channel Cart Isolation Tests",
     "_postman_id": "sc-cart-isolation-001",
-    "description": "Test collection for Per-Sales-Channel Cart Isolation.\n\nSetup:\n1. Tạo 2 Publishable API Keys trong Admin → gắn mỗi key với 1 Sales Channel khác nhau.\n2. Điền vào Variables: pk_channel_a, pk_channel_b.\n3. Cần có ít nhất 1 customer account và 1 product variant.\n4. Chạy theo thứ tự từ trên xuống dưới.",
+    "description": "Test collection for Cart Workflows & Per-Sales-Channel Cart Isolation.\n\nKịch bản bao gồm:\n- Phần 0: Setup (Login lấy token, lấy region_id, variant_id).\n- Phần 1: Kịch bản 1 Kênh (Sales Channel A) — Vòng đời hoàn chỉnh: Tạo guest cart 1 -> Transfer khi customer chưa có cart -> Tạo guest cart 2 -> Merge vào customer cart đã có -> Thêm item trực tiếp -> Xem chi tiết cart & Restore cart.\n- Phần 2+: Kịch bản 2 Kênh (Channel A & Channel B) — Cart Isolation, Cross-Channel Mismatch, Restore Cart Isolation.\n\nSetup:\n1. Tạo 2 Publishable API Keys trong Admin → gắn mỗi key với 1 Sales Channel khác nhau.\n2. Điền vào Variables: pk_channel_a, pk_channel_b.\n3. Cần có ít nhất 1 customer account và 1 product variant.\n4. Chạy theo thứ tự từ trên xuống dưới.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -66,6 +66,24 @@
       "key": "region_id",
       "value": "YOUR_REGION_ID",
       "type": "string"
+    },
+    {
+      "key": "guest_cart_id_a_1",
+      "value": "",
+      "type": "string",
+      "description": "Guest cart 1 in Channel A (for Transfer test)"
+    },
+    {
+      "key": "guest_cart_id_a_2",
+      "value": "",
+      "type": "string",
+      "description": "Guest cart 2 in Channel A (for Merge test)"
+    },
+    {
+      "key": "customer_cart_id_a",
+      "value": "",
+      "type": "string",
+      "description": "Active customer cart in Channel A"
     }
   ],
   "item": [
@@ -96,7 +114,10 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -104,8 +125,14 @@
             },
             "url": {
               "raw": "{{base_url}}/auth/customer/emailpass",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "customer", "emailpass"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "customer",
+                "emailpass"
+              ]
             }
           }
         },
@@ -133,12 +160,20 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "x-publishable-api-key", "value": "{{pk_channel_a}}" }
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_a}}"
+              }
             ],
             "url": {
               "raw": "{{base_url}}/store/regions",
-              "host": ["{{base_url}}"],
-              "path": ["store", "regions"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "regions"
+              ]
             }
           }
         },
@@ -168,16 +203,513 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "x-publishable-api-key", "value": "{{pk_channel_a}}" }
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_a}}"
+              }
             ],
             "url": {
               "raw": "{{base_url}}/store/products?fields=*variants",
-              "host": ["{{base_url}}"],
-              "path": ["store", "products"],
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "products"
+              ],
               "query": [
-                { "key": "fields", "value": "*variants" }
+                {
+                  "key": "fields",
+                  "value": "*variants"
+                }
               ]
             }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Single Channel Flow (Channel A) — Transfer, Merge, Add Item & View Cart",
+      "item": [
+        {
+          "name": "1.1 Tạo Guest Cart 1 (Channel A)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test(\"Tạo Guest Cart 1 thành công ở Channel A\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(json.cart).to.be.an(\"object\");",
+                  "    pm.expect(json.cart.id).to.be.a(\"string\");",
+                  "});",
+                  "if (json.cart && json.cart.id) {",
+                  "    pm.collectionVariables.set(\"guest_cart_id_a_1\", json.cart.id);",
+                  "    console.log(\"Guest Cart A1 ID:\", json.cart.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_a}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"region_id\": \"{{region_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/store/carts",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "carts"
+              ]
+            },
+            "description": "Khách vãng lai (Guest) chưa đăng nhập truy cập Sales Channel A và khởi tạo giỏ hàng."
+          }
+        },
+        {
+          "name": "1.2 Thêm Item vào Guest Cart 1 (Channel A)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Thêm item vào Guest Cart 1 thành công\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.cart.items).to.be.an(\"array\");",
+                  "    pm.expect(json.cart.items.length).to.be.greaterThan(0);",
+                  "    pm.expect(json.cart.items[0].quantity).to.eql(1);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_a}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"variant_id\": \"{{variant_id}}\",\n  \"quantity\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/store/carts/{{guest_cart_id_a_1}}/line-items",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "carts",
+                "{{guest_cart_id_a_1}}",
+                "line-items"
+              ]
+            },
+            "description": "Khách thêm 1 sản phẩm vào Guest Cart 1."
+          }
+        },
+        {
+          "name": "1.3 Merge — Transfer Guest Cart 1 sang Customer (Customer chưa có Cart)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "console.log(\"Transfer result cart:\", json.cart?.id);",
+                  "pm.test(\"Transfer thành công — cart_id trả về chính là guest_cart_id_a_1\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(json.cart.id).to.eql(pm.collectionVariables.get(\"guest_cart_id_a_1\"));",
+                  "});",
+                  "pm.test(\"Không có item nào bị skipped\", () => {",
+                  "    pm.expect(json.skipped_items).to.be.an(\"array\").that.is.empty;",
+                  "});",
+                  "if (json.cart && json.cart.id) {",
+                  "    pm.collectionVariables.set(\"customer_cart_id_a\", json.cart.id);",
+                  "    console.log(\"Customer Cart A ID (sau transfer):\", json.cart.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_a}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/store/carts/{{guest_cart_id_a_1}}/merge-customer",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "carts",
+                "{{guest_cart_id_a_1}}",
+                "merge-customer"
+              ]
+            },
+            "description": "Khách hàng đăng nhập. Vì khách chưa có giỏ hàng nào tại Channel A, workflow chạy nhánh Transfer: chuyển quyền sở hữu giỏ hàng guest 1 sang cho customer (giữ nguyên ID giỏ hàng)."
+          }
+        },
+        {
+          "name": "1.4 Tạo Guest Cart 2 (Channel A — Khi Customer đã có Cart)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test(\"Tạo Guest Cart 2 thành công ở Channel A\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(json.cart.id).to.be.a(\"string\");",
+                  "    pm.expect(json.cart.id).to.not.eql(pm.collectionVariables.get(\"customer_cart_id_a\"));",
+                  "});",
+                  "if (json.cart && json.cart.id) {",
+                  "    pm.collectionVariables.set(\"guest_cart_id_a_2\", json.cart.id);",
+                  "    console.log(\"Guest Cart A2 ID:\", json.cart.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_a}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"region_id\": \"{{region_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/store/carts",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "carts"
+              ]
+            },
+            "description": "Mô phỏng trường hợp sau đó người dùng mở tab ẩn danh hoặc thiết bị khác (chưa login) và tạo thêm 1 Guest Cart 2 tại Channel A."
+          }
+        },
+        {
+          "name": "1.5 Thêm Item vào Guest Cart 2 (Channel A)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Thêm item vào Guest Cart 2 thành công\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.cart.items).to.be.an(\"array\");",
+                  "    pm.expect(json.cart.items.length).to.be.greaterThan(0);",
+                  "    pm.expect(json.cart.items[0].quantity).to.eql(2);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_a}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"variant_id\": \"{{variant_id}}\",\n  \"quantity\": 2\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/store/carts/{{guest_cart_id_a_2}}/line-items",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "carts",
+                "{{guest_cart_id_a_2}}",
+                "line-items"
+              ]
+            },
+            "description": "Thêm 2 sản phẩm vào Guest Cart 2."
+          }
+        },
+        {
+          "name": "1.6 Merge — Gộp Guest Cart 2 vào Customer Cart đã có (Nhánh Merge Items)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "console.log(\"Merge result cart:\", json.cart?.id);",
+                  "pm.test(\"Merge thành công — cart_id là Customer Cart hiện tại (không phải guest_cart_id_a_2)\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(json.cart.id).to.eql(pm.collectionVariables.get(\"customer_cart_id_a\"));",
+                  "    pm.expect(json.cart.id).to.not.eql(pm.collectionVariables.get(\"guest_cart_id_a_2\"));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_a}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/store/carts/{{guest_cart_id_a_2}}/merge-customer",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "carts",
+                "{{guest_cart_id_a_2}}",
+                "merge-customer"
+              ]
+            },
+            "description": "Customer đăng nhập khi đang có Guest Cart 2. Do customer đã có giỏ hàng ở Channel A (customer_cart_id_a), workflow kích hoạt nhánh Merge Items: sao chép các mặt hàng từ Guest Cart 2 sang Customer Cart và xóa Guest Cart 2. ID giỏ hàng trả về chính là customer_cart_id_a."
+          }
+        },
+        {
+          "name": "1.7 Thêm Item trực tiếp vào Customer Cart (Channel A)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Thêm item trực tiếp vào Customer Cart thành công\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.cart.id).to.eql(pm.collectionVariables.get(\"customer_cart_id_a\"));",
+                  "    pm.expect(json.cart.items).to.be.an(\"array\");",
+                  "    pm.expect(json.cart.items.length).to.be.greaterThan(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_a}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"variant_id\": \"{{variant_id}}\",\n  \"quantity\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/store/carts/{{customer_cart_id_a}}/line-items",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "carts",
+                "{{customer_cart_id_a}}",
+                "line-items"
+              ]
+            },
+            "description": "Customer sau khi gộp giỏ hàng tiếp tục mua sắm và thêm trực tiếp 1 item vào giỏ hàng của mình."
+          }
+        },
+        {
+          "name": "1.8 Xem Chi Tiết Cart của Customer (Get Customer Cart Channel A)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "console.log(\"Customer Cart details:\", JSON.stringify(json.cart));",
+                  "pm.test(\"Lấy thông tin Customer Cart thành công\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(json.cart).to.be.an(\"object\");",
+                  "    pm.expect(json.cart.id).to.eql(pm.collectionVariables.get(\"customer_cart_id_a\"));",
+                  "});",
+                  "pm.test(\"Cart chứa đầy đủ items đã transfer, merge và add trực tiếp\", () => {",
+                  "    pm.expect(json.cart.items).to.be.an(\"array\");",
+                  "    pm.expect(json.cart.items.length).to.be.greaterThan(0);",
+                  "    const totalQty = json.cart.items.reduce((sum, item) => sum + item.quantity, 0);",
+                  "    console.log(\"Tổng số lượng sản phẩm trong cart:\", totalQty);",
+                  "    pm.expect(totalQty).to.be.at.least(4);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_a}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/store/carts/{{customer_cart_id_a}}?fields=*items,*items.variant",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "carts",
+                "{{customer_cart_id_a}}"
+              ],
+              "query": [
+                {
+                  "key": "fields",
+                  "value": "*items,*items.variant"
+                }
+              ]
+            },
+            "description": "Xem chi tiết toàn bộ giỏ hàng của customer tại Channel A để kiểm tra danh sách items, số lượng tổng cộng và các trường liên quan."
+          }
+        },
+        {
+          "name": "1.9 Restore Customer Cart (Channel A — Xác nhận phiên mua sắm)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "console.log(\"Restore result Channel A:\", JSON.stringify(json));",
+                  "pm.test(\"Restore trả về chính xác Customer Cart của Channel A\", () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(json.cart).to.be.an(\"object\");",
+                  "    pm.expect(json.cart.id).to.eql(pm.collectionVariables.get(\"customer_cart_id_a\"));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_a}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/store/carts/restore-customer",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "carts",
+                "restore-customer"
+              ]
+            },
+            "description": "Gọi API POST /store/carts/restore-customer ở Channel A để kiểm tra xem hệ thống có trả về chính xác customer_cart_id_a để Storefront khôi phục active cart hay không."
           }
         }
       ]
@@ -207,8 +739,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-publishable-api-key", "value": "{{pk_channel_b}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_b}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -216,8 +754,13 @@
             },
             "url": {
               "raw": "{{base_url}}/store/carts",
-              "host": ["{{base_url}}"],
-              "path": ["store", "carts"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "carts"
+              ]
             }
           }
         },
@@ -241,8 +784,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-publishable-api-key", "value": "{{pk_channel_b}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_b}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -250,8 +799,15 @@
             },
             "url": {
               "raw": "{{base_url}}/store/carts/{{guest_cart_id_b}}/line-items",
-              "host": ["{{base_url}}"],
-              "path": ["store", "carts", "{{guest_cart_id_b}}", "line-items"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "carts",
+                "{{guest_cart_id_b}}",
+                "line-items"
+              ]
             }
           }
         },
@@ -283,9 +839,18 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{customer_token}}" },
-              { "key": "x-publishable-api-key", "value": "{{pk_channel_b}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_b}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -293,8 +858,15 @@
             },
             "url": {
               "raw": "{{base_url}}/store/carts/{{guest_cart_id_b}}/merge-customer",
-              "host": ["{{base_url}}"],
-              "path": ["store", "carts", "{{guest_cart_id_b}}", "merge-customer"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "carts",
+                "{{guest_cart_id_b}}",
+                "merge-customer"
+              ]
             }
           }
         }
@@ -321,8 +893,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-publishable-api-key", "value": "{{pk_channel_b}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_b}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -330,8 +908,13 @@
             },
             "url": {
               "raw": "{{base_url}}/store/carts",
-              "host": ["{{base_url}}"],
-              "path": ["store", "carts"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "carts"
+              ]
             }
           }
         },
@@ -340,8 +923,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-publishable-api-key", "value": "{{pk_channel_b}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_b}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -349,8 +938,15 @@
             },
             "url": {
               "raw": "{{base_url}}/store/carts/{{guest_cart_id_b}}/line-items",
-              "host": ["{{base_url}}"],
-              "path": ["store", "carts", "{{guest_cart_id_b}}", "line-items"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "carts",
+                "{{guest_cart_id_b}}",
+                "line-items"
+              ]
             }
           }
         },
@@ -378,9 +974,18 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{customer_token}}" },
-              { "key": "x-publishable-api-key", "value": "{{pk_channel_b}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_b}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -388,8 +993,15 @@
             },
             "url": {
               "raw": "{{base_url}}/store/carts/{{guest_cart_id_b}}/merge-customer",
-              "host": ["{{base_url}}"],
-              "path": ["store", "carts", "{{guest_cart_id_b}}", "merge-customer"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "carts",
+                "{{guest_cart_id_b}}",
+                "merge-customer"
+              ]
             }
           }
         }
@@ -416,9 +1028,18 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-publishable-api-key", "value": "{{pk_channel_a}}" },
-              { "key": "Authorization", "value": "Bearer {{customer_token}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_a}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -426,8 +1047,13 @@
             },
             "url": {
               "raw": "{{base_url}}/store/carts",
-              "host": ["{{base_url}}"],
-              "path": ["store", "carts"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "carts"
+              ]
             }
           }
         },
@@ -449,8 +1075,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-publishable-api-key", "value": "{{pk_channel_b}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_b}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -458,8 +1090,13 @@
             },
             "url": {
               "raw": "{{base_url}}/store/carts",
-              "host": ["{{base_url}}"],
-              "path": ["store", "carts"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "carts"
+              ]
             }
           }
         },
@@ -468,8 +1105,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-publishable-api-key", "value": "{{pk_channel_b}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_b}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -477,8 +1120,15 @@
             },
             "url": {
               "raw": "{{base_url}}/store/carts/{{guest_cart_id_b}}/line-items",
-              "host": ["{{base_url}}"],
-              "path": ["store", "carts", "{{guest_cart_id_b}}", "line-items"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "carts",
+                "{{guest_cart_id_b}}",
+                "line-items"
+              ]
             }
           }
         },
@@ -509,9 +1159,18 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{customer_token}}" },
-              { "key": "x-publishable-api-key", "value": "{{pk_channel_b}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_b}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -519,8 +1178,15 @@
             },
             "url": {
               "raw": "{{base_url}}/store/carts/{{guest_cart_id_b}}/merge-customer",
-              "host": ["{{base_url}}"],
-              "path": ["store", "carts", "{{guest_cart_id_b}}", "merge-customer"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "carts",
+                "{{guest_cart_id_b}}",
+                "merge-customer"
+              ]
             }
           }
         }
@@ -551,9 +1217,18 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{customer_token}}" },
-              { "key": "x-publishable-api-key", "value": "{{pk_channel_b}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_b}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -561,8 +1236,14 @@
             },
             "url": {
               "raw": "{{base_url}}/store/carts/restore-customer",
-              "host": ["{{base_url}}"],
-              "path": ["store", "carts", "restore-customer"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "carts",
+                "restore-customer"
+              ]
             }
           }
         },
@@ -591,9 +1272,18 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{customer_token}}" },
-              { "key": "x-publishable-api-key", "value": "{{pk_channel_a}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_a}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -601,8 +1291,14 @@
             },
             "url": {
               "raw": "{{base_url}}/store/carts/restore-customer",
-              "host": ["{{base_url}}"],
-              "path": ["store", "carts", "restore-customer"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "carts",
+                "restore-customer"
+              ]
             }
           }
         }
@@ -629,8 +1325,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-publishable-api-key", "value": "{{pk_channel_a}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_a}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -638,8 +1340,13 @@
             },
             "url": {
               "raw": "{{base_url}}/store/carts",
-              "host": ["{{base_url}}"],
-              "path": ["store", "carts"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "carts"
+              ]
             }
           }
         },
@@ -648,8 +1355,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "x-publishable-api-key", "value": "{{pk_channel_a}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_a}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -657,8 +1370,15 @@
             },
             "url": {
               "raw": "{{base_url}}/store/carts/{{guest_cart_id_a}}/line-items",
-              "host": ["{{base_url}}"],
-              "path": ["store", "carts", "{{guest_cart_id_a}}", "line-items"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "carts",
+                "{{guest_cart_id_a}}",
+                "line-items"
+              ]
             }
           }
         },
@@ -688,9 +1408,18 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{customer_token}}" },
-              { "key": "x-publishable-api-key", "value": "{{pk_channel_b}}" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_b}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -698,8 +1427,15 @@
             },
             "url": {
               "raw": "{{base_url}}/store/carts/{{guest_cart_id_a}}/merge-customer",
-              "host": ["{{base_url}}"],
-              "path": ["store", "carts", "{{guest_cart_id_a}}", "merge-customer"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "carts",
+                "{{guest_cart_id_a}}",
+                "merge-customer"
+              ]
             },
             "description": "Guest cart tạo ở Channel A, nhưng merge request dùng Publishable Key Channel B → SALES_CHANNEL_MISMATCH"
           }
