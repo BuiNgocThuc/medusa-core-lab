@@ -1,74 +1,58 @@
 import { MedusaError, MedusaService } from "@medusajs/framework/utils"
-import { FirstPurchaseEntitlement } from "./models"
+import { FlashRedemption } from "./models"
+import { FLASH_CUSTOMER_USAGE_LIMIT } from "@/src/constant"
 
-class PromotionEntitlementModuleService extends MedusaService({
-    FirstPurchaseEntitlement,
-}) {
-    async reserveFirstPurchase(customerId: string, cartId: string) {
-        const [existing] = await this.listFirstPurchaseEntitlements({ customer_id: customerId })
+class PromotionEntitlementModuleService extends MedusaService({ FlashRedemption }) {
+    async reserveFlashRedemption(customerId: string, cartId: string, amount: number) {
+        const [forCart] = await this.listFlashRedemptions({ cart_id: cartId })
+        if (forCart?.state === "consumed") {
+            return forCart
+        }
 
-        if (!existing) {
-            return await this.createFirstPurchaseEntitlements({
+        const redemptions = await this.listFlashRedemptions({ customer_id: customerId })
+        const active = redemptions.filter((redemption) =>
+            redemption.state === "reserved" || redemption.state === "consumed",
+        )
+        const alreadyReserved = active.some((redemption) => redemption.cart_id === cartId)
+        if (!alreadyReserved && active.length >= FLASH_CUSTOMER_USAGE_LIMIT) {
+            throw new MedusaError(MedusaError.Types.NOT_ALLOWED, "Bạn đã dùng Flash Promotion tối đa 2 lần")
+        }
+
+        if (forCart) {
+            return await this.updateFlashRedemptions({
+                id: forCart.id,
                 customer_id: customerId,
                 state: "reserved",
-                cart_id: cartId,
+                amount,
                 reserved_at: new Date(),
             })
         }
-
-        if (existing.state === "consumed") {
-            throw new MedusaError(
-                MedusaError.Types.NOT_ALLOWED,
-                "Ưu đãi đơn đầu đã được sử dụng",
-            )
-        }
-
-        if (existing.state === "reserved" && existing.cart_id !== cartId) {
-            throw new MedusaError(
-                MedusaError.Types.CONFLICT,
-                "Ưu đãi đơn đầu đang được giữ ở giỏ hàng khác",
-            )
-        }
-
-        return await this.updateFirstPurchaseEntitlements({
-            id: existing.id,
-            state: "reserved",
+        return await this.createFlashRedemptions({
+            customer_id: customerId,
             cart_id: cartId,
+            state: "reserved",
+            amount,
             reserved_at: new Date(),
         })
     }
 
-    async consumeFirstPurchase(customerId: string, cartId: string, orderId: string) {
-        const [existing] = await this.listFirstPurchaseEntitlements({ customer_id: customerId })
-
-        if (!existing || existing.state !== "reserved" || existing.cart_id !== cartId) {
-            throw new MedusaError(
-                MedusaError.Types.NOT_ALLOWED,
-                "Ưu đãi đơn đầu không hợp lệ cho giỏ hàng này",
-            )
+    async consumeFlashRedemption(cartId: string, orderId: string) {
+        const [redemption] = await this.listFlashRedemptions({ cart_id: cartId })
+        if (!redemption || redemption.state !== "reserved") {
+            throw new MedusaError(MedusaError.Types.NOT_ALLOWED, "Flash Promotion không hợp lệ cho giỏ hàng này")
         }
-
-        return await this.updateFirstPurchaseEntitlements({
-            id: existing.id,
+        return await this.updateFlashRedemptions({
+            id: redemption.id,
             state: "consumed",
             order_id: orderId,
             consumed_at: new Date(),
         })
     }
 
-    async releaseFirstPurchase(cartId: string) {
-        const [existing] = await this.listFirstPurchaseEntitlements({ cart_id: cartId })
-
-        if (!existing || existing.state !== "reserved") {
-            return existing
-        }
-
-        return await this.updateFirstPurchaseEntitlements({
-            id: existing.id,
-            state: "available",
-            cart_id: null,
-            reserved_at: null,
-        })
+    async releaseFlashRedemption(cartId: string) {
+        const [redemption] = await this.listFlashRedemptions({ cart_id: cartId })
+        if (!redemption || redemption.state !== "reserved") return redemption
+        return await this.deleteFlashRedemptions(redemption.id)
     }
 }
 

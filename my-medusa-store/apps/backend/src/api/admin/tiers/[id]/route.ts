@@ -3,6 +3,7 @@ import { ContainerRegistrationKeys } from "@medusajs/framework/utils";
 import { updateTierWorkflow } from "@/src/workflows";
 import { UpdateTierInput } from "./validators";
 
+// retrieve by id
 export async function GET(req: MedusaRequest, res: MedusaResponse): Promise<void> {
     const query = req.scope.resolve(ContainerRegistrationKeys.QUERY);
     const { id } = req.params;
@@ -23,6 +24,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse): Promise<void
     res.json({ tier: tiers[0] });
 }
 
+// update
 export async function POST(
     req: MedusaRequest<UpdateTierInput>,
     res: MedusaResponse,

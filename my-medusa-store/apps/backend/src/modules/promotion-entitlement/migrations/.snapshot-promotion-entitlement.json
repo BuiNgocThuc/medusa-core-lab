@@ -38,22 +38,6 @@
           "enumItems": [],
           "mappedType": "text"
         },
-        "state": {
-          "name": "state",
-          "type": "text",
-          "unsigned": false,
-          "autoincrement": false,
-          "primary": false,
-          "nullable": false,
-          "unique": false,
-          "length": null,
-          "precision": null,
-          "scale": null,
-          "default": "'available'",
-          "comment": null,
-          "enumItems": [],
-          "mappedType": "text"
-        },
         "cart_id": {
           "name": "cart_id",
           "type": "text",
@@ -85,6 +69,38 @@
           "comment": null,
           "enumItems": [],
           "mappedType": "text"
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": "'reserved'",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "text"
+        },
+        "amount": {
+          "name": "amount",
+          "type": "integer",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "integer"
         },
         "reserved_at": {
           "name": "reserved_at",
@@ -167,47 +183,47 @@
           "mappedType": "datetime"
         }
       },
-      "name": "first_purchase_entitlement",
+      "name": "flash_redemption",
       "schema": "public",
       "indexes": [
         {
-          "keyName": "IDX_first_purchase_entitlement_customer_id_unique",
+          "keyName": "IDX_flash_redemption_deleted_at",
           "columnNames": [],
           "composite": false,
           "constraint": false,
           "primary": false,
           "unique": false,
-          "expression": "CREATE UNIQUE INDEX IF NOT EXISTS \"IDX_first_purchase_entitlement_customer_id_unique\" ON \"first_purchase_entitlement\" (\"customer_id\") WHERE deleted_at IS NULL"
+          "expression": "CREATE INDEX IF NOT EXISTS \"IDX_flash_redemption_deleted_at\" ON \"flash_redemption\" (\"deleted_at\") WHERE deleted_at IS NULL"
         },
         {
-          "keyName": "IDX_first_purchase_entitlement_deleted_at",
+          "keyName": "IDX_flash_redemption_customer_id",
           "columnNames": [],
           "composite": false,
           "constraint": false,
           "primary": false,
           "unique": false,
-          "expression": "CREATE INDEX IF NOT EXISTS \"IDX_first_purchase_entitlement_deleted_at\" ON \"first_purchase_entitlement\" (\"deleted_at\") WHERE deleted_at IS NULL"
+          "expression": "CREATE INDEX IF NOT EXISTS \"IDX_flash_redemption_customer_id\" ON \"flash_redemption\" (\"customer_id\") WHERE deleted_at IS NULL"
         },
         {
-          "keyName": "IDX_first_purchase_entitlement_cart_id",
+          "keyName": "IDX_flash_redemption_cart_id_unique",
           "columnNames": [],
           "composite": false,
           "constraint": false,
           "primary": false,
           "unique": false,
-          "expression": "CREATE INDEX IF NOT EXISTS \"IDX_first_purchase_entitlement_cart_id\" ON \"first_purchase_entitlement\" (\"cart_id\") WHERE deleted_at IS NULL"
+          "expression": "CREATE UNIQUE INDEX IF NOT EXISTS \"IDX_flash_redemption_cart_id_unique\" ON \"flash_redemption\" (\"cart_id\") WHERE deleted_at IS NULL"
         },
         {
-          "keyName": "IDX_first_purchase_entitlement_order_id_unique",
+          "keyName": "IDX_flash_redemption_order_id_unique",
           "columnNames": [],
           "composite": false,
           "constraint": false,
           "primary": false,
           "unique": false,
-          "expression": "CREATE UNIQUE INDEX IF NOT EXISTS \"IDX_first_purchase_entitlement_order_id_unique\" ON \"first_purchase_entitlement\" (\"order_id\") WHERE deleted_at IS NULL"
+          "expression": "CREATE UNIQUE INDEX IF NOT EXISTS \"IDX_flash_redemption_order_id_unique\" ON \"flash_redemption\" (\"order_id\") WHERE deleted_at IS NULL"
         },
         {
-          "keyName": "first_purchase_entitlement_pkey",
+          "keyName": "flash_redemption_pkey",
           "columnNames": [
             "id"
           ],

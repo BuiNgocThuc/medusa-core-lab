@@ -9,6 +9,7 @@ const tiers = [
     { name: "Bronze", min_purchase_value: 0, promotion_code: null },
     { name: "Silver", min_purchase_value: 2_000_000, promotion_code: "TIER_SILVER" },
     { name: "Gold", min_purchase_value: 10_000_000, promotion_code: "TIER_GOLD" },
+    { name: "VIP", min_purchase_value: 20_000_000, promotion_code: null },
 ];
 
 const customers = [

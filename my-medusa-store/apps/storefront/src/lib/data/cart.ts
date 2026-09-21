@@ -411,8 +411,14 @@ export async function placeOrder(cartId?: string) {
         ...(await getAuthHeaders()),
     }
 
-    const cartRes = await sdk.store.cart
-        .complete(id, {}, headers)
+    const cartRes = await sdk.client
+        .fetch<HttpTypes.StoreCompleteCartResponse>(
+            `/store/carts/${id}/complete-customer-promotion`,
+            {
+                method: 'POST',
+                headers,
+            }
+        )
         .then(async (cartRes) => {
             const cartCacheTag = await getCacheTag('carts')
             revalidateTag(cartCacheTag)
@@ -427,7 +433,7 @@ export async function placeOrder(cartId?: string) {
         const orderCacheTag = await getCacheTag('orders')
         revalidateTag(orderCacheTag)
 
-        removeCartId()
+        await removeCartId()
         redirect(`/${countryCode}/order/${cartRes?.order.id}/confirmed`)
     }
 

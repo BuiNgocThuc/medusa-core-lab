@@ -80,24 +80,56 @@ class LoyaltyModuleService extends MedusaService({
         return transaction
     }
 
-    async releaseReservation(customerId: string, cartId: string, points: number) {
-        const [reservation] = await this.listLoyaltyTransactions({
-            type: "redemption_reservation",
-            reference_id: cartId,
+    async consumePointsForCart(input: {
+        customer_id: string
+        cart_id: string
+        points: number
+        promotion_id: string
+    }) {
+        const [existing] = await this.listLoyaltyTransactions({
+            type: "redemption",
+            reference_id: input.cart_id,
         })
-
-        if (!reservation || reservation.status !== "reserved") {
-            return reservation
+        if (existing?.status === "consumed") {
+            return { transaction: existing, consumed: false }
         }
 
-        await this.updateLoyaltyTransactions({ id: reservation.id, status: "released" })
-        return await this.recordTransaction({
-            customer_id: customerId,
-            type: "redemption_release",
+        await this.deductPoints(input.customer_id, input.points)
+        try {
+            const transaction = existing
+                ? await this.updateLoyaltyTransactions({
+                    id: existing.id,
+                    points: -input.points,
+                    status: "consumed",
+                    promotion_id: input.promotion_id,
+                })
+                : await this.createLoyaltyTransactions({
+                    customer_id: input.customer_id,
+                    type: "redemption",
+                    reference_id: input.cart_id,
+                    points: -input.points,
+                    status: "consumed",
+                    cart_id: input.cart_id,
+                    promotion_id: input.promotion_id,
+                })
+            return { transaction, consumed: true }
+        } catch (error) {
+            await this.addPoints(input.customer_id, input.points)
+            throw error
+        }
+    }
+
+    async reverseCartPointConsumption(cartId: string, customerId: string, points: number) {
+        const [transaction] = await this.listLoyaltyTransactions({
+            type: "redemption",
             reference_id: cartId,
-            points,
-            status: "released",
-            cart_id: cartId,
+        })
+        if (!transaction || transaction.status !== "consumed") return transaction
+
+        await this.addPoints(customerId, points)
+        return await this.updateLoyaltyTransactions({
+            id: transaction.id,
+            status: "reversed",
         })
     }
 

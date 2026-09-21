@@ -13,6 +13,8 @@ export const CATEGORY_NAMES = [
     "Tubes",
 ] as const;
 
+export const SUMMER_COLLECTION_HANDLE = "summer";
+
 export async function seedCategories(container: MedusaContainer) {
     const { result: categoryResult } = await createProductCategoriesWorkflow(container).run({
         input: {

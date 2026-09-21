@@ -1,1 +1,1 @@
-export * from "./first-purchase-entitlement"
+export * from "./flash-redemption"

@@ -1,7 +1,7 @@
 import { MedusaContainer } from "@medusajs/framework";
-import { ProductStatus } from "@medusajs/framework/utils";
+import { Modules, ProductStatus } from "@medusajs/framework/utils";
 import { createProductsWorkflow } from "@medusajs/medusa/core-flows";
-import { CATEGORY_NAMES } from "./categories";
+import { CATEGORY_NAMES, SUMMER_COLLECTION_HANDLE } from "./categories";
 import { R2_IMAGES } from "../data";
 
 // Mock image placeholder for products without real photos yet.
@@ -470,6 +470,20 @@ export async function seedProducts(
 ) {
     const catId = (name: string) => categoryResult.find((c) => c.name === name)!.id;
 
+    const productModule = container.resolve(Modules.PRODUCT) as any;
+    const [existingSummerCollection] = await productModule.listProductCollections({
+        handle: SUMMER_COLLECTION_HANDLE,
+    });
+    const summerCollection = existingSummerCollection ?? await productModule.createProductCollections({
+        title: "SUMMER",
+        handle: SUMMER_COLLECTION_HANDLE,
+    });
+    const summerHandles = new Set([
+        "yonex-astrox-99-pro",
+        "yonex-nanoflare-800",
+        "yonex-astrox-88d-pro",
+    ]);
+
     await createProductsWorkflow(container).run({
         input: {
             products: PRODUCTS.map((p) => ({
@@ -483,6 +497,9 @@ export async function seedProducts(
                 thumbnail: imgOf(p.handle).thumbnail,
                 images: imgOf(p.handle).images,
                 category_ids: [catId(p.category)],
+                ...(summerHandles.has(p.handle) && summerCollection
+                    ? { collection_id: summerCollection.id }
+                    : {}),
                 options: [
                     {
                         title: p.optionTitle,
