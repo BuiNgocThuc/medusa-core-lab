@@ -12,6 +12,7 @@ import {
     ValidateCustomerExistsStepInput,
     getCartLoyaltyPromoStep,
     getCartLoyaltyPromoAmountStep,
+    reserveLoyaltyReservationStep,
     GetCartLoyaltyPromoAmountStepInput,
 } from "./steps";
 import { CartData } from "@/src/utils";
@@ -40,8 +41,6 @@ const fields = [
 export const applyLoyaltyOnCartWorkflow = createWorkflow(
     APPLY_LOYALTY_ON_CART_WORKFLOW_ID,
     (input: ApplyLoyaltyOnCartWorkflowInput) => {
-        acquireLockStep({ key: input.cart_id, timeout: 10, ttl: 30 });
-
         const { data: carts } = useQueryGraphStep({
             entity: "cart", fields, filters: { id: input.cart_id },
             options: { throwIfKeyNotFound: true },
@@ -50,6 +49,12 @@ export const applyLoyaltyOnCartWorkflow = createWorkflow(
         validateCustomerExistsStep({
             customer: carts[0].customer,
         } as ValidateCustomerExistsStepInput);
+
+        const lockKeys = transform({ carts }, ({ carts }) => [
+            carts[0].id,
+            `loyalty-customer-${carts[0].customer!.id}`,
+        ]);
+        acquireLockStep({ key: lockKeys, timeout: 10, ttl: 30 });
 
         getCartLoyaltyPromoStep({
             cart: carts[0] as unknown as CartData,
@@ -116,6 +121,14 @@ export const applyLoyaltyOnCartWorkflow = createWorkflow(
 
         const loyaltyPromo = createPromotionsStep([promoToCreate] as CreatePromotionDTO[]);
 
+        const reservationInput = transform({ carts, loyaltyPromo }, ({ carts, loyaltyPromo }) => ({
+            customer_id: carts[0].customer!.id,
+            cart_id: carts[0].id,
+            promotion_id: loyaltyPromo[0].id,
+            points: input.points,
+        }));
+        reserveLoyaltyReservationStep(reservationInput);
+
         const updatePromoData = transform(
             {
                 carts,
@@ -158,7 +171,7 @@ export const applyLoyaltyOnCartWorkflow = createWorkflow(
             filters: { id: input.cart_id },
         }).config({ name: "retrieve-cart" });
 
-        releaseLockStep({ key: input.cart_id });
+        releaseLockStep({ key: lockKeys });
 
         return new WorkflowResponse(updatedCarts[0]);
     },

@@ -18,6 +18,10 @@ export const LoyaltyTransaction = model
             unique: true,
         },
         {
+            on: ["order_id", "type"],
+            unique: true,
+        },
+        {
             on: ["customer_id"],
         },
     ])

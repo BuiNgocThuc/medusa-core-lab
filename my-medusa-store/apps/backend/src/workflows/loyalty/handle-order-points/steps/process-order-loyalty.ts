@@ -29,29 +29,24 @@ export const processOrderLoyaltyStep = createStep(
             redeemedPoints = await loyaltyModule.calculatePointsFromDiscountAmount(
                 loyaltyPromotion.application_method!.value as number,
             );
-            const [consumption] = await loyaltyModule.listLoyaltyTransactions({
-                type: "redemption",
-                reference_id: order.cart.id,
+            await loyaltyModule.consumeReservationForOrder({
+                order_id: order.id,
+                customer_id: order.customer.id,
+                cart_id: order.cart.id,
+                promotion_id: loyaltyPromotion.id,
+                points: redeemedPoints,
             });
-
-            if (consumption?.status === "consumed") {
-                await loyaltyModule.updateLoyaltyTransactions({
-                    id: consumption.id,
-                    order_id: order.id,
-                    promotion_id: loyaltyPromotion.id,
-                });
-            }
             await promotionModule.updatePromotions(loyaltyPromotion.id, { status: "inactive" });
+        } else {
+            const earnedPoints = await loyaltyModule.calculatePointsFromAmount(order.total);
+            await loyaltyModule.recordTransaction({
+                customer_id: order.customer.id,
+                type: "add",
+                reference_id: order.id,
+                points: earnedPoints,
+                order_id: order.id,
+            });
         }
-
-        const earnedPoints = await loyaltyModule.calculatePointsFromAmount(order.total);
-        await loyaltyModule.recordTransaction({
-            customer_id: order.customer.id,
-            type: "earn",
-            reference_id: order.id,
-            points: earnedPoints,
-            order_id: order.id,
-        });
         await orderModule.updateOrders({
             id: order.id,
             metadata: { ...(order.metadata ?? {}), loyalty_processed: true },
@@ -59,7 +54,7 @@ export const processOrderLoyaltyStep = createStep(
 
         return new StepResponse({
             skipped: false,
-            earned_points: earnedPoints,
+            earned_points: loyaltyPromotion ? 0 : await loyaltyModule.calculatePointsFromAmount(order.total),
             redeemed_points: redeemedPoints,
         });
     },

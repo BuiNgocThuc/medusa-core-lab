@@ -26,16 +26,20 @@ export async function validateLoyaltyPoints(
     const requiredPoints = await loyaltyModuleService.calculatePointsFromDiscountAmount(
         loyaltyPromotion.application_method!.value as number,
     )
-    const [consumption] = await loyaltyModuleService.listLoyaltyTransactions({
-        type: "redemption",
-        reference_id: cartId,
+    const [reservation] = await loyaltyModuleService.listLoyaltyReservations({
+        cart_id: cartId,
     })
     if (
-        !consumption ||
-        consumption.status !== "consumed" ||
-        consumption.customer_id !== cart.customer!.id ||
-        -consumption.points !== requiredPoints
+        !reservation ||
+        reservation.state !== "reserved" ||
+        reservation.expires_at <= new Date() ||
+        reservation.customer_id !== cart.customer!.id ||
+        reservation.promotion_id !== loyaltyPromotion.id ||
+        reservation.points !== requiredPoints
     ) {
-        throw new MedusaError(MedusaError.Types.INVALID_DATA, "Đổi điểm chưa hợp lệ cho giỏ hàng này")
+        throw new MedusaError(
+            MedusaError.Types.INVALID_DATA,
+            "Loyalty points reservation expired, please apply again",
+        )
     }
 }

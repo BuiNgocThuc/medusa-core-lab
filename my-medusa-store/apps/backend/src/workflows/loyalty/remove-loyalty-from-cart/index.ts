@@ -8,6 +8,7 @@ import {
     updatePromotionsStep,
 } from "@medusajs/medusa/core-flows";
 import { getCartLoyaltyPromoStep } from "../apply-loyalty-on-cart/steps";
+import { releaseLoyaltyReservationStep } from "./steps";
 import { PromotionActions } from "@medusajs/framework/utils";
 import { CartData } from "@/src/utils";
 
@@ -30,8 +31,6 @@ const fields = [
 export const removeLoyaltyFromCartWorkflow = createWorkflow(
     "remove-loyalty-from-cart",
     (input: WorkflowInput) => {
-        acquireLockStep({ key: input.cart_id, timeout: 10, ttl: 30 });
-
         const { data: carts } = useQueryGraphStep({
             entity: "cart",
             fields,
@@ -43,10 +42,18 @@ export const removeLoyaltyFromCartWorkflow = createWorkflow(
             },
         });
 
+        const lockKeys = transform({ carts }, ({ carts }) => [
+            carts[0].id,
+            `loyalty-customer-${carts[0].customer!.id}`,
+        ]);
+        acquireLockStep({ key: lockKeys, timeout: 10, ttl: 30 });
+
         const loyaltyPromo = getCartLoyaltyPromoStep({
             cart: carts[0] as unknown as CartData,
             throwErrorOn: "not-found",
         });
+
+        releaseLoyaltyReservationStep({ cart_id: input.cart_id });
 
         updateCartPromotionsWorkflow.runAsStep({
             input: {
@@ -91,7 +98,7 @@ export const removeLoyaltyFromCartWorkflow = createWorkflow(
             filters: { id: input.cart_id },
         }).config({ name: "retrieve-cart" });
 
-        releaseLockStep({ key: input.cart_id });
+        releaseLockStep({ key: lockKeys });
 
         return new WorkflowResponse(updatedCarts[0]);
     },

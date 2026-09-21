@@ -11,7 +11,6 @@ import {
     useQueryGraphStep,
 } from "@medusajs/medusa/core-flows";
 import { FIRST_PURCHASE_PROMOTION_CODE } from "@/src/constant";
-import { consumeLoyaltyPointsForCheckoutStep } from "./steps";
 
 type CompleteCustomerPromotionCartInput = {
     cart_id: string;
@@ -47,16 +46,32 @@ export const completeCustomerPromotionCartWorkflow = createWorkflow(
 
         acquireLockStep({ key: lockKeys, timeout: 30, ttl: 120 });
 
-        consumeLoyaltyPointsForCheckoutStep({ cart_id: input.cart_id });
-
-        const result = completeCartWorkflow.runAsStep({
-            input: { id: input.cart_id },
-        });
+        const { data: orderCart } = useQueryGraphStep({
+            entity: "order_cart",
+            fields: ["order_id"],
+            filters: { cart_id: input.cart_id },
+            options: { isList: false },
+        }).config({ name: "retrieve-existing-order" });
+        const existingOrderId = transform({ orderCart }, ({ orderCart }) =>
+            orderCart?.order_id ?? null,
+        );
+        const completedOrder = when(
+            { existingOrderId },
+            ({ existingOrderId }) => !existingOrderId,
+        ).then(() =>
+            completeCartWorkflow.runAsStep({
+                input: { id: input.cart_id },
+            }),
+        );
+        const orderId = transform(
+            { existingOrderId, completedOrder },
+            ({ existingOrderId, completedOrder }) => existingOrderId ?? completedOrder?.id,
+        );
 
         releaseLockStep({
             key: lockKeys,
         });
 
-        return new WorkflowResponse(result);
+        return new WorkflowResponse({ id: orderId });
     },
 );

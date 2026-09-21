@@ -19,43 +19,4 @@ describe("LoyaltyModuleService conversion policy", () => {
         )
     })
 
-    it("consumes points once per cart and does not deduct them again on retry", async () => {
-        const service = Object.create(LoyaltyModuleService.prototype) as any
-        service.listLoyaltyTransactions = jest
-            .fn()
-            .mockResolvedValueOnce([])
-            .mockResolvedValueOnce([{ id: "lt_1", status: "consumed" }])
-        service.deductPoints = jest.fn().mockResolvedValue(undefined)
-        service.createLoyaltyTransactions = jest.fn().mockResolvedValue({ id: "lt_1" })
-
-        await expect(service.consumePointsForCart({
-            customer_id: "cus_1",
-            cart_id: "cart_1",
-            points: 100,
-            promotion_id: "promo_1",
-        })).resolves.toMatchObject({ consumed: true })
-        await expect(service.consumePointsForCart({
-            customer_id: "cus_1",
-            cart_id: "cart_1",
-            points: 100,
-            promotion_id: "promo_1",
-        })).resolves.toMatchObject({ consumed: false })
-
-        expect(service.deductPoints).toHaveBeenCalledTimes(1)
-    })
-
-    it("restores points when checkout compensation reverses a consumed redemption", async () => {
-        const service = Object.create(LoyaltyModuleService.prototype) as any
-        service.listLoyaltyTransactions = jest.fn().mockResolvedValue([{ id: "lt_1", status: "consumed" }])
-        service.addPoints = jest.fn().mockResolvedValue(undefined)
-        service.updateLoyaltyTransactions = jest.fn().mockResolvedValue({ id: "lt_1", status: "reversed" })
-
-        await service.reverseCartPointConsumption("cart_1", "cus_1", 100)
-
-        expect(service.addPoints).toHaveBeenCalledWith("cus_1", 100)
-        expect(service.updateLoyaltyTransactions).toHaveBeenCalledWith({
-            id: "lt_1",
-            status: "reversed",
-        })
-    })
 })

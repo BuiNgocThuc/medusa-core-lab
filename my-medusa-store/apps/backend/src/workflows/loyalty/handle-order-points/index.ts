@@ -22,7 +22,7 @@ export const handleOrderPointsWorkflow = createWorkflow(
             options: { throwIfKeyNotFound: true },
         });
         const customerLockKey = transform({ orders }, ({ orders }) =>
-            `customer-promotion-${orders[0].customer!.id}`,
+            `loyalty-customer-${orders[0].customer!.id}`,
         );
 
         acquireLockStep({

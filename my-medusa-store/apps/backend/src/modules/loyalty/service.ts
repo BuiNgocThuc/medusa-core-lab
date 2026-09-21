@@ -1,6 +1,6 @@
 import { MedusaError, MedusaService } from "@medusajs/framework/utils";
 import LoyaltyPoint from "./models/loyalty-point";
-import { LoyaltyTransaction } from "./models";
+import { LoyaltyReservation, LoyaltyTransaction } from "./models";
 import { InferTypeOf } from "@medusajs/framework/types";
 import {
     LOYALTY_EARN_VND_PER_POINT,
@@ -13,7 +13,86 @@ type LoyaltyPoint = InferTypeOf<typeof LoyaltyPoint>;
 class LoyaltyModuleService extends MedusaService({
     LoyaltyPoint,
     LoyaltyTransaction,
+    LoyaltyReservation,
 }) {
+    async reservePointsForCart(input: {
+        customer_id: string
+        cart_id: string
+        promotion_id: string
+        points: number
+        expires_at: Date
+    }) {
+        const reservations = await this.listLoyaltyReservations({
+            customer_id: input.customer_id,
+            state: "reserved",
+        })
+        const now = new Date()
+        const reservedByOtherCarts = reservations
+            .filter((reservation) => reservation.cart_id !== input.cart_id && reservation.expires_at > now)
+            .reduce((sum, reservation) => sum + reservation.points, 0)
+        const balance = await this.getPoints(input.customer_id)
+        if (balance - reservedByOtherCarts < input.points) {
+            throw new MedusaError(MedusaError.Types.NOT_ALLOWED, "Không đủ điểm tích lũy khả dụng")
+        }
+
+        const [existing] = await this.listLoyaltyReservations({ cart_id: input.cart_id })
+        if (existing) {
+            return await this.updateLoyaltyReservations({
+                id: existing.id,
+                promotion_id: input.promotion_id,
+                points: input.points,
+                state: "reserved",
+                expires_at: input.expires_at,
+                order_id: null,
+            })
+        }
+        return await this.createLoyaltyReservations(input)
+    }
+
+    async releaseReservation(cartId: string, state: "released" | "expired" = "released") {
+        const [reservation] = await this.listLoyaltyReservations({ cart_id: cartId })
+        if (!reservation || reservation.state !== "reserved") return reservation
+        return await this.updateLoyaltyReservations({ id: reservation.id, state })
+    }
+
+    async consumeReservationForOrder(input: {
+        order_id: string
+        customer_id: string
+        cart_id: string
+        promotion_id: string
+        points: number
+    }) {
+        const [existingTransaction] = await this.listLoyaltyTransactions({
+            order_id: input.order_id,
+            type: "deduct",
+        })
+        if (existingTransaction) return { skipped: true, transaction: existingTransaction }
+
+        const [reservation] = await this.listLoyaltyReservations({ cart_id: input.cart_id })
+        if (
+            !reservation || reservation.customer_id !== input.customer_id ||
+            reservation.promotion_id !== input.promotion_id || reservation.points !== input.points ||
+            reservation.state !== "reserved" || reservation.expires_at <= new Date()
+        ) {
+            throw new MedusaError(MedusaError.Types.INVALID_DATA, "Loyalty reservation không hợp lệ")
+        }
+        await this.deductPoints(input.customer_id, input.points)
+        const transaction = await this.createLoyaltyTransactions({
+            customer_id: input.customer_id,
+            type: "deduct",
+            reference_id: input.order_id,
+            points: -input.points,
+            order_id: input.order_id,
+            cart_id: input.cart_id,
+            promotion_id: input.promotion_id,
+        })
+        await this.updateLoyaltyReservations({
+            id: reservation.id,
+            state: "consumed",
+            order_id: input.order_id,
+        })
+        return { skipped: false, transaction }
+    }
     async addPoints(customerId: string, points: number): Promise<LoyaltyPoint> {
         const existingPoints = await this.listLoyaltyPoints({
             customer_id: customerId,
@@ -78,59 +157,6 @@ class LoyaltyModuleService extends MedusaService({
         await this.addPoints(input.customer_id, input.points)
 
         return transaction
-    }
-
-    async consumePointsForCart(input: {
-        customer_id: string
-        cart_id: string
-        points: number
-        promotion_id: string
-    }) {
-        const [existing] = await this.listLoyaltyTransactions({
-            type: "redemption",
-            reference_id: input.cart_id,
-        })
-        if (existing?.status === "consumed") {
-            return { transaction: existing, consumed: false }
-        }
-
-        await this.deductPoints(input.customer_id, input.points)
-        try {
-            const transaction = existing
-                ? await this.updateLoyaltyTransactions({
-                    id: existing.id,
-                    points: -input.points,
-                    status: "consumed",
-                    promotion_id: input.promotion_id,
-                })
-                : await this.createLoyaltyTransactions({
-                    customer_id: input.customer_id,
-                    type: "redemption",
-                    reference_id: input.cart_id,
-                    points: -input.points,
-                    status: "consumed",
-                    cart_id: input.cart_id,
-                    promotion_id: input.promotion_id,
-                })
-            return { transaction, consumed: true }
-        } catch (error) {
-            await this.addPoints(input.customer_id, input.points)
-            throw error
-        }
-    }
-
-    async reverseCartPointConsumption(cartId: string, customerId: string, points: number) {
-        const [transaction] = await this.listLoyaltyTransactions({
-            type: "redemption",
-            reference_id: cartId,
-        })
-        if (!transaction || transaction.status !== "consumed") return transaction
-
-        await this.addPoints(customerId, points)
-        return await this.updateLoyaltyTransactions({
-            id: transaction.id,
-            status: "reversed",
-        })
     }
 
     async calculatePointsFromAmount(amount: number): Promise<number> {
