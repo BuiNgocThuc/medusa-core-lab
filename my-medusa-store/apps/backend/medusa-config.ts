@@ -118,6 +118,9 @@ module.exports = defineConfig({
                     paymentUrl:
                       process.env.VNPAY_PAYMENT_URL ||
                       "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html",
+                    transactionApiUrl:
+                      process.env.VNPAY_TRANSACTION_API_URL ||
+                      "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction",
                     returnUrl:
                       process.env.VNPAY_RETURN_URL ||
                       "http://localhost:8000/api/payment-return/vnpay",
@@ -129,6 +132,9 @@ module.exports = defineConfig({
                     paymentExpiryMinutes: Number(
                       process.env.VNPAY_PAYMENT_EXPIRY_MINUTES || 15
                     ),
+                    refundCreateBy: process.env.VNPAY_REFUND_CREATE_BY || "system",
+                    refundIpAddress:
+                      process.env.VNPAY_REFUND_IP_ADDRESS || "127.0.0.1",
                   },
                 },
               ]

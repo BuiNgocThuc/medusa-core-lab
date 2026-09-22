@@ -29,6 +29,7 @@ import type {
 import { VNPAY_PAYMENT_MODULE } from "../vnpay-payment"
 import VnpayPaymentModuleService from "../vnpay-payment/service"
 import type { CompleteVnpayPaymentResult } from "../vnpay-payment/types"
+import { VnpayClient } from "./client"
 import {
   buildVnpaySignData,
   formatVnpayDate,
@@ -50,6 +51,8 @@ type InjectedDependencies = {
 
 const DEFAULT_PROVIDER_ID = "pp_vnpay_default"
 const DEFAULT_PAYMENT_URL = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
+const DEFAULT_TRANSACTION_API_URL =
+  "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction"
 const DEFAULT_EXPIRY_MINUTES = 15
 
 class VnpayPaymentProviderService extends AbstractPaymentProvider<VnpayProviderOptions> {
@@ -58,6 +61,7 @@ class VnpayPaymentProviderService extends AbstractPaymentProvider<VnpayProviderO
   protected readonly logger_: Logger
   protected readonly options_: VnpayProviderOptions
   protected readonly vnpayPaymentService_?: VnpayPaymentModuleService
+  protected readonly vnpayClient_: VnpayClient
 
   constructor(container: InjectedDependencies, options: VnpayProviderOptions) {
     super(container, options)
@@ -66,14 +70,18 @@ class VnpayPaymentProviderService extends AbstractPaymentProvider<VnpayProviderO
     this.vnpayPaymentService_ = container[VNPAY_PAYMENT_MODULE]
     this.options_ = {
       paymentUrl: DEFAULT_PAYMENT_URL,
+      transactionApiUrl: DEFAULT_TRANSACTION_API_URL,
       providerId: DEFAULT_PROVIDER_ID,
       locale: "vn",
       orderType: "other",
       command: "pay",
       version: "2.1.0",
       paymentExpiryMinutes: DEFAULT_EXPIRY_MINUTES,
+      refundCreateBy: "system",
+      refundIpAddress: "127.0.0.1",
       ...options,
     }
+    this.vnpayClient_ = new VnpayClient(this.options_)
   }
 
   static validateOptions(options: Record<string, unknown>) {
@@ -228,11 +236,114 @@ class VnpayPaymentProviderService extends AbstractPaymentProvider<VnpayProviderO
   }
 
   async refundPayment(input: RefundPaymentInput): Promise<RefundPaymentOutput> {
+    const amount = this.toNumber(input.amount)
+    const sessionId = this.getSessionId(input.data)
+    const payment = sessionId
+      ? await this.vnpayPaymentService_?.retrievePaymentBySessionId(sessionId)
+      : undefined
+
+    if (!payment) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "VNPay refund requires a known payment session"
+      )
+    }
+
+    if (payment.status !== "paid" && payment.status !== "partially_refunded") {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "VNPay refund requires a paid payment"
+      )
+    }
+
+    if (!Number.isInteger(amount) || amount <= 0) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "VNPay refund amount must be a positive VND integer"
+      )
+    }
+
+    const transactionNo =
+      payment.transaction_no ?? this.getString(input.data, "vnp_transaction_no")
+    const transactionDate =
+      payment.pay_date ??
+      this.getString(input.data, "vnp_pay_date") ??
+      this.getMetadataString(payment.metadata, "create_date")
+
+    if (!transactionNo || !transactionDate) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "VNPay refund requires transactionNo and transactionDate from the paid transaction"
+      )
+    }
+
+    const alreadyRefunded =
+      (await this.vnpayPaymentService_?.sumRefundAmount(payment.id)) ?? 0
+
+    if (alreadyRefunded + amount > payment.amount) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "VNPay refund amount exceeds the paid amount"
+      )
+    }
+
+    const requestId = randomVnpayTxnRef("VNR")
+    const transactionType =
+      amount === payment.amount && alreadyRefunded === 0 ? "02" : "03"
+    const orderInfo = `Refund VNPay payment ${payment.vnp_txn_ref}`
+    const { request, response } = await this.vnpayClient_.refund({
+      requestId,
+      txnRef: payment.vnp_txn_ref,
+      amount,
+      transactionNo,
+      transactionDate,
+      transactionType,
+      orderInfo,
+    })
+
+    await this.vnpayPaymentService_?.createRefund({
+      vnpay_payment_id: payment.id,
+      payment_id: this.getString(input.data, "payment_id"),
+      request_id: requestId,
+      txn_ref: payment.vnp_txn_ref,
+      amount,
+      transaction_type: transactionType,
+      raw_request: this.maskRefundRequest(request),
+    })
+
+    const refundStatus = this.getRefundStatus(response)
+    await this.vnpayPaymentService_?.updateRefundFromResponse({
+      request_id: requestId,
+      status: refundStatus,
+      response_code: response.vnp_ResponseCode,
+      transaction_status: response.vnp_TransactionStatus,
+      message: response.vnp_Message,
+      refund_transaction_no: response.vnp_TransactionNo,
+      raw_response: this.maskRefundResponse(response),
+    })
+
+    if (!this.isAcceptedRefundResponse(response)) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        response.vnp_Message ?? "VNPay refund failed"
+      )
+    }
+
+    const acceptedRefundedAmount = alreadyRefunded + amount
+    await this.vnpayPaymentService_?.markRefundedStatus(
+      payment.id,
+      acceptedRefundedAmount
+    )
+
     return {
       data: {
         ...input.data,
-        last_refund_amount: this.toNumber(input.amount),
-        last_refund_status: "manual_required",
+        last_refund_amount: amount,
+        last_refund_status: refundStatus,
+        last_refund_request_id: requestId,
+        last_refund_transaction_no: response.vnp_TransactionNo,
+        last_refund_response_code: response.vnp_ResponseCode,
+        last_refund_transaction_status: response.vnp_TransactionStatus,
         last_refund_requested_at: new Date().toISOString(),
       },
     }
@@ -396,6 +507,54 @@ class VnpayPaymentProviderService extends AbstractPaymentProvider<VnpayProviderO
     const txnRef = data?.vnp_txn_ref ?? data?.provider_session_id ?? data?.id
 
     return typeof txnRef === "string" ? txnRef : undefined
+  }
+
+  private getString(data: Record<string, unknown> | undefined, key: string) {
+    const value = data?.[key]
+
+    return typeof value === "string" && value ? value : undefined
+  }
+
+  private getMetadataString(
+    metadata: Record<string, unknown> | null | undefined,
+    key: string
+  ) {
+    const value = metadata?.[key]
+
+    return typeof value === "string" && value ? value : undefined
+  }
+
+  private getRefundStatus(response: Record<string, unknown>) {
+    if (response.vnp_ResponseCode !== "00") {
+      return "failed" as const
+    }
+
+    if (
+      response.vnp_TransactionStatus === "05" ||
+      response.vnp_TransactionStatus === "06"
+    ) {
+      return "processing" as const
+    }
+
+    return "succeeded" as const
+  }
+
+  private isAcceptedRefundResponse(response: Record<string, unknown>) {
+    return response.vnp_ResponseCode === "00"
+  }
+
+  private maskRefundRequest(request: Record<string, unknown>) {
+    return {
+      ...request,
+      vnp_SecureHash: "[masked]",
+    }
+  }
+
+  private maskRefundResponse(response: Record<string, unknown>) {
+    return {
+      ...response,
+      vnp_SecureHash: response.vnp_SecureHash ? "[masked]" : undefined,
+    }
   }
 
   private getExpiresAt() {

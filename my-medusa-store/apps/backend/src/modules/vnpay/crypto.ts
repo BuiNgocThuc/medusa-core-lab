@@ -67,6 +67,38 @@ export function randomVnpayTxnRef(prefix = "VNP", length = 12) {
   return `${prefix}${randomBytes(length).toString("hex").toUpperCase()}`
 }
 
+export function buildVnpayRefundSignatureData(input: {
+  requestId: string
+  version: string
+  command: string
+  tmnCode: string
+  transactionType: string
+  txnRef: string
+  amount: number
+  transactionNo: string
+  transactionDate: string
+  createBy: string
+  createDate: string
+  ipAddress: string
+  orderInfo: string
+}) {
+  return [
+    input.requestId,
+    input.version,
+    input.command,
+    input.tmnCode,
+    input.transactionType,
+    input.txnRef,
+    input.amount,
+    input.transactionNo,
+    input.transactionDate,
+    input.createBy,
+    input.createDate,
+    input.ipAddress,
+    input.orderInfo,
+  ].join("|")
+}
+
 export function formatVnpayDate(date: Date) {
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Ho_Chi_Minh",

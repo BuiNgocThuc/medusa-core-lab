@@ -1,11 +1,15 @@
 import { MedusaService } from "@medusajs/framework/utils"
 
 import VnpayPayment from "./models/vnpay-payment"
+import VnpayRefund from "./models/vnpay-refund"
 import VnpayWebhookEvent from "./models/vnpay-webhook-event"
 import type {
   CompleteVnpayPaymentInput,
   CompleteVnpayPaymentResult,
+  CreateVnpayRefundInput,
+  UpdateVnpayRefundInput,
   UpsertVnpayPaymentInput,
+  VnpayRefundStatus,
   VnpayPaymentStatus,
 } from "./types"
 
@@ -22,11 +26,18 @@ type GeneratedModuleMethods = {
     config?: Record<string, unknown>
   ): Promise<any[]>
   updateVnpayWebhookEvents(data: Record<string, unknown>): Promise<any>
+  createVnpayRefunds(data: Record<string, unknown>): Promise<any>
+  updateVnpayRefunds(data: Record<string, unknown>): Promise<any>
+  listVnpayRefunds(
+    filters?: Record<string, unknown>,
+    config?: Record<string, unknown>
+  ): Promise<any[]>
 }
 
 class VnpayPaymentModuleService extends MedusaService({
   VnpayPayment,
   VnpayWebhookEvent,
+  VnpayRefund,
 }) {
   async upsertPaymentFromSession(input: UpsertVnpayPaymentInput) {
     const methods = this.methods()
@@ -193,6 +204,95 @@ class VnpayPaymentModuleService extends MedusaService({
       amount: payment.amount,
       reason: input.message ?? "VNPay payment failed",
     }
+  }
+
+  async createRefund(input: CreateVnpayRefundInput) {
+    return this.methods().createVnpayRefunds({
+      vnpay_payment_id: input.vnpay_payment_id,
+      payment_id: input.payment_id ?? null,
+      request_id: input.request_id,
+      txn_ref: input.txn_ref,
+      amount: input.amount,
+      transaction_type: input.transaction_type,
+      status: "pending",
+      raw_request: input.raw_request ?? null,
+    })
+  }
+
+  async updateRefundFromResponse(input: UpdateVnpayRefundInput) {
+    const [refund] = await this.methods().listVnpayRefunds(
+      {
+        request_id: input.request_id,
+      },
+      { take: 1 }
+    )
+
+    if (!refund) {
+      return
+    }
+
+    return this.methods().updateVnpayRefunds({
+      id: refund.id,
+      status: input.status,
+      response_code: input.response_code ?? null,
+      transaction_status: input.transaction_status ?? null,
+      message: input.message ?? null,
+      refund_transaction_no: input.refund_transaction_no ?? null,
+      raw_response: input.raw_response ?? null,
+      processed_at: new Date(),
+    })
+  }
+
+  async sumRefundAmount(
+    vnpayPaymentId: string,
+    statuses: VnpayRefundStatus[] = ["processing", "succeeded"]
+  ) {
+    const refunds = await this.methods().listVnpayRefunds(
+      {
+        vnpay_payment_id: vnpayPaymentId,
+        status: statuses,
+      },
+      { take: 1000 }
+    )
+
+    return refunds.reduce((total, refund) => total + Number(refund.amount ?? 0), 0)
+  }
+
+  async markRefundedStatus(paymentId: string, refundedAmount: number) {
+    const [payment] = await this.methods().listVnpayPayments(
+      {
+        id: paymentId,
+      },
+      { take: 1 }
+    )
+
+    if (!payment) {
+      return
+    }
+
+    const status =
+      refundedAmount >= Number(payment.amount ?? 0)
+        ? "refunded"
+        : "partially_refunded"
+
+    return this.methods().updateVnpayPayments({
+      id: paymentId,
+      status,
+    })
+  }
+
+  async listRefundsForPayment(vnpayPaymentId: string) {
+    return this.methods().listVnpayRefunds(
+      {
+        vnpay_payment_id: vnpayPaymentId,
+      },
+      {
+        take: 100,
+        order: {
+          created_at: "DESC",
+        },
+      }
+    )
   }
 
   private async markPaymentAndEvent(

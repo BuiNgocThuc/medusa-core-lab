@@ -60,3 +60,30 @@ export type CompleteVnpayPaymentResult = {
   amount?: number
   reason?: string
 }
+
+export type VnpayRefundStatus =
+  | "pending"
+  | "processing"
+  | "succeeded"
+  | "failed"
+  | "manual_review"
+
+export type CreateVnpayRefundInput = {
+  vnpay_payment_id: string
+  payment_id?: string
+  request_id: string
+  txn_ref: string
+  amount: number
+  transaction_type: "02" | "03"
+  raw_request?: Record<string, unknown>
+}
+
+export type UpdateVnpayRefundInput = {
+  request_id: string
+  status: VnpayRefundStatus
+  response_code?: string
+  transaction_status?: string
+  message?: string
+  refund_transaction_no?: string
+  raw_response?: Record<string, unknown>
+}

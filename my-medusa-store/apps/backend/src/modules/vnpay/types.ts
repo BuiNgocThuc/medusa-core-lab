@@ -2,6 +2,7 @@ export type VnpayProviderOptions = {
   tmnCode: string
   hashSecret: string
   paymentUrl?: string
+  transactionApiUrl?: string
   returnUrl: string
   ipnUrl?: string
   providerId?: string
@@ -10,6 +11,8 @@ export type VnpayProviderOptions = {
   command?: "pay"
   version?: string
   paymentExpiryMinutes?: number
+  refundCreateBy?: string
+  refundIpAddress?: string
 }
 
 export type VnpaySessionData = {
@@ -38,4 +41,39 @@ export type VnpayGatewayPayload = {
   vnp_SecureHash?: string
   vnp_SecureHashType?: string
   [key: string]: string | undefined
+}
+
+export type VnpayRefundRequest = {
+  vnp_RequestId: string
+  vnp_Version: string
+  vnp_Command: "refund"
+  vnp_TmnCode: string
+  vnp_TransactionType: "02" | "03"
+  vnp_TxnRef: string
+  vnp_Amount: number
+  vnp_OrderInfo: string
+  vnp_TransactionNo: string
+  vnp_TransactionDate: string
+  vnp_CreateBy: string
+  vnp_CreateDate: string
+  vnp_IpAddr: string
+  vnp_SecureHash: string
+}
+
+export type VnpayRefundResponse = {
+  vnp_ResponseId?: string
+  vnp_Command?: string
+  vnp_ResponseCode?: string
+  vnp_Message?: string
+  vnp_TmnCode?: string
+  vnp_TxnRef?: string
+  vnp_Amount?: number | string
+  vnp_OrderInfo?: string
+  vnp_BankCode?: string
+  vnp_PayDate?: string
+  vnp_TransactionNo?: string
+  vnp_TransactionType?: string
+  vnp_TransactionStatus?: string
+  vnp_SecureHash?: string
+  [key: string]: string | number | undefined
 }
