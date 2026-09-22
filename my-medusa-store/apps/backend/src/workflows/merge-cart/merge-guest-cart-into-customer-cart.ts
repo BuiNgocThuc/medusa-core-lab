@@ -14,22 +14,13 @@ import {
   addToCartWorkflow,
   releaseLockStep,
   transferCartCustomerWorkflow,
+  updateCartsStep,
   useQueryGraphStep,
 } from "@medusajs/medusa/core-flows"
 import { MergeGuestCartInput, MergeGuestCartOutput } from "./types"
 import { validateInventoryForMergeStep } from "./steps/validate-inventory-for-merge"
 import { deleteCartStep } from "./steps/delete-cart"
 
-const logStep = createStep(
-  "log-step",
-  async (input: { stage: string; payload?: any }) => {
-    console.log(`[Workflow: MergeCart] ${input.stage}`)
-    if (input.payload !== undefined) {
-      console.dir(input.payload, { depth: 4, colors: true })
-    }
-    return new StepResponse(true)
-  }
-)
 
 const validateSalesChannelMismatchStep = createStep(
   "validate-sales-channel-mismatch",
@@ -51,10 +42,6 @@ export const mergeGuestCartIntoCustomerCartWorkflow = createWorkflow(
     retentionTime: 60 * 60 * 24 * 7, // Lưu log trong 7 ngày (tuỳ chọn)
   },
   (input: WorkflowData<MergeGuestCartInput>): WorkflowResponse<MergeGuestCartOutput> => {
-    logStep({
-      stage: "Started",
-      payload: input,
-    }).config({ name: "log-start" })
 
     // Tim gio hang chua checkout cua customer (Cart A)
     const customerCart = useQueryGraphStep({
@@ -80,7 +67,8 @@ export const mergeGuestCartIntoCustomerCartWorkflow = createWorkflow(
         "items.variant_id",
         "items.quantity",
       ],
-    }).config({ name: "get-customer-cart" })
+    }).config({ name: "get-customer-cart" }) // trả về 1 list
+
 
     // Chon cart duoc cap nhat moi nhat (NGOẠI TRỪ guest_cart_id)
     const customerCartTransform = transform(
@@ -112,6 +100,8 @@ export const mergeGuestCartIntoCustomerCartWorkflow = createWorkflow(
         return activeCart
       }
     )
+    // lấy ra được cart muốn merge
+
 
     // Nhanh 1: Khach chua co Cart A va co guest_cart_id -> Transfer guest cart sang customer
     when("transfer-guest-cart", { customerCartTransform, input }, ({ customerCartTransform, input }) => {
@@ -119,17 +109,13 @@ export const mergeGuestCartIntoCustomerCartWorkflow = createWorkflow(
       console.log(`[Workflow: MergeCart] Condition transfer-guest-cart: ${condition}`)
       return condition
     }).then(() => {
-      logStep({
-        stage: "Branch: Transfer guest cart to customer",
-        payload: { guest_cart_id: input.guest_cart_id, customer_id: input.customer_id },
-      }).config({ name: "log-transfer-start" })
 
       acquireLockStep({
         key: input.guest_cart_id!,
         timeout: 30,
         ttl: 120,
       })
-
+      // dùng lại core
       transferCartCustomerWorkflow.runAsStep({
         input: {
           id: input.guest_cart_id!,
@@ -139,20 +125,14 @@ export const mergeGuestCartIntoCustomerCartWorkflow = createWorkflow(
 
       releaseLockStep({ key: input.guest_cart_id! })
 
-      logStep({
-        stage: "Branch: Transfer guest cart completed",
-      }).config({ name: "log-transfer-done" })
     })
 
     // Nhanh 2: Khach da co Cart A -> Merge line items tu Cart B vao Cart A
-    const mergeBranchResult = when("has-customer-cart", { customerCartTransform }, ({ customerCartTransform }) => {
-      const condition = customerCartTransform !== null
+    const mergeBranchResult = when("has-customer-cart", { customerCartTransform, input }, ({ customerCartTransform, input }) => {
+      const condition = customerCartTransform !== null && !!input.guest_cart_id
       console.log(`[Workflow: MergeCart] Condition has-customer-cart: ${condition}`)
       return condition
     }).then(() => {
-      logStep({
-        stage: "Branch: Merge guest cart items into customer cart",
-      }).config({ name: "log-merge-branch" })
 
       acquireLockStep({
         key: [customerCartTransform.id, input.guest_cart_id!],
@@ -239,6 +219,10 @@ export const mergeGuestCartIntoCustomerCartWorkflow = createWorkflow(
           items: inventoryValidationResult.valid_items,
         },
       })
+      // // sau khi add vao gio hang thi can update gio hang
+      // updateCartsStep([{
+      //   id: customerCartTransform.id,
+      // }]).config({ name: "touch-customer-cart-updated-at" })
 
       // BẮT BUỘC: Dọn dẹp Cart B sau khi đã gộp các mặt hàng hợp lệ vào Cart A!
       // Lý do:
@@ -266,7 +250,7 @@ export const mergeGuestCartIntoCustomerCartWorkflow = createWorkflow(
           `[Workflow: MergeCart] Done. Result cart_id: ${finalCartId}, skipped_items count: ${skipped_items.length}`
         )
         return {
-          cart_id: finalCartId,
+          cart: { id: finalCartId },
           skipped_items,
         }
       }

@@ -1,4 +1,5 @@
 import {
+    allowFields,
     authenticate,
     defineMiddlewares,
     validateAndTransformBody,
@@ -10,6 +11,7 @@ import { CreateTierSchema, UpdateTierSchema } from "@/src/api/admin/tiers";
 import { RedeemLoyaltyPointsSchema } from "@/src/api/store/carts/[id]/loyalty-points/validators.ts";
 
 export default defineMiddlewares({
+
     routes: [
         // create tier
         {
@@ -112,6 +114,11 @@ export default defineMiddlewares({
             matcher: "/store/carts/restore-customer",
             method: "POST",
             middlewares: [authenticate("customer", ["session", "bearer"])],
+        },
+        {
+            matcher: "/store/carts",
+            middlewares: [allowFields("custom", "custom.custom_name"),],
+
         },
         //..
     ],
