@@ -14,7 +14,7 @@ export type SkippedCartItem = {
 }
 
 export type MergeGuestCartOutput = {
-  cart_id: string
+  cart: { id: string }
   skipped_items: SkippedCartItem[]
 }
 

@@ -17,7 +17,7 @@ export default defineMiddlewares({
         validateAndTransformQuery(
           createSelectParams(),
           {
-            defaults: [
+            defaults: [ // có thể giúp khi đi vào route.ts dùng fields: req.queryConfig.fields, // <-- Tự động lấy các fields từ defaults hoặc từ ?fields của client
               "id",
               "email",
               "customer_id",
@@ -25,7 +25,7 @@ export default defineMiddlewares({
               "region.*",
               "shipping_address.*",
             ],
-            isList: false,
+            isList: false, // trả về 1, tránh các logic phân trang k cần thiết
           }
         ),
       ],
