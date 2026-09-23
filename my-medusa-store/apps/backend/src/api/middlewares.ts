@@ -1,3 +1,15 @@
+import {
+    authenticate,
+    defineMiddlewares,
+    validateAndTransformBody,
+    validateAndTransformQuery,
+} from "@medusajs/framework/http";
+import { allowFields } from "@medusajs/framework/http";
+import { createFindParams, createSelectParams } from "@medusajs/medusa/api/utils/validators";
+import { NextTierSchema } from "@/src/api/store/customers";
+import { CreateTierSchema, UpdateTierSchema } from "@/src/api/admin/tiers";
+import { RedeemLoyaltyPointsSchema } from "@/src/api/store/carts/[id]/loyalty-points/validators.ts";
+
 export default defineMiddlewares({
     routes: [
         // create tier
@@ -81,37 +93,31 @@ export default defineMiddlewares({
         //...
         {
             matcher: "/store/carts",
-            middlewares: [allowFields("custom", "custom.custom_name"),],
-            
+            middlewares: [allowFields("custom", "custom.custom_name")],
         },
         {
             matcher: "/store/carts/:id/merge-customer",
             method: "POST",
             middlewares: [
                 authenticate("customer", ["session", "bearer"]),
-                validateAndTransformQuery(
-                    createSelectParams(),
-                    {
-                        defaults: [
-                            "id",
-                            "email",
-                            "customer_id",
-                            "items.*",
-                            "region.*",
-                            "shipping_address.*",
-                        ],
-                        isList: false,
-                    }
-                ),
+                validateAndTransformQuery(createSelectParams(), {
+                    defaults: [
+                        "id",
+                        "email",
+                        "customer_id",
+                        "items.*",
+                        "region.*",
+                        "shipping_address.*",
+                    ],
+                    isList: false,
+                }),
             ],
         },
         {
             matcher: "/store/carts/restore-customer",
             method: "POST",
-            middlewares: [
-                authenticate("customer", ["session", "bearer"]),
-            ],
+            middlewares: [authenticate("customer", ["session", "bearer"])],
         },
         //..
     ],
-})
+});

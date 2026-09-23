@@ -1,22 +1,21 @@
-import { loadEnv, defineConfig } from '@medusajs/framework/utils'
+import { loadEnv, defineConfig } from "@medusajs/framework/utils";
 
-loadEnv(process.env.NODE_ENV || 'development', process.cwd())
+loadEnv(process.env.NODE_ENV || "development", process.cwd());
 
 const REDIS_URL = process.env.REDIS_URL;
 
-
 module.exports = defineConfig({
-  projectConfig: {
-    databaseUrl: process.env.DATABASE_URL,
-    redisUrl: REDIS_URL,
-    http: {
-      storeCors: process.env.STORE_CORS!,
-      adminCors: process.env.ADMIN_CORS!,
-      authCors: process.env.AUTH_CORS!,
-      jwtSecret: process.env.JWT_SECRET,
-      cookieSecret: process.env.COOKIE_SECRET,
-    }
-  },
+    projectConfig: {
+        databaseUrl: process.env.DATABASE_URL,
+        redisUrl: REDIS_URL,
+        http: {
+            storeCors: process.env.STORE_CORS!,
+            adminCors: process.env.ADMIN_CORS!,
+            authCors: process.env.AUTH_CORS!,
+            jwtSecret: process.env.JWT_SECRET,
+            cookieSecret: process.env.COOKIE_SECRET,
+        },
+    },
 
     modules: [
         {
@@ -32,17 +31,20 @@ module.exports = defineConfig({
             resolve: "./src/modules/promotion-entitlement",
         },
         {
+            resolve: "./src/modules/hello",
+        },
+        {
             resolve: "@medusajs/medusa/caching",
-            
+
             options: {
                 ttl: 3600, // TTL mặc định: 1 giờ
-                
+
                 providers: [
                     {
                         resolve: "@medusajs/caching-redis",
                         id: "caching-redis",
                         is_default: true,
-                        
+
                         options: {
                             redisUrl: REDIS_URL,
                         },
@@ -52,15 +54,15 @@ module.exports = defineConfig({
         },
         ...(REDIS_URL
             ? [
-                {
-                    resolve: "@medusajs/medusa/workflow-engine-redis",
-                    options: {
-                        redis: {
-                            redisUrl: REDIS_URL,
-                        },
-                    },
-                },
-            ]
+                  {
+                      resolve: "@medusajs/medusa/workflow-engine-redis",
+                      options: {
+                          redis: {
+                              redisUrl: REDIS_URL,
+                          },
+                      },
+                  },
+              ]
             : []),
         // --- STORAGE: Dùng Cloudflare R2 để lưu ảnh sản phẩm ---- Bỏ vào modules[]
         ...(process.env.S3_BUCKET
@@ -91,5 +93,3 @@ module.exports = defineConfig({
             : []),
     ],
 });
-
-
