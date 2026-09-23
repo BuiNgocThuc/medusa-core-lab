@@ -1,3 +1,7 @@
+/**
+ * Cron Job Reconcile MoMo Payments:
+ * - Quét các giao dịch MoMo đang pending/authorized, gọi MoMo Query API để xác nhận trạng thái và đồng bộ workflow.
+ */
 import { MedusaContainer } from "@medusajs/framework/types"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { processPaymentWorkflow } from "@medusajs/medusa/core-flows"

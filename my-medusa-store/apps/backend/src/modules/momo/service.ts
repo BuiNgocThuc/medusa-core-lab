@@ -1,3 +1,8 @@
+/**
+ * Service Provider cho MoMo Payment:
+ * - Adapter gọi API MoMo gateway (tạo thanh toán, refund, IPN processing).
+ * - Implement initiatePayment, authorizePayment, refundPayment, getWebhookActionAndData.
+ */
 import {
   AbstractPaymentProvider,
   MedusaError,

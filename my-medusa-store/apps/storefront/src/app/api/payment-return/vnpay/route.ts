@@ -1,3 +1,8 @@
+/**
+ * Storefront Return Route cho VNPay:
+ * - Đón khách quay về từ cổng VNPay, forward payload qua Backend Hook để verify checksum.
+ * - Nếu backend trả OK (RspCode 00/02), gọi placeOrder() hoàn tất đơn hàng.
+ */
 import { placeOrder } from "@lib/data/cart"
 import { unstable_rethrow } from "next/navigation"
 import { NextRequest, NextResponse } from "next/server"

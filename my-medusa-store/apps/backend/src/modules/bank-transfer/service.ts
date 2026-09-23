@@ -1,3 +1,8 @@
+/**
+ * Service Provider cho Bank Transfer:
+ * - Adapter kết nối Medusa Payment Module với Bank Transfer Ledger Module.
+ * - Implement initiatePayment, authorizePayment, capturePayment, getWebhookActionAndData.
+ */
 import {
   AbstractPaymentProvider,
   MedusaError,

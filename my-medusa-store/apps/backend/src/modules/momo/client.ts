@@ -1,3 +1,7 @@
+/**
+ * Client giao tiếp API MoMo Gateway:
+ * - Gửi API create payment (/v2/gateway/api/create), query status (/v2/gateway/api/query) và refund (/v2/gateway/api/refund).
+ */
 import { MedusaError } from "@medusajs/framework/utils"
 
 import {

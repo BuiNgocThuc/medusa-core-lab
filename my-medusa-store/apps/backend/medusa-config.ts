@@ -1,3 +1,8 @@
+/**
+ * Cấu hình Medusa Backend:
+ * - Đăng ký các custom payment modules (bank-transfer-payment, momo-payment, vnpay-payment).
+ * - Đăng ký providers vào Medusa Payment Module (bank-transfer luôn bật, momo & vnpay bật khi đủ env).
+ */
 import { loadEnv, defineConfig } from '@medusajs/framework/utils'
 
 import { BANK_TRANSFER_PAYMENT_MODULE } from "./src/modules/bank-transfer-payment"

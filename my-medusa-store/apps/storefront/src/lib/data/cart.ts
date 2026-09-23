@@ -1,4 +1,8 @@
 "use server"
+/**
+ * Server actions quản lý Cart & Checkout:
+ * - retrieveCart, initiatePaymentSession, placeOrder (gọi Medusa Store API complete cart).
+ */
 
 import { sdk } from "@lib/config"
 import medusaError from "@lib/util/medusa-error"

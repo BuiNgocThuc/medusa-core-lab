@@ -1,3 +1,7 @@
+/**
+ * Custom Admin API Route cho VNPay Refund Audit:
+ * - Cung cấp thông tin thanh toán & lịch sử refund VNPay cho Admin Widget UI.
+ */
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 
 import { VNPAY_PAYMENT_MODULE } from "../../../modules/vnpay-payment"

@@ -1,3 +1,8 @@
+/**
+ * Admin UI Widget cho VNPay Refund:
+ * - Hiển thị trong trang chi tiết đơn hàng (zone order.details.side.after) nếu dùng VNPay.
+ * - Xem audit refund & gửi yêu cầu refund thông qua Medusa Admin API.
+ */
 import { defineWidgetConfig } from "@medusajs/admin-sdk"
 import { AdminOrder, AdminPayment, AdminPaymentCollection } from "@medusajs/types"
 import {

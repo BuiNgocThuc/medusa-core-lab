@@ -1,3 +1,9 @@
+/**
+ * Custom Backend Hook nhận callback từ VNPay:
+ * - Verify checksum & signature từ VNPay.
+ * - Ghi nhận webhook event, cập nhật status vnpay_payment.
+ * - Gọi processPaymentWorkflow (authorize & capture).
+ */
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { processPaymentWorkflow } from "@medusajs/medusa/core-flows"

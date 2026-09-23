@@ -1,4 +1,9 @@
 "use client"
+/**
+ * UI chọn payment method:
+ * - Khi chọn provider sẽ gọi initiatePaymentSession.
+ * - Hiển thị thông tin session data: reference bank, URL MoMo/VNPay, expiry.
+ */
 import { RadioGroup } from "@headlessui/react"
 import { isBankTransfer, isMomo, isStripeLike, isVnpay, paymentInfoMap } from "@lib/constants"
 import { initiatePaymentSession } from "@lib/data/cart"

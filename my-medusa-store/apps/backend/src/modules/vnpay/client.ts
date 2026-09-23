@@ -1,3 +1,8 @@
+/**
+ * Client giao tiếp API VNPay Merchant WebAPI:
+ * - Gửi yêu cầu refund qua API merchant_webapi/api/transaction.
+ * - Xây dựng payload & chữ ký HMAC SHA512 cho giao dịch refund VNPay.
+ */
 import { MedusaError } from "@medusajs/framework/utils"
 
 import {

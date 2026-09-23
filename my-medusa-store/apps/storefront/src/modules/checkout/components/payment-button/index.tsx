@@ -1,4 +1,8 @@
 "use client"
+/**
+ * Nút thanh toán cuối ở bước review checkout:
+ * - Quyết định: placeOrder ngay (Manual / Bank Transfer), confirm Stripe, hoặc redirect sang cổng MoMo / VNPay.
+ */
 
 import { isBankTransfer, isManual, isMomo, isStripeLike, isVnpay } from "@lib/constants"
 import { placeOrder } from "@lib/data/cart"

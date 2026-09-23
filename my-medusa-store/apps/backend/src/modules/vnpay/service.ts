@@ -1,3 +1,8 @@
+/**
+ * Service Provider cho VNPay Payment:
+ * - Tạo URL thanh toán VNPay (vnp_TxnRef, HMAC SHA512 signature).
+ * - Xử lý refund giao dịch VNPay (API transaction merchant_webapi).
+ */
 import {
   AbstractPaymentProvider,
   MedusaError,

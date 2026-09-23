@@ -1,3 +1,7 @@
+/**
+ * Cron Job Expire Bank Transfer Payments:
+ * - Quét và chuyển trạng thái expired cho các bank payment reference quá hạn chuyển khoản.
+ */
 import { MedusaContainer } from "@medusajs/framework/types"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 

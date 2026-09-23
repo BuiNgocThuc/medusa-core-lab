@@ -1,3 +1,8 @@
+/**
+ * Service Ledger/Audit cho MoMo Payment:
+ * - Lưu trữ và quản lý bảng momo_payment, momo_webhook_event, momo_refund.
+ * - Xử lý complete payment từ IPN callback & idempotency check.
+ */
 import { MedusaService } from "@medusajs/framework/utils"
 
 import MomoPayment from "./models/momo-payment"

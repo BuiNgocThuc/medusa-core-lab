@@ -1,3 +1,8 @@
+/**
+ * Service Ledger/Audit cho VNPay Payment:
+ * - Quản lý dữ liệu vnpay_payment, vnpay_webhook_event, vnpay_refund.
+ * - Xử lý completePaymentFromGateway khi backend hook xác nhận checksum thành công.
+ */
 import { MedusaService } from "@medusajs/framework/utils"
 
 import VnpayPayment from "./models/vnpay-payment"

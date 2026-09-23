@@ -1,3 +1,8 @@
+/**
+ * Constants & Helpers cho Payment Providers:
+ * - Khai báo provider IDs (pp_bank-transfer_default, pp_momo_default, pp_vnpay_default, ...).
+ * - Helper functions kiểm tra provider type: isBankTransfer, isMomo, isVnpay, isStripeLike, isManual.
+ */
 import { CreditCard } from "@medusajs/icons"
 import Bancontact from "@modules/common/icons/bancontact"
 import Ideal from "@modules/common/icons/ideal"

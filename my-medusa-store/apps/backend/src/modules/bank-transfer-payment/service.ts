@@ -1,3 +1,8 @@
+/**
+ * Service Ledger/Audit cho Bank Transfer:
+ * - Quản lý bank payment reference, transaction và webhook events.
+ * - Xử lý matching logic (matchIncomingTransfer) khi nhận webhook chuyển khoản.
+ */
 import { MedusaError, MedusaService } from "@medusajs/framework/utils"
 
 import BankPaymentReference from "./models/bank-payment-reference"

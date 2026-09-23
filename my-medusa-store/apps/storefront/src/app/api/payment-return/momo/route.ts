@@ -1,3 +1,8 @@
+/**
+ * Storefront Return Route cho MoMo:
+ * - Đón khách quay về từ MoMo redirect (UX flow).
+ * - Kiểm tra resultCode === "0" rồi gọi placeOrder().
+ */
 import { placeOrder } from "@lib/data/cart"
 import { unstable_rethrow } from "next/navigation"
 import { NextRequest, NextResponse } from "next/server"
