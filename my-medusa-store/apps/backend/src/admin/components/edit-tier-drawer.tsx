@@ -4,8 +4,26 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { sdk } from "../lib/sdk";
 import { useState, useEffect } from "react";
 import { Tier } from "../routes/tiers/page";
-import { Trash } from "@medusajs/icons";
 import { CurrencyAmountInput } from "./currency-amount-input";
+
+const TrashIcon = () => (
+    <svg
+        aria-hidden="true"
+        fill="none"
+        height="16"
+        viewBox="0 0 24 24"
+        width="16"
+        xmlns="http://www.w3.org/2000/svg"
+    >
+        <path
+            d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+        />
+    </svg>
+);
 
 type EditTierFormData = {
     name: string;
@@ -289,7 +307,7 @@ export const EditTierDrawer = ({ tier }: EditTierDrawerProps) => {
                                             size="small"
                                             onClick={() => removeTierRule(index)}
                                         >
-                                            <Trash />
+                                            <TrashIcon />
                                         </IconButton>
                                     </div>
                                 ))}

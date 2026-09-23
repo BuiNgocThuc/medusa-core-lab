@@ -1,5 +1,5 @@
 import { convertToLocale } from '@lib/util/money'
-import { clx } from '@medusajs/ui'
+import { clx } from '@modules/common/components/ui'
 import { CustomerNextTier } from 'types/tier'
 
 type CustomerTierProps = {

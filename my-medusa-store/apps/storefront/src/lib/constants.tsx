@@ -33,6 +33,18 @@ export const paymentInfoMap: Record<
         title: 'Manual Payment',
         icon: <CreditCard />,
     },
+    'pp_bank-transfer_default': {
+        title: 'Bank Transfer',
+        icon: <CreditCard />,
+    },
+    pp_momo_default: {
+        title: 'MoMo',
+        icon: <CreditCard />,
+    },
+    pp_vnpay_default: {
+        title: 'VNPay',
+        icon: <CreditCard />,
+    },
     // Add more payment providers here
 }
 
@@ -47,8 +59,21 @@ export const isStripeLike = (providerId?: string) => {
 export const isPaypal = (providerId?: string) => {
     return providerId?.startsWith('pp_paypal')
 }
+
 export const isManual = (providerId?: string) => {
     return providerId?.startsWith('pp_system_default')
+}
+
+export const isBankTransfer = (providerId?: string) => {
+    return providerId?.startsWith('pp_bank-transfer')
+}
+
+export const isMomo = (providerId?: string) => {
+    return providerId?.startsWith('pp_momo')
+}
+
+export const isVnpay = (providerId?: string) => {
+    return providerId?.startsWith('pp_vnpay')
 }
 
 // Add currencies that don't need to be divided by 100

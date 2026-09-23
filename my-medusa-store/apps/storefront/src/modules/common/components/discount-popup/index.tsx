@@ -1,6 +1,6 @@
 'use client'
 
-import { Button, Heading, Text } from '@medusajs/ui'
+import { Button, Heading, Text } from '@modules/common/components/ui'
 import Modal from '@modules/common/components/modal'
 import useToggleState from '@lib/hooks/use-toggle-state'
 import { useEffect } from 'react'

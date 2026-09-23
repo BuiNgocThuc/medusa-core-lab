@@ -9,11 +9,45 @@ import {
     DataTablePaginationState,
 } from "@medusajs/ui";
 import { useNavigate, Link } from "react-router-dom";
-import { UserGroup } from "@medusajs/icons";
 import { useQuery } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
 import { sdk } from "../../lib/sdk";
 import { CreateTierModal } from "../../components/";
+
+const UserGroupIcon = () => (
+    <svg
+        aria-hidden="true"
+        fill="none"
+        height="20"
+        viewBox="0 0 24 24"
+        width="20"
+        xmlns="http://www.w3.org/2000/svg"
+    >
+        <path
+            d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+        />
+        <circle
+            cx="10"
+            cy="7"
+            r="4"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+        />
+        <path
+            d="M21 21v-2a4 4 0 0 0-3-3.87M17 3.13a4 4 0 0 1 0 7.75"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+        />
+    </svg>
+);
 
 export type Tier = {
     id: string;
@@ -115,7 +149,7 @@ const TiersPage = () => {
 
 export const config = defineRouteConfig({
     label: "Customer Tiers",
-    icon: UserGroup,
+    icon: UserGroupIcon,
 });
 
 export default TiersPage;

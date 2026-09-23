@@ -4,7 +4,6 @@ import {
     validateAndTransformBody,
     validateAndTransformQuery,
 } from "@medusajs/framework/http";
-import { allowFields } from "@medusajs/framework/http";
 import { createFindParams, createSelectParams } from "@medusajs/medusa/api/utils/validators";
 import { NextTierSchema } from "@/src/api/store/customers";
 import { CreateTierSchema, UpdateTierSchema } from "@/src/api/admin/tiers";
@@ -91,10 +90,6 @@ export default defineMiddlewares({
             middlewares: [authenticate("customer", ["session", "bearer"])],
         },
         //...
-        {
-            matcher: "/store/carts",
-            middlewares: [allowFields("custom", "custom.custom_name")],
-        },
         {
             matcher: "/store/carts/:id/merge-customer",
             method: "POST",

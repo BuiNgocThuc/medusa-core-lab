@@ -46,7 +46,9 @@ export async function seedStoreAndRegion(container: MedusaContainer) {
             stores: [
                 {
                     name: "Ralley Badminton Store",
-                    supported_currencies: [{ currency_code: "vnd", is_default: true }],
+                    supported_currencies: [
+                        { currency_code: "vnd", is_default: true },
+                    ],
                     default_sales_channel_id: defaultSalesChannel.id,
                 },
             ],
@@ -60,7 +62,10 @@ export async function seedStoreAndRegion(container: MedusaContainer) {
                     name: "Vietnam",
                     currency_code: "vnd",
                     countries: COUNTRIES,
-                    payment_providers: ["pp_system_default"],
+                    payment_providers: [
+                        "pp_system_default",
+                        "pp_bank-transfer_default",
+                    ],
                 },
             ],
         },

@@ -1,5 +1,4 @@
 import { FocusModal, Heading, Label, Input, Button, Select, IconButton, toast } from "@medusajs/ui";
-import { Trash } from "@medusajs/icons";
 import { useForm, Controller, FormProvider } from "react-hook-form";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { sdk } from "../lib/sdk";
@@ -7,6 +6,25 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Tier } from "../routes/tiers/page";
 import { CurrencyAmountInput } from "./currency-amount-input";
+
+const TrashIcon = () => (
+    <svg
+        aria-hidden="true"
+        fill="none"
+        height="16"
+        viewBox="0 0 24 24"
+        width="16"
+        xmlns="http://www.w3.org/2000/svg"
+    >
+        <path
+            d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+        />
+    </svg>
+);
 
 type CreateTierFormData = {
     name: string;
@@ -282,7 +300,7 @@ export const CreateTierModal = ({ open, onOpenChange }: CreateTierModalProps) =>
                                                     size="small"
                                                     onClick={() => removeTierRule(index)}
                                                 >
-                                                    <Trash />
+                                                    <TrashIcon />
                                                 </IconButton>
                                             </div>
                                         ))}

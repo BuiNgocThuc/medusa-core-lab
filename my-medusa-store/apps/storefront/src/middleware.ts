@@ -23,39 +23,49 @@ async function getRegionMap(cacheId: string) {
         !regionMap.keys().next().value ||
         regionMapUpdated < Date.now() - 3600 * 1000
     ) {
-        // Fetch regions from Medusa. We can't use the JS client here because middleware is running on Edge and the client needs a Node environment.
-        const response = await fetch(`${BACKEND_URL}/store/regions`, {
-            method: 'GET',
-            headers: {
-                'x-publishable-api-key': PUBLISHABLE_API_KEY!,
-            },
-            next: {
-                revalidate: 3600,
-                tags: [`regions-${cacheId}`],
-            },
-            cache: 'force-cache',
-        })
-
-        if (!response.ok) {
-            throw new Error(`Backend returned ${response.status}`)
-        }
-
-        const json = await response.json()
-
-        const { regions } = json
-
-        if (!regions?.length) {
-            return new Map<string, HttpTypes.StoreRegion>()
-        }
-
-        // Create a map of country codes to regions.
-        regions.forEach((region: HttpTypes.StoreRegion) => {
-            region.countries?.forEach((c) => {
-                regionMapCache.regionMap.set(c.iso_2 ?? '', region)
+        try {
+            // Fetch regions from Medusa. We can't use the JS client here because middleware is running on Edge and the client needs a Node environment.
+            const response = await fetch(`${BACKEND_URL}/store/regions`, {
+                method: 'GET',
+                headers: {
+                    'x-publishable-api-key': PUBLISHABLE_API_KEY!,
+                },
+                next: {
+                    revalidate: 3600,
+                    tags: [`regions-${cacheId}`],
+                },
+                cache: 'force-cache',
             })
-        })
 
-        regionMapCache.regionMapUpdated = Date.now()
+            if (!response.ok) {
+                console.error(
+                    `[Middleware] Backend returned status ${response.status} when fetching regions.`
+                )
+                return regionMapCache.regionMap
+            }
+
+            const json = await response.json()
+
+            const { regions } = json
+
+            if (!regions?.length) {
+                return new Map<string, HttpTypes.StoreRegion>()
+            }
+
+            // Create a map of country codes to regions.
+            regions.forEach((region: HttpTypes.StoreRegion) => {
+                region.countries?.forEach((c) => {
+                    regionMapCache.regionMap.set(c.iso_2 ?? '', region)
+                })
+            })
+
+            regionMapCache.regionMapUpdated = Date.now()
+        } catch (error) {
+            console.error(
+                `[Middleware] Unable to connect to Medusa backend at ${BACKEND_URL}. Ensure backend is running.`,
+                error
+            )
+        }
     }
 
     return regionMapCache.regionMap

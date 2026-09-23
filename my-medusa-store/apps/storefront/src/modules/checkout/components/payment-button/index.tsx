@@ -1,6 +1,12 @@
 'use client'
 
-import { isManual, isStripeLike } from '@lib/constants'
+import {
+    isBankTransfer,
+    isManual,
+    isMomo,
+    isStripeLike,
+    isVnpay,
+} from '@lib/constants'
 import { placeOrder } from '@lib/data/cart'
 import { HttpTypes } from '@medusajs/types'
 import { Button } from '@modules/common/components/ui'
@@ -25,7 +31,11 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
         !cart.email ||
         (cart.shipping_methods?.length ?? 0) < 1
 
-    const paymentSession = cart.payment_collection?.payment_sessions?.[0]
+    const paymentSession = cart.payment_collection?.payment_sessions?.find(
+        (session) =>
+            session.status === 'pending' ||
+            session.status === 'pending_authorization'
+    )
 
     switch (true) {
         case isStripeLike(paymentSession?.provider_id):
@@ -40,6 +50,29 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
             return (
                 <ManualTestPaymentButton
                     notReady={notReady}
+                    data-testid={dataTestId}
+                />
+            )
+        case isBankTransfer(paymentSession?.provider_id):
+            return (
+                <BankTransferPaymentButton
+                    notReady={notReady}
+                    data-testid={dataTestId}
+                />
+            )
+        case isMomo(paymentSession?.provider_id):
+            return (
+                <MomoPaymentButton
+                    notReady={notReady}
+                    cart={cart}
+                    data-testid={dataTestId}
+                />
+            )
+        case isVnpay(paymentSession?.provider_id):
+            return (
+                <VnpayPaymentButton
+                    notReady={notReady}
+                    cart={cart}
                     data-testid={dataTestId}
                 />
             )
@@ -116,8 +149,6 @@ const StripePaymentButton = ({
                         },
                     },
                 },
-                // Only leave the site when the selected method actually requires it, so
-                // card payments still complete inline.
                 redirect: 'if_required',
             })
             .then(({ error, paymentIntent }) => {
@@ -168,11 +199,19 @@ const StripePaymentButton = ({
     )
 }
 
-const ManualTestPaymentButton = ({ notReady }: { notReady: boolean }) => {
+const ManualTestPaymentButton = ({
+    notReady,
+    'data-testid': dataTestId,
+}: {
+    notReady: boolean
+    'data-testid'?: string
+}) => {
     const [submitting, setSubmitting] = useState(false)
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-    const onPaymentCompleted = async () => {
+    const handlePayment = async () => {
+        setSubmitting(true)
+
         await placeOrder()
             .catch((err) => {
                 setErrorMessage(err.message)
@@ -182,10 +221,45 @@ const ManualTestPaymentButton = ({ notReady }: { notReady: boolean }) => {
             })
     }
 
-    const handlePayment = () => {
+    return (
+        <>
+            <Button
+                disabled={notReady}
+                isLoading={submitting}
+                onClick={handlePayment}
+                size="large"
+                data-testid={dataTestId}
+            >
+                Place order
+            </Button>
+            <ErrorMessage
+                error={errorMessage}
+                data-testid="manual-payment-error-message"
+            />
+        </>
+    )
+}
+
+const BankTransferPaymentButton = ({
+    notReady,
+    'data-testid': dataTestId,
+}: {
+    notReady: boolean
+    'data-testid'?: string
+}) => {
+    const [submitting, setSubmitting] = useState(false)
+    const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+    const handlePayment = async () => {
         setSubmitting(true)
 
-        onPaymentCompleted()
+        await placeOrder()
+            .catch((err) => {
+                setErrorMessage(err.message)
+            })
+            .finally(() => {
+                setSubmitting(false)
+            })
     }
 
     return (
@@ -195,13 +269,112 @@ const ManualTestPaymentButton = ({ notReady }: { notReady: boolean }) => {
                 isLoading={submitting}
                 onClick={handlePayment}
                 size="large"
-                data-testid="submit-order-button"
+                data-testid={dataTestId}
             >
-                Place order
+                Place order and pay by bank transfer
             </Button>
             <ErrorMessage
                 error={errorMessage}
-                data-testid="manual-payment-error-message"
+                data-testid="bank-transfer-payment-error-message"
+            />
+        </>
+    )
+}
+
+const MomoPaymentButton = ({
+    cart,
+    notReady,
+    'data-testid': dataTestId,
+}: {
+    cart: HttpTypes.StoreCart
+    notReady: boolean
+    'data-testid'?: string
+}) => {
+    const [submitting, setSubmitting] = useState(false)
+    const [errorMessage, setErrorMessage] = useState<string | null>(null)
+    const paymentSession = cart.payment_collection?.payment_sessions?.find(
+        (session) => isMomo(session.provider_id)
+    )
+    const hostedPaymentUrl =
+        (paymentSession?.data?.pay_url as string | undefined) ??
+        (paymentSession?.data?.short_link as string | undefined)
+    const deeplink = paymentSession?.data?.deeplink as string | undefined
+    const paymentUrl =
+        typeof window !== 'undefined' &&
+        /Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent) &&
+        deeplink
+            ? deeplink
+            : hostedPaymentUrl
+
+    const handlePayment = () => {
+        if (!paymentUrl) {
+            setErrorMessage('MoMo payment URL is not available')
+            return
+        }
+
+        setSubmitting(true)
+        window.location.href = paymentUrl
+    }
+
+    return (
+        <>
+            <Button
+                disabled={notReady || !paymentUrl}
+                isLoading={submitting}
+                onClick={handlePayment}
+                size="large"
+                data-testid={dataTestId}
+            >
+                Pay with MoMo
+            </Button>
+            <ErrorMessage
+                error={errorMessage}
+                data-testid="momo-payment-error-message"
+            />
+        </>
+    )
+}
+
+const VnpayPaymentButton = ({
+    cart,
+    notReady,
+    'data-testid': dataTestId,
+}: {
+    cart: HttpTypes.StoreCart
+    notReady: boolean
+    'data-testid'?: string
+}) => {
+    const [submitting, setSubmitting] = useState(false)
+    const [errorMessage, setErrorMessage] = useState<string | null>(null)
+    const paymentSession = cart.payment_collection?.payment_sessions?.find(
+        (session) => isVnpay(session.provider_id)
+    )
+    const paymentUrl = paymentSession?.data?.payment_url as string | undefined
+
+    const handlePayment = () => {
+        if (!paymentUrl) {
+            setErrorMessage('VNPay payment URL is not available')
+            return
+        }
+
+        setSubmitting(true)
+        window.location.href = paymentUrl
+    }
+
+    return (
+        <>
+            <Button
+                disabled={notReady || !paymentUrl}
+                isLoading={submitting}
+                onClick={handlePayment}
+                size="large"
+                data-testid={dataTestId}
+            >
+                Pay with VNPay
+            </Button>
+            <ErrorMessage
+                error={errorMessage}
+                data-testid="vnpay-payment-error-message"
             />
         </>
     )

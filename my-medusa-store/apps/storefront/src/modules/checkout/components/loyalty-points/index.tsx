@@ -3,7 +3,7 @@
 import { HttpTypes } from '@medusajs/types'
 import React, { useEffect, useMemo, useState } from 'react'
 import { getLoyaltyPoints } from '@lib/data/customer'
-import { Button, Heading } from '@medusajs/ui'
+import { Button, Heading } from '@modules/common/components/ui'
 import Link from 'next/link'
 import {
     applyLoyaltyPointsOnCart,

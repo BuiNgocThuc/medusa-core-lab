@@ -25,7 +25,7 @@ export const updateTierStep = createStep(
             return;
         }
 
-        const tierModuleService = container.resolve(TIER_MODULE);
+        const tierModuleService: TierModuleService = container.resolve(TIER_MODULE);
 
         await tierModuleService.updateTiers({
             id: originalInput.id,
