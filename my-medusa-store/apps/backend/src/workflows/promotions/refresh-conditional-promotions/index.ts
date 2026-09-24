@@ -9,6 +9,7 @@ import {
     VIP_BUNDLE_PROMOTION_CODE,
     VIP_TIER_NAME,
 } from "@/src/constant"
+import { orderPromotionCodes } from "@/src/utils"
 import {
     PROMOTION_ENTITLEMENT_MODULE,
     PromotionEntitlementModuleService,
@@ -69,7 +70,7 @@ const refreshConditionalPromotionsStep = createStep(
                 "id", "subtotal", "customer.id", "customer.tier.name", "region.name",
                 "shipping_address.country_code", "items.quantity", "items.unit_price",
                 "items.variant.product.product_categories.name", "items.variant.product.collection.handle",
-                "promotions.code",
+                "promotions.id", "promotions.code", "promotions.is_automatic", "metadata",
             ],
             filters: { id: cart_id },
         })
@@ -101,7 +102,13 @@ const refreshConditionalPromotionsStep = createStep(
         const existingCodes = (cart.promotions ?? []).map((promotion: any) => promotion.code).filter(Boolean)
 
         if (!selected) {
-            const remaining = existingCodes.filter((code: string) => !CONDITIONAL_CODES.has(code) && !code.startsWith(FLASH_PROMOTION_CODE_PREFIX))
+            const remaining = orderPromotionCodes(
+                (cart.promotions ?? []).filter((promotion: any) =>
+                    !CONDITIONAL_CODES.has(promotion.code) &&
+                    !promotion.code.startsWith(FLASH_PROMOTION_CODE_PREFIX),
+                ),
+                { loyaltyPromotionId: cart.metadata?.loyalty_promo_id },
+            )
             if (remaining.length !== existingCodes.length) {
                 await updateCartPromotionsWorkflow(container).run({ input: { cart_id, promo_codes: remaining, action: PromotionActions.REPLACE } })
             }
@@ -133,8 +140,25 @@ const refreshConditionalPromotionsStep = createStep(
             await entitlementService.releaseFlashRedemption(cart_id)
         }
 
-        if (existingCodes.length !== 1 || existingCodes[0] !== selected.code) {
-            await updateCartPromotionsWorkflow(container).run({ input: { cart_id, promo_codes: [selected.code], action: PromotionActions.REPLACE } })
+        const promoCodes = orderPromotionCodes(
+            [
+                { id: selected.code, code: selected.code, is_automatic: true },
+                ...(cart.promotions ?? []).filter((promotion: any) =>
+                    !CONDITIONAL_CODES.has(promotion.code) &&
+                    !promotion.code.startsWith(FLASH_PROMOTION_CODE_PREFIX),
+                ),
+            ],
+            {
+                automaticCodes: [selected.code],
+                loyaltyPromotionId: cart.metadata?.loyalty_promo_id,
+            },
+        )
+        const hasSamePromotionCodes =
+            promoCodes.length === existingCodes.length &&
+            promoCodes.every((code) => existingCodes.includes(code))
+
+        if (!hasSamePromotionCodes) {
+            await updateCartPromotionsWorkflow(container).run({ input: { cart_id, promo_codes: promoCodes, action: PromotionActions.REPLACE } })
         }
         return new StepResponse(selected.code)
     },

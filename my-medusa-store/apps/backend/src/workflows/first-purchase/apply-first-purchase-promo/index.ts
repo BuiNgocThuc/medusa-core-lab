@@ -4,7 +4,7 @@ import {
     when,
     WorkflowResponse,
 } from "@medusajs/framework/workflows-sdk";
-import { updateCartPromotionsStep, useQueryGraphStep } from "@medusajs/medusa/core-flows";
+import { updateCartPromotionsWorkflow, useQueryGraphStep } from "@medusajs/medusa/core-flows";
 import { FIRST_PURCHASE_PROMOTION_CODE } from "@/src/constant";
 import { PromotionActions } from "@medusajs/framework/utils";
 
@@ -52,12 +52,14 @@ export const applyFirstPurchasePromoWorkflow = createWorkflow(
             },
         ).then(() => {
             const promotionInput = transform({ carts, promotions }, ({ carts, promotions }) => ({
-                id: carts[0].id,
+                cart_id: carts[0].id,
                 promo_codes: [promotions[0].code!],
                 action: PromotionActions.ADD,
             }));
 
-            updateCartPromotionsStep(promotionInput);
+            updateCartPromotionsWorkflow.runAsStep({
+                input: promotionInput,
+            });
         });
 
         // retrieve updated cart

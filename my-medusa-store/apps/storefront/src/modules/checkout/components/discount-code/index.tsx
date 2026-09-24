@@ -25,9 +25,17 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
     const { showToast } = useToast()
 
     const { promotions = [] } = cart
+    const isLoyaltyPromotion = (promotion: (typeof promotions)[number]) =>
+        promotion.id === cart.metadata?.loyalty_promo_id
+    const orderedPromotions = [...promotions].sort((left, right) => {
+        if (isLoyaltyPromotion(left)) return 1
+        if (isLoyaltyPromotion(right)) return -1
+        if (left.is_automatic === right.is_automatic) return 0
+        return left.is_automatic ? -1 : 1
+    })
     const removePromotionCode = async (code: string) => {
         const validPromotions = promotions.filter(
-            (promotion) => promotion.code !== code
+            (promotion) => promotion.code !== code && !isLoyaltyPromotion(promotion)
         )
 
         await applyPromotions(
@@ -56,7 +64,7 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
             'promotion-input'
         ) as HTMLInputElement
         const codes = promotions
-            .filter((p) => p.code !== undefined)
+            .filter((p) => p.code !== undefined && !isLoyaltyPromotion(p))
             .map((p) => p.code!)
         codes.push(normalizedCode)
 
@@ -123,7 +131,22 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
                                 Promotion(s) applied:
                             </Heading>
 
-                            {promotions.map((promotion) => {
+                            {orderedPromotions.map((promotion) => {
+                                const isLoyalty = isLoyaltyPromotion(promotion)
+                                const applicationMethod = promotion.application_method
+                                const promotionValue = applicationMethod?.value
+                                const promotionValueLabel =
+                                    promotionValue === undefined
+                                        ? null
+                                        : applicationMethod?.type === 'percentage'
+                                        ? `${promotionValue}%`
+                                        : convertToLocale({
+                                              amount: Number(promotionValue),
+                                              currency_code:
+                                                  applicationMethod?.currency_code ||
+                                                  cart.currency_code,
+                                          })
+
                                 return (
                                     <div
                                         key={promotion.id}
@@ -137,6 +160,7 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
                                             >
                                                 <Badge
                                                     color={
+                                                        isLoyalty ||
                                                         promotion.is_automatic
                                                             ? 'green'
                                                             : 'grey'
@@ -144,32 +168,14 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
                                                 >
                                                     {promotion.code}
                                                 </Badge>{' '}
-                                                (
-                                                {promotion.application_method
-                                                    ?.value !== undefined &&
-                                                    promotion.application_method
-                                                        .currency_code !==
-                                                        undefined && (
-                                                        <>
-                                                            {promotion
-                                                                .application_method
-                                                                .type ===
-                                                            'percentage'
-                                                                ? `${promotion.application_method.value}%`
-                                                                : convertToLocale(
-                                                                      {
-                                                                          amount: +promotion
-                                                                              .application_method
-                                                                              .value,
-                                                                          currency_code:
-                                                                              promotion
-                                                                                  .application_method
-                                                                                  .currency_code,
-                                                                      }
-                                                                  )}
-                                                        </>
-                                                    )}
-                                                )
+                                                {promotionValueLabel && (
+                                                    <>({promotionValueLabel})</>
+                                                )}
+                                                {isLoyalty && (
+                                                    <span className="ml-1 text-ui-fg-subtle">
+                                                        Loyalty points
+                                                    </span>
+                                                )}
                                                 {/* {promotion.is_automatic && (
                           <Tooltip content="This promotion is automatically applied">
                             <InformationCircleSolid className="inline text-zinc-400" />
@@ -177,7 +183,8 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
                         )} */}
                                             </span>
                                         </Text>
-                                        {!promotion.is_automatic && (
+                                        {!promotion.is_automatic &&
+                                            !isLoyalty && (
                                             <button
                                                 className="flex items-center"
                                                 onClick={() => {

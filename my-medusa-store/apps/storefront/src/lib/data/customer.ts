@@ -497,7 +497,7 @@ export const getLoyaltyPoints = async () => {
         .fetch<{ points: number }>(`/store/customers/me/loyalty-points`, {
             method: 'GET',
             headers,
+            cache: 'no-store',
         })
         .then(({ points }) => points)
-        .catch(() => null)
 }
