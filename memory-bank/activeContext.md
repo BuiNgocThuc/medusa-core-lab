@@ -1,9 +1,10 @@
 # Active Context
 
 ## Current Focus
-Dang trien khai **Task 5: Custom Loyalty Module & Module Link** theo ke hoach chi tiet da luu tai `memory-bank/task-5-implementation-plan.md`. Da hoan thanh xong **Buoc 1** (Xay dung Data Model `LoyaltyAccount`, Service `LoyaltyModuleService` ke thua `MedusaService`, va Module definition `index.ts` tai `apps/backend/src/modules/loyalty`). Tam dung phien lam viec tai vi tri `service.ts`, san sang tiep tuc Buoc 2 (Dang ky module vao `medusa-config.ts` va sinh database migration).
+Hoan thanh tron ven 100% **Task 5: Custom Loyalty Module & Module Link** theo dung tieu chuan nghiem thu Definition of Done. Chuan bi commit ma nguon va chuyen trong tam sang **Task 6: Multi-Step Saga Workflow with Compensation** (thiet ke transactional workflow voi co che rollback tu dong, tao dong thoi Customer, LoyaltyAccount va Stored Link).
 
 ## Recent Changes
+- Hoan thanh dang ky module `loyalty` vao `apps/backend/medusa-config.ts` (Buoc 2 cua Task 5).
 - Hoan thanh **Buoc 1 cua Task 5: Custom Loyalty Module (Domain & Service Layer)**:
   - Trien khai model `LoyaltyAccount` tai `apps/backend/src/modules/loyalty/models/loyalty-account.ts` voi cac truong `id` (primaryKey), `customer_id` (unique text theo mo hinh Hybrid Reference), `points` (number default 0), `tier` (enum LoyaltyTier BRONZE/SILVER/GOLD default BRONZE).
   - Trien khai service `LoyaltyModuleService` tai `apps/backend/src/modules/loyalty/service.ts` ke thua factory function `MedusaService({ LoyaltyAccount })`.

@@ -74,3 +74,4 @@
   - *Module Service Factory:* `LoyaltyModuleService` ke thua dynamic factory `MedusaService({ LoyaltyAccount })` tu dong sinh 8 ham CRUD chuan ma khong can repository boilerplate.
   - *Module Definition:* Export qua `Module("loyalty", { service: LoyaltyModuleService })` de Medusa IoC Container resolve dependency voi module key `camelCase`.
   - *Stored Module Link:* Dinh nghia tai `src/links/customer-loyalty.ts` ket noi `CustomerModule.linkable.customer` va `LoyaltyModule.linkable.loyaltyAccount` cho phep Query Graph `query.graph({ entity: "customer", fields: ["loyalty_account.*"] })`.
+  - *Integration Test Harness Pattern:* Su dung `medusaIntegrationTestRunner` tu `@medusajs/test-utils` de khoi tao database tam thoi (`medusa-loyalty-integration-*`), tu dong chay migrations va `syncLinks`. Runner ap dung co che PostgreSQL Template Snapshot/Restore truoc moi ca test `it(...)` de bao dam tinh co lap du lieu ma khong can khoi dong lai toan bo ung dung.

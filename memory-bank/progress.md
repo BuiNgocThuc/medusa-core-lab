@@ -28,7 +28,7 @@
   - Task 3 [Medium]: Workflow Hook Customization (`createCustomersWorkflow.hooks.customersCreated`) -> [Completed] (code + 8/8 unit tests + 2/2 HTTP integration tests + Bruno Black-box 10/10 requests PASS 27/27 assertions + Notion docs + git pushed).
   - Task 4 [Medium]: Admin Dashboard UI Widget (`customer.details` zone) -> [Completed] (code + 0 tsc errors + 0 lint errors + verified live on Medusa Admin UI with dark mode and fallbacks).
 - **Cluster 2: Custom Module & Distributed Transactions (Medium - Hard)**
-  - Task 5 [Med-Hard]: Custom Loyalty Module & Module Link (`defineLink`, migration) -> [In Progress] (Hoan thanh Buoc 1: Data Model, Service, Module definition tai `src/modules/loyalty`; tiep theo: Buoc 2 - medusa-config & migration).
+  - Task 5 [Med-Hard]: Custom Loyalty Module & Module Link (`defineLink`, migration) -> [Completed] (Model `LoyaltyAccount`, Service `LoyaltyModuleService`, migration `loyalty_account`, Stored Link `customer_customer_loyalty_loyalty_account`, 6/6 integration tests PASS via `medusaIntegrationTestRunner`, CLI verify script `verify-loyalty.ts`, 0 type/lint errors, build PASS).
   - Task 6 [Hard]: Multi-Step Saga Workflow with Compensation (4-step rollback & DB unique idempotency) -> [Pending].
 - **Cluster 3: Identity, Account Reconciliation & Social Auth (Hard - Expert)**
   - Task 7 [Hard]: Account Reconciliation & Order Transfer (`createCustomerAccountWorkflow` + `requestOrderTransferWorkflow` / `acceptOrderTransferWorkflow` vs In-place Upgrade Spike) -> [Pending].

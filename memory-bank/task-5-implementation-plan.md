@@ -199,15 +199,15 @@ cd /home/ubuntu/Data_D/SmartOSC/project/backend/nodejs/medusa-core-lab/my-medusa
 ## 4. Tiêu chuẩn Hoàn thành (Definition of Done)
 
 ### Cổng Nghiệm thu Bắt buộc (Hard Mandatory Gates):
-- [ ] Model `LoyaltyAccount` định nghĩa `tier` bằng `model.enum(Object.values(LoyaltyTier)).default(LoyaltyTier.BRONZE)` và `points` bằng `model.number().default(0)`.
-- [ ] Module `loyalty` export đúng chuẩn v2 và đăng ký thành công trong `medusa-config.ts`.
-- [ ] File migration của `loyalty` nằm trong `apps/backend/src/modules/loyalty/migrations`.
-- [ ] Bảng link được tạo trong cơ sở dữ liệu sau `pnpm exec medusa db:migrate`; xác nhận không có Foreign Key constraint sang hai bảng module.
-- [ ] 100% các ca kiểm thử trong `src/modules/loyalty/__tests__/link.spec.ts` vượt qua (Pass) khi chạy `pnpm test:integration:modules` trên runtime Medusa 2.20.1.
-- [ ] Lệnh `pnpm exec medusa lint` và `pnpm run build` chạy thành công không có lỗi syntax hoặc type error.
+- [x] Model `LoyaltyAccount` định nghĩa `tier` bằng `model.enum(Object.values(LoyaltyTier)).default(LoyaltyTier.BRONZE)` và `points` bằng `model.number().default(0)`.
+- [x] Module `loyalty` export đúng chuẩn v2 và đăng ký thành công trong `medusa-config.ts`.
+- [x] File migration của `loyalty` nằm trong `apps/backend/src/modules/loyalty/migrations`.
+- [x] Bảng link được tạo trong cơ sở dữ liệu sau `pnpm exec medusa db:migrate`; xác nhận không có Foreign Key constraint sang hai bảng module.
+- [x] 100% các ca kiểm thử trong `src/modules/loyalty/__tests__/link.spec.ts` vượt qua (Pass) khi chạy `pnpm test:integration:modules` trên runtime Medusa 2.20.1.
+- [x] Lệnh `pnpm exec medusa lint` và `pnpm run build` chạy thành công không có lỗi syntax hoặc type error.
 
 ### Cổng Xác minh Phụ trợ (Optional Dev Verification):
-- [ ] Script `verify-loyalty.ts` tuân thủ `ExecArgs`, ném lỗi rõ ràng khi thiếu ID/lệch dữ liệu, và chạy thành công khi truyền đúng ID của Customer đã có liên kết hợp lệ trên dev.
+- [x] Script `verify-loyalty.ts` tuân thủ `ExecArgs`, ném lỗi `MedusaError` rõ ràng khi thiếu ID/lệch dữ liệu, và chạy thành công khi truyền đúng ID của Customer đã có liên kết hợp lệ trên dev.
 
 ---
 
