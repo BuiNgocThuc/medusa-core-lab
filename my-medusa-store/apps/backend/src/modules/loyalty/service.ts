@@ -1,6 +1,7 @@
 import { MedusaError, MedusaService } from "@medusajs/framework/utils";
 import LoyaltyPoint from "./models/loyalty-point";
 import { LoyaltyReservation, LoyaltyTransaction } from "./models";
+import { LoyaltyAccount } from "./models/loyalty-account";
 import { InferTypeOf } from "@medusajs/framework/types";
 import {
     LOYALTY_EARN_VND_PER_POINT,
@@ -11,6 +12,7 @@ import {
 type LoyaltyPoint = InferTypeOf<typeof LoyaltyPoint>;
 
 class LoyaltyModuleService extends MedusaService({
+    LoyaltyAccount,
     LoyaltyPoint,
     LoyaltyTransaction,
     LoyaltyReservation,

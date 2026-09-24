@@ -9,10 +9,18 @@ import { createFindParams, createSelectParams } from "@medusajs/medusa/api/utils
 import { NextTierSchema } from "@/src/api/store/customers";
 import { CreateTierSchema, UpdateTierSchema } from "@/src/api/admin/tiers";
 import { RedeemLoyaltyPointsSchema } from "@/src/api/store/carts/[id]/loyalty-points/validators.ts";
+import { customerAdditionalDataSchema } from "../utils/customer-additional-data";
+
+export const adminCreateCustomerAdditionalDataValidator = customerAdditionalDataSchema.shape;
 
 export default defineMiddlewares({
 
     routes: [
+        {
+            methods: ["POST"],
+            matcher: "/admin/customers",
+            additionalDataValidator: adminCreateCustomerAdditionalDataValidator,
+        },
         // create tier
         {
             matcher: "/admin/tiers",
