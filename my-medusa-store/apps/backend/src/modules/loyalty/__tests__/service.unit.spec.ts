@@ -8,14 +8,14 @@ describe("LoyaltyModuleService conversion policy", () => {
         await expect(loyalty.calculatePointsFromAmount(30_000)).resolves.toBe(3)
     })
 
-    it("redeems only complete 100-point blocks", async () => {
-        await expect(loyalty.calculateDiscountAmountFromPoints(299)).resolves.toBe(40_000)
-        await expect(loyalty.calculatePointsFromDiscountAmount(40_000)).resolves.toBe(200)
+    it("redeems one point for every 500 VND", async () => {
+        await expect(loyalty.calculateDiscountAmountFromPoints(10)).resolves.toBe(5_000)
+        await expect(loyalty.calculatePointsFromDiscountAmount(5_000)).resolves.toBe(10)
     })
 
     it("rejects an invalid redemption amount", async () => {
-        await expect(loyalty.calculatePointsFromDiscountAmount(10_000)).rejects.toThrow(
-            "valid redemption block",
+        await expect(loyalty.calculatePointsFromDiscountAmount(5_100)).rejects.toThrow(
+            "divisible by the point value",
         )
     })
 

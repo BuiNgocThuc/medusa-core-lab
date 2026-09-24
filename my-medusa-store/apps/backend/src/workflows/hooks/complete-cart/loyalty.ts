@@ -23,9 +23,6 @@ export async function validateLoyaltyPoints(
     const loyaltyPromotion = getCartLoyaltyPromotion(cart)
     if (!loyaltyPromotion) return
 
-    const requiredPoints = await loyaltyModuleService.calculatePointsFromDiscountAmount(
-        loyaltyPromotion.application_method!.value as number,
-    )
     const [reservation] = await loyaltyModuleService.listLoyaltyReservations({
         cart_id: cartId,
     })
@@ -35,7 +32,7 @@ export async function validateLoyaltyPoints(
         reservation.expires_at <= new Date() ||
         reservation.customer_id !== cart.customer!.id ||
         reservation.promotion_id !== loyaltyPromotion.id ||
-        reservation.points !== requiredPoints
+        reservation.points <= 0
     ) {
         throw new MedusaError(
             MedusaError.Types.INVALID_DATA,

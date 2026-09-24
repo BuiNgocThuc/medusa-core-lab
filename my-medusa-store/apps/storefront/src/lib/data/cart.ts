@@ -24,7 +24,7 @@ import { getLocale } from './locale-actions'
 export async function retrieveCart(cartId?: string, fields?: string) {
     const id = cartId || (await getCartId())
     fields ??=
-        '*items, *region, *items.product, *items.variant, *items.thumbnail, *items.metadata, +items.total, *promotions, +shipping_methods.name, *payment_collection, *payment_collection.payment_sessions'
+        '*items, *region, *items.product, *items.variant, *items.thumbnail, *items.metadata, +items.total, +discount_total, +discount_subtotal, *promotions, promotions.application_method.*, +shipping_methods.name, *payment_collection, *payment_collection.payment_sessions'
 
     if (!id) {
         return null

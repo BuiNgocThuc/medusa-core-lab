@@ -26,9 +26,16 @@ export async function validateConditionalPromotions(
     })
     const cart = data[0]
     const codes = (cart?.promotions ?? []).map((promotion: any) => promotion.code).filter(Boolean)
-    if (codes.length > 1) throwInvalidPromotion("Mỗi đơn hàng chỉ được dùng một promotion")
+    const conditionalCodes = codes.filter((code: string) =>
+        code === VIP_BUNDLE_PROMOTION_CODE ||
+        code === RACKET_SUMMER_GET_SOCK_PROMOTION_CODE ||
+        code.startsWith(FLASH_PROMOTION_CODE_PREFIX),
+    )
+    if (conditionalCodes.length > 1) {
+        throwInvalidPromotion("Mỗi đơn hàng chỉ được dùng một conditional promotion")
+    }
 
-    const code = codes[0]
+    const code = conditionalCodes[0]
     if (code === VIP_BUNDLE_PROMOTION_CODE) validateVipBundle(cart)
     if (code === RACKET_SUMMER_GET_SOCK_PROMOTION_CODE) validateBuyRacketGetSock(cart)
     if (code?.startsWith(FLASH_PROMOTION_CODE_PREFIX)) {

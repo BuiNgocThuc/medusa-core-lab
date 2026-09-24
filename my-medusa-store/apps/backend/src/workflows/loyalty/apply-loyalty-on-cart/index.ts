@@ -12,10 +12,11 @@ import {
     ValidateCustomerExistsStepInput,
     getCartLoyaltyPromoStep,
     getCartLoyaltyPromoAmountStep,
+    applyLoyaltyAdjustmentStep,
     reserveLoyaltyReservationStep,
     GetCartLoyaltyPromoAmountStepInput,
 } from "./steps";
-import { CartData } from "@/src/utils";
+import { CartData, orderPromotionCodes } from "@/src/utils";
 import { CUSTOMER_ID_PROMOTION_RULE_ATTRIBUTE } from "@/src/constant";
 import { PromotionActions } from "@medusajs/framework/utils";
 import { CreatePromotionDTO } from "@medusajs/framework/types";
@@ -30,6 +31,7 @@ const fields = [
     "id",
     "customer.*",
     "promotions.*",
+    "promotions.is_automatic",
     "promotions.application_method.*",
     "promotions.rules.*",
     "promotions.rules.values.*",
@@ -42,7 +44,9 @@ export const applyLoyaltyOnCartWorkflow = createWorkflow(
     APPLY_LOYALTY_ON_CART_WORKFLOW_ID,
     (input: ApplyLoyaltyOnCartWorkflowInput) => {
         const { data: carts } = useQueryGraphStep({
-            entity: "cart", fields, filters: { id: input.cart_id },
+            entity: "cart",
+            fields,
+            filters: { id: input.cart_id },
             options: { throwIfKeyNotFound: true },
         });
 
@@ -61,7 +65,7 @@ export const applyLoyaltyOnCartWorkflow = createWorkflow(
             throwErrorOn: "found",
         });
 
-        const loyaltyAmountInput = transform({ carts }, ({ carts }) => ({
+        const loyaltyAmountInput = transform({ carts, input }, ({ carts, input }) => ({
             cart: {
                 id: carts[0].id,
                 customer: carts[0].customer,
@@ -121,12 +125,15 @@ export const applyLoyaltyOnCartWorkflow = createWorkflow(
 
         const loyaltyPromo = createPromotionsStep([promoToCreate] as CreatePromotionDTO[]);
 
-        const reservationInput = transform({ carts, loyaltyPromo }, ({ carts, loyaltyPromo }) => ({
-            customer_id: carts[0].customer!.id,
-            cart_id: carts[0].id,
-            promotion_id: loyaltyPromo[0].id,
-            points: input.points,
-        }));
+        const reservationInput = transform(
+            { carts, loyaltyPromo, input },
+            ({ carts, loyaltyPromo, input }) => ({
+                customer_id: carts[0].customer!.id,
+                cart_id: carts[0].id,
+                promotion_id: loyaltyPromo[0].id,
+                points: input.points,
+            }),
+        );
         reserveLoyaltyReservationStep(reservationInput);
 
         const updatePromoData = transform(
@@ -136,11 +143,17 @@ export const applyLoyaltyOnCartWorkflow = createWorkflow(
                 loyaltyPromo,
             },
             (data) => {
-                const promos = [
-                    ...((data.carts[0].promotions?.map((promo) => promo?.code).filter(Boolean) ||
-                        []) as string[]),
-                    data.promoToCreate.code,
-                ];
+                const promos = orderPromotionCodes(
+                    [
+                        ...(data.carts[0].promotions ?? []).filter(
+                            (promotion): promotion is NonNullable<typeof promotion> => promotion != null,
+                        ),
+                        ...data.loyaltyPromo.filter(
+                            (promotion): promotion is NonNullable<typeof promotion> => promotion != null,
+                        ),
+                    ],
+                    { loyaltyPromotionId: data.loyaltyPromo[0].id },
+                );
 
                 return {
                     cart_id: data.carts[0].id,
@@ -155,6 +168,12 @@ export const applyLoyaltyOnCartWorkflow = createWorkflow(
 
         updateCartPromotionsWorkflow.runAsStep({
             input: updatePromoData,
+        });
+
+        applyLoyaltyAdjustmentStep({
+            cart_id: input.cart_id,
+            promotion_id: loyaltyPromo[0].id,
+            points: input.points,
         });
 
         updateCartsStep([

@@ -1,0 +1,182 @@
+{
+  "info": {
+    "name": "Promotion Module — Manual API Tests",
+    "_postman_id": "promotion-module-manual-tests-001",
+    "description": "Collection kiểm thử thủ công cho Promotion Module. Bao phủ toàn bộ 16 API custom file-based hiện có trong apps/backend/src/api, cùng các API Medusa chuẩn cần để tạo dữ liệu và chạy luồng promotion.\n\nCách dùng:\n1. Import file này vào Postman.\n2. Điền base_url, publishable_key, admin_email và admin_password.\n3. Nếu cần dữ liệu mẫu, chạy từ root: pnpm run seed:promotions và pnpm run seed:customer-tiers.\n4. Chạy folder 00 Setup từ trên xuống. Các request có script sẽ tự lưu token/ID vào Collection Variables.\n5. Các request tạo/sửa/xóa có nhãn [MUTATION] thay đổi dữ liệu; chỉ chạy khi cần. Request complete cart tạo order.\n\nKhông đưa toàn bộ Store/Admin API lõi của Medusa vào collection vì framework cung cấp số lượng lớn endpoint. Các endpoint lõi trong đây chỉ là dependency trực tiếp của luồng promotion/cart.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:9000", "type": "string" },
+    { "key": "publishable_key", "value": "YOUR_PUBLISHABLE_API_KEY", "type": "string", "description": "Publishable key gắn với sales channel đang test" },
+    { "key": "admin_email", "value": "admin@test.com", "type": "string" },
+    { "key": "admin_password", "value": "supersecret", "type": "string" },
+    { "key": "admin_token", "value": "", "type": "string" },
+    { "key": "customer_email", "value": "tier-silver-1@example.test", "type": "string", "description": "Dữ liệu seed có password supersecret" },
+    { "key": "customer_password", "value": "supersecret", "type": "string" },
+    { "key": "customer_token", "value": "", "type": "string" },
+    { "key": "region_id", "value": "", "type": "string" },
+    { "key": "variant_id", "value": "", "type": "string" },
+    { "key": "cart_id", "value": "", "type": "string" },
+    { "key": "guest_cart_id", "value": "", "type": "string", "description": "Guest cart dùng riêng cho API merge-customer" },
+    { "key": "tier_id", "value": "", "type": "string" },
+    { "key": "promotion_id", "value": "", "type": "string" },
+    { "key": "created_promotion_id", "value": "", "type": "string", "description": "Chỉ được set bởi request Create promotion; dùng an toàn cho Delete promotion" },
+    { "key": "promotion_code", "value": "TIER_SILVER", "type": "string" },
+    { "key": "new_promotion_code", "value": "POSTMAN_TEST_10", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "00. Setup & dữ liệu phụ thuộc",
+      "item": [
+        {
+          "name": "Admin login — lưu admin_token",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Admin login thành công', () => pm.response.to.have.status(200));", "const body = pm.response.json();", "pm.expect(body.token).to.be.a('string');", "pm.collectionVariables.set('admin_token', body.token);"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}" }, "url": "{{base_url}}/auth/user/emailpass" }
+        },
+        {
+          "name": "Customer login — lưu customer_token",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Customer login thành công', () => pm.response.to.have.status(200));", "const body = pm.response.json();", "pm.expect(body.token).to.be.a('string');", "pm.collectionVariables.set('customer_token', body.token);"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{customer_email}}\",\n  \"password\": \"{{customer_password}}\"\n}" }, "url": "{{base_url}}/auth/customer/emailpass" }
+        },
+        {
+          "name": "List regions — lưu region_id",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Có ít nhất một region', () => pm.response.to.have.status(200));", "const body = pm.response.json();", "pm.expect(body.regions).to.be.an('array').that.is.not.empty;", "pm.collectionVariables.set('region_id', body.regions[0].id);"] } }],
+          "request": { "method": "GET", "header": [{ "key": "x-publishable-api-key", "value": "{{publishable_key}}" }], "url": "{{base_url}}/store/regions" }
+        },
+        {
+          "name": "List products — lưu variant_id",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('List products thành công', () => pm.response.to.have.status(200));", "const body = pm.response.json();", "const product = body.products && body.products.find((item) => item.variants && item.variants.length);", "pm.expect(product, 'Cần có product có variant').to.exist;", "pm.collectionVariables.set('variant_id', product.variants[0].id);"] } }],
+          "request": { "method": "GET", "header": [{ "key": "x-publishable-api-key", "value": "{{publishable_key}}" }], "url": "{{base_url}}/store/products?fields=*variants&limit=20" }
+        }
+      ]
+    },
+    {
+      "name": "01. Promotion lõi Medusa (dependency)",
+      "item": [
+        {
+          "name": "List promotions",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('List promotions thành công', () => pm.response.to.have.status(200));", "const body = pm.response.json();", "const promo = body.promotions && body.promotions.find((item) => item.code === pm.collectionVariables.get('promotion_code'));", "if (promo) pm.collectionVariables.set('promotion_id', promo.id);"] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }], "url": "{{base_url}}/admin/promotions?limit=100" }
+        },
+        {
+          "name": "Get promotion by ID",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }], "url": "{{base_url}}/admin/promotions/{{promotion_id}}" }
+        },
+        {
+          "name": "[MUTATION] Create promotion",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Create promotion thành công', () => pm.response.to.have.status(200));", "const body = pm.response.json();", "pm.collectionVariables.set('promotion_id', body.promotion.id);", "pm.collectionVariables.set('created_promotion_id', body.promotion.id);"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"code\": \"{{new_promotion_code}}\",\n  \"type\": \"standard\",\n  \"status\": \"active\",\n  \"is_automatic\": false,\n  \"application_method\": {\n    \"type\": \"percentage\",\n    \"target_type\": \"items\",\n    \"allocation\": \"across\",\n    \"value\": 10\n  }\n}" }, "url": "{{base_url}}/admin/promotions" }
+        },
+        {
+          "name": "[MUTATION] Update promotion",
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"status\": \"inactive\"\n}" }, "url": "{{base_url}}/admin/promotions/{{promotion_id}}" }
+        },
+        {
+          "name": "[MUTATION] Delete promotion (chỉ promotion tạo từ request trước)",
+          "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }], "url": "{{base_url}}/admin/promotions/{{created_promotion_id}}" }
+        }
+      ]
+    },
+    {
+      "name": "02. Tier APIs custom (Admin)",
+      "item": [
+        {
+          "name": "List tiers — lưu tier_id đầu tiên",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('List tiers thành công', () => pm.response.to.have.status(200));", "const body = pm.response.json();", "pm.expect(body.tiers).to.be.an('array');", "if (body.tiers.length) pm.collectionVariables.set('tier_id', body.tiers[0].id);"] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }], "url": "{{base_url}}/admin/tiers?limit=100" }
+        },
+        {
+          "name": "Get tier by ID",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }], "url": "{{base_url}}/admin/tiers/{{tier_id}}" }
+        },
+        {
+          "name": "Get customers in tier",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }], "url": "{{base_url}}/admin/tiers/{{tier_id}}/customers?limit=20" }
+        },
+        {
+          "name": "[MUTATION] Create tier",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Create tier thành công', () => pm.response.to.have.status(200));", "const body = pm.response.json();", "pm.collectionVariables.set('tier_id', body.tier.id);"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Postman Test Tier\",\n  \"promo_id\": null,\n  \"tier_rules\": [\n    { \"min_purchase_value\": 0, \"currency_code\": \"vnd\" }\n  ]\n}" }, "url": "{{base_url}}/admin/tiers" }
+        },
+        {
+          "name": "[MUTATION] Update tier",
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Postman Test Tier Updated\",\n  \"promo_id\": null,\n  \"tier_rules\": [\n    { \"min_purchase_value\": 1000000, \"currency_code\": \"vnd\" }\n  ]\n}" }, "url": "{{base_url}}/admin/tiers/{{tier_id}}" }
+        }
+      ]
+    },
+    {
+      "name": "03. Customer benefit APIs custom (Store)",
+      "item": [
+        {
+          "name": "Get my loyalty points",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customer_token}}" }, { "key": "x-publishable-api-key", "value": "{{publishable_key}}" }], "url": "{{base_url}}/store/customers/me/loyalty-points" }
+        },
+        {
+          "name": "Get my active cart",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Get active cart thành công', () => pm.response.to.have.status(200));", "const body = pm.response.json();", "if (body.cart) pm.collectionVariables.set('cart_id', body.cart.id);"] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customer_token}}" }, { "key": "x-publishable-api-key", "value": "{{publishable_key}}" }], "url": "{{base_url}}/store/customers/me/cart" }
+        },
+        {
+          "name": "Get my next tier",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customer_token}}" }, { "key": "x-publishable-api-key", "value": "{{publishable_key}}" }], "url": "{{base_url}}/store/customers/me/next-tier?region_id={{region_id}}" }
+        }
+      ]
+    },
+    {
+      "name": "04. Cart, promotion & loyalty APIs (Store)",
+      "item": [
+        {
+          "name": "Create customer cart — lưu cart_id",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Create cart thành công', () => pm.response.to.have.status(200));", "const body = pm.response.json();", "pm.collectionVariables.set('cart_id', body.cart.id);"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{customer_token}}" }, { "key": "x-publishable-api-key", "value": "{{publishable_key}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"region_id\": \"{{region_id}}\"\n}" }, "url": "{{base_url}}/store/carts" }
+        },
+        {
+          "name": "Create guest cart for merge — lưu guest_cart_id",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Create guest cart thành công', () => pm.response.to.have.status(200));", "pm.collectionVariables.set('guest_cart_id', pm.response.json().cart.id);"] } }],
+          "request": { "method": "POST", "header": [{ "key": "x-publishable-api-key", "value": "{{publishable_key}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"region_id\": \"{{region_id}}\"\n}" }, "url": "{{base_url}}/store/carts" }
+        },
+        {
+          "name": "Add line item to cart",
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{customer_token}}" }, { "key": "x-publishable-api-key", "value": "{{publishable_key}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"variant_id\": \"{{variant_id}}\",\n  \"quantity\": 1\n}" }, "url": "{{base_url}}/store/carts/{{cart_id}}/line-items" }
+        },
+        {
+          "name": "Apply promotion code to cart",
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{customer_token}}" }, { "key": "x-publishable-api-key", "value": "{{publishable_key}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"promo_codes\": [\"{{promotion_code}}\"]\n}" }, "url": "{{base_url}}/store/carts/{{cart_id}}" }
+        },
+        {
+          "name": "Apply loyalty points to cart",
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{customer_token}}" }, { "key": "x-publishable-api-key", "value": "{{publishable_key}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"points\": 10\n}" }, "url": "{{base_url}}/store/carts/{{cart_id}}/loyalty-points" }
+        },
+        {
+          "name": "Remove loyalty points from cart",
+          "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{customer_token}}" }, { "key": "x-publishable-api-key", "value": "{{publishable_key}}" }], "url": "{{base_url}}/store/carts/{{cart_id}}/loyalty-points" }
+        },
+        {
+          "name": "Get cart payment collection (custom-cart)",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{customer_token}}" }, { "key": "x-publishable-api-key", "value": "{{publishable_key}}" }], "url": "{{base_url}}/store/custom-cart/{{cart_id}}" }
+        },
+        {
+          "name": "Restore latest customer cart",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Restore cart thành công', () => pm.response.to.have.status(200));", "const body = pm.response.json();", "if (body.cart) pm.collectionVariables.set('cart_id', body.cart.id);"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{customer_token}}" }, { "key": "x-publishable-api-key", "value": "{{publishable_key}}" }], "url": "{{base_url}}/store/carts/restore-customer" }
+        },
+        {
+          "name": "Merge guest cart into my cart (custom)",
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{customer_token}}" }, { "key": "x-publishable-api-key", "value": "{{publishable_key}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{}" }, "url": "{{base_url}}/store/carts/{{guest_cart_id}}/merge-customer" }
+        },
+        {
+          "name": "[MUTATION] Complete cart with customer promotion",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Complete cart trả về order', () => pm.response.to.have.status(200));", "pm.expect(pm.response.json().type).to.eql('order');"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{customer_token}}" }, { "key": "x-publishable-api-key", "value": "{{publishable_key}}" }], "url": "{{base_url}}/store/carts/{{cart_id}}/complete-customer-promotion" }
+        }
+      ]
+    },
+    {
+      "name": "05. Smoke endpoints custom",
+      "item": [
+        { "name": "Store custom health", "request": { "method": "GET", "url": "{{base_url}}/store/custom" } },
+        { "name": "Admin custom health", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }], "url": "{{base_url}}/admin/custom" } }
+      ]
+    }
+  ]
+}

@@ -7,7 +7,11 @@ import Divider from '@modules/common/components/divider'
 import { HttpTypes } from '@medusajs/types'
 import LoyaltyPoints from '../../components/loyalty-points'
 
-const CheckoutSummary = ({ cart }: { cart: HttpTypes.StoreCart }) => {
+const CheckoutSummary = ({
+    cart,
+}: {
+    cart: HttpTypes.StoreCart
+}) => {
     return (
         <div className="sticky top-0 flex flex-col-reverse small:flex-col gap-y-8 py-8 small:py-0 ">
             <div className="w-full bg-white flex flex-col">

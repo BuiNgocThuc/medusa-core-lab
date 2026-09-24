@@ -2,11 +2,7 @@ import { MedusaError, MedusaService } from "@medusajs/framework/utils";
 import LoyaltyPoint from "./models/loyalty-point";
 import { LoyaltyReservation, LoyaltyTransaction } from "./models";
 import { InferTypeOf } from "@medusajs/framework/types";
-import {
-    LOYALTY_EARN_VND_PER_POINT,
-    LOYALTY_REDEEM_POINTS_PER_BLOCK,
-    LOYALTY_REDEEM_VND_PER_BLOCK,
-} from "@/src/constant";
+import { LOYALTY_EARN_VND_PER_POINT, LOYALTY_REDEEM_VND_PER_POINT } from "@/src/constant";
 
 type LoyaltyPoint = InferTypeOf<typeof LoyaltyPoint>;
 
@@ -16,26 +12,29 @@ class LoyaltyModuleService extends MedusaService({
     LoyaltyReservation,
 }) {
     async reservePointsForCart(input: {
-        customer_id: string
-        cart_id: string
-        promotion_id: string
-        points: number
-        expires_at: Date
+        customer_id: string;
+        cart_id: string;
+        promotion_id: string;
+        points: number;
+        expires_at: Date;
     }) {
         const reservations = await this.listLoyaltyReservations({
             customer_id: input.customer_id,
             state: "reserved",
-        })
-        const now = new Date()
+        });
+        const now = new Date();
         const reservedByOtherCarts = reservations
-            .filter((reservation) => reservation.cart_id !== input.cart_id && reservation.expires_at > now)
-            .reduce((sum, reservation) => sum + reservation.points, 0)
-        const balance = await this.getPoints(input.customer_id)
+            .filter(
+                (reservation) =>
+                    reservation.cart_id !== input.cart_id && reservation.expires_at > now,
+            )
+            .reduce((sum, reservation) => sum + reservation.points, 0);
+        const balance = await this.getPoints(input.customer_id);
         if (balance - reservedByOtherCarts < input.points) {
-            throw new MedusaError(MedusaError.Types.NOT_ALLOWED, "Không đủ điểm tích lũy khả dụng")
+            throw new MedusaError(MedusaError.Types.NOT_ALLOWED, "Không đủ điểm tích lũy khả dụng");
         }
 
-        const [existing] = await this.listLoyaltyReservations({ cart_id: input.cart_id })
+        const [existing] = await this.listLoyaltyReservations({ cart_id: input.cart_id });
         if (existing) {
             return await this.updateLoyaltyReservations({
                 id: existing.id,
@@ -44,39 +43,45 @@ class LoyaltyModuleService extends MedusaService({
                 state: "reserved",
                 expires_at: input.expires_at,
                 order_id: null,
-            })
+            });
         }
-        return await this.createLoyaltyReservations(input)
+        return await this.createLoyaltyReservations(input);
     }
 
     async releaseReservation(cartId: string, state: "released" | "expired" = "released") {
-        const [reservation] = await this.listLoyaltyReservations({ cart_id: cartId })
-        if (!reservation || reservation.state !== "reserved") return reservation
-        return await this.updateLoyaltyReservations({ id: reservation.id, state })
+        const [reservation] = await this.listLoyaltyReservations({ cart_id: cartId });
+        if (!reservation || reservation.state !== "reserved") return reservation;
+        return await this.updateLoyaltyReservations({ id: reservation.id, state });
     }
 
     async consumeReservationForOrder(input: {
-        order_id: string
-        customer_id: string
-        cart_id: string
-        promotion_id: string
-        points: number
+        order_id: string;
+        customer_id: string;
+        cart_id: string;
+        promotion_id: string;
+        points: number;
     }) {
         const [existingTransaction] = await this.listLoyaltyTransactions({
             order_id: input.order_id,
             type: "deduct",
-        })
-        if (existingTransaction) return { skipped: true, transaction: existingTransaction }
+        });
+        if (existingTransaction) return { skipped: true, transaction: existingTransaction };
 
-        const [reservation] = await this.listLoyaltyReservations({ cart_id: input.cart_id })
+        const [reservation] = await this.listLoyaltyReservations({ cart_id: input.cart_id });
         if (
-            !reservation || reservation.customer_id !== input.customer_id ||
-            reservation.promotion_id !== input.promotion_id || reservation.points !== input.points ||
-            reservation.state !== "reserved" || reservation.expires_at <= new Date()
+            !reservation ||
+            reservation.customer_id !== input.customer_id ||
+            reservation.promotion_id !== input.promotion_id ||
+            reservation.points !== input.points ||
+            reservation.state !== "reserved" ||
+            reservation.expires_at <= new Date()
         ) {
-            throw new MedusaError(MedusaError.Types.INVALID_DATA, "Loyalty reservation không hợp lệ")
+            throw new MedusaError(
+                MedusaError.Types.INVALID_DATA,
+                "Loyalty reservation không hợp lệ",
+            );
         }
-        await this.deductPoints(input.customer_id, input.points)
+        await this.deductPoints(input.customer_id, input.points);
         const transaction = await this.createLoyaltyTransactions({
             customer_id: input.customer_id,
             type: "deduct",
@@ -85,13 +90,13 @@ class LoyaltyModuleService extends MedusaService({
             order_id: input.order_id,
             cart_id: input.cart_id,
             promotion_id: input.promotion_id,
-        })
+        });
         await this.updateLoyaltyReservations({
             id: reservation.id,
             state: "consumed",
             order_id: input.order_id,
-        })
-        return { skipped: false, transaction }
+        });
+        return { skipped: false, transaction };
     }
     async addPoints(customerId: string, points: number): Promise<LoyaltyPoint> {
         const existingPoints = await this.listLoyaltyPoints({
@@ -135,28 +140,28 @@ class LoyaltyModuleService extends MedusaService({
     }
 
     async recordTransaction(input: {
-        customer_id: string
-        type: string
-        reference_id: string
-        points: number
-        status?: string
-        cart_id?: string | null
-        order_id?: string | null
-        promotion_id?: string | null
+        customer_id: string;
+        type: string;
+        reference_id: string;
+        points: number;
+        status?: string;
+        cart_id?: string | null;
+        order_id?: string | null;
+        promotion_id?: string | null;
     }) {
         const [existing] = await this.listLoyaltyTransactions({
             type: input.type,
             reference_id: input.reference_id,
-        })
+        });
 
         if (existing) {
-            return existing
+            return existing;
         }
 
-        const transaction = await this.createLoyaltyTransactions(input)
-        await this.addPoints(input.customer_id, input.points)
+        const transaction = await this.createLoyaltyTransactions(input);
+        await this.addPoints(input.customer_id, input.points);
 
-        return transaction
+        return transaction;
     }
 
     async calculatePointsFromAmount(amount: number): Promise<number> {
@@ -172,18 +177,18 @@ class LoyaltyModuleService extends MedusaService({
             throw new MedusaError(MedusaError.Types.INVALID_DATA, "Points cannot be negative");
         }
 
-        return Math.floor(points / LOYALTY_REDEEM_POINTS_PER_BLOCK) * LOYALTY_REDEEM_VND_PER_BLOCK;
+        return points * LOYALTY_REDEEM_VND_PER_POINT;
     }
 
     async calculatePointsFromDiscountAmount(amount: number): Promise<number> {
-        if (amount < 0 || amount % LOYALTY_REDEEM_VND_PER_BLOCK !== 0) {
+        if (amount < 0 || amount % LOYALTY_REDEEM_VND_PER_POINT !== 0) {
             throw new MedusaError(
                 MedusaError.Types.INVALID_DATA,
-                "Loyalty discount amount must be a valid redemption block",
+                "Loyalty discount amount must be divisible by the point value",
             );
         }
 
-        return (amount / LOYALTY_REDEEM_VND_PER_BLOCK) * LOYALTY_REDEEM_POINTS_PER_BLOCK;
+        return amount / LOYALTY_REDEEM_VND_PER_POINT;
     }
 }
 

@@ -2,7 +2,11 @@ import { Metadata } from 'next'
 
 import Overview from '@modules/account/components/overview'
 import { notFound } from 'next/navigation'
-import { retrieveCustomer, retrieveCustomerNextTier } from '@lib/data/customer'
+import {
+    getLoyaltyPoints,
+    retrieveCustomer,
+    retrieveCustomerNextTier,
+} from '@lib/data/customer'
 import { listOrders } from '@lib/data/orders'
 
 export const metadata: Metadata = {
@@ -19,6 +23,7 @@ export default async function OverviewTemplate(props: Props) {
     const { countryCode } = params
     const customer = await retrieveCustomer().catch(() => null)
     const orders = (await listOrders().catch(() => null)) || null
+    const loyaltyPoints = await getLoyaltyPoints().catch(() => null)
     const tierData = await retrieveCustomerNextTier(countryCode).catch(
         () => null
     )
@@ -27,5 +32,12 @@ export default async function OverviewTemplate(props: Props) {
         notFound()
     }
 
-    return <Overview customer={customer} orders={orders} tierData={tierData} />
+    return (
+        <Overview
+            customer={customer}
+            orders={orders}
+            tierData={tierData}
+            loyaltyPoints={loyaltyPoints}
+        />
+    )
 }
