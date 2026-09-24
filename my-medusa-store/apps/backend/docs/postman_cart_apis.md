@@ -269,3 +269,47 @@ curl --location --request POST 'http://localhost:9000/store/carts/cart_01M2QEEH4
   }
 }'
 ```
+
+---
+
+## 4. API Core: Xem Tồn Kho của 1 Variant (Storefront API)
+
+Medusa v2 hỗ trợ sẵn API Storefront để lấy số lượng tồn kho (`inventory_quantity`) của variant theo từng Sales Channel mà **không cần viết thêm code**.
+
+* **Endpoint:** `GET {{base_url}}/store/product-variants/{{variant_id}}?fields=+inventory_quantity,product.*`
+* **Method:** `GET`
+* **Headers:**
+  ```http
+  x-publishable-api-key: {{pk_channel_a}}
+  ```
+
+### Response mẫu: `200 OK`
+```json
+{
+  "variant": {
+    "id": "variant_01J8ABC...",
+    "title": "Default",
+    "sku": "TSHIRT-M",
+    "manage_inventory": true,
+    "allow_backorder": false,
+    "inventory_quantity": 8,
+    "product": {
+      "id": "prod_01J8ABC...",
+      "title": "Medusa T-Shirt",
+      "handle": "medusa-t-shirt",
+      "thumbnail": "..."
+    }
+  }
+}
+```
+
+> **Lưu ý:**
+> - `product.*`: Bắt buộc phải có dấu chấm `.` (`product.*`) để engine expand relation `product`. Không dùng `*product`.
+> - `inventory_quantity` được Medusa tự động tính toán dựa trên các kho hàng (`stock_locations`) được liên kết với Sales Channel của `publishable_key` tương ứng.
+> - Nếu đổi sang `{{pk_channel_b}}`, trường `inventory_quantity` sẽ phản ánh số tồn kho của Channel B.
+
+### cURL mẫu:
+```bash
+curl --location 'http://localhost:9000/store/product-variants/variant_01J8ABC...?fields=+inventory_quantity,product.*' \
+--header 'x-publishable-api-key: pk_YOUR_KEY'
+```
