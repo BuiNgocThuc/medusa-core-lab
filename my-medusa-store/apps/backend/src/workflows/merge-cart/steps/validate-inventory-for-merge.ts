@@ -31,10 +31,55 @@ export type ValidateInventoryForMergeOutput = {
   skipped_items: SkippedCartItem[]
 }
 
+/**
+ * Helper: Chuẩn hóa dữ liệu từ Remote Query về dạng mảng
+ * (Medusa đôi khi trả về Array, đôi khi trả về Object đơn lẻ hoặc null)
+ */
+function toArray<T>(value: T | T[] | null | undefined): T[] {
+  if (Array.isArray(value)) return value
+  if (value) return [value]
+  return []
+}
+
+/**
+ * Helper: Lọc ra các location_id hợp lệ cho sales channel hiện tại
+ */
+function getLocationIdsForSalesChannel(
+  locationLevels: any[],
+  salesChannelId?: string | null
+): string[] {
+  if (!salesChannelId) {
+    // Không có sales channel → lấy tất cả kho
+    return locationLevels.map((lvl: any) => lvl.location_id)
+  }
+
+  return locationLevels
+    .filter((lvl: any) => {
+      const stockLocations = toArray(lvl.stock_locations)
+      return stockLocations.some((loc: any) => {
+        const salesChannels = toArray(loc.sales_channels)
+        return salesChannels.some((sc: any) => sc.id === salesChannelId)
+      })
+    })
+    .map((lvl: any) => lvl.location_id)
+}
+
+/**
+ * Phương án E: Smart Partial Merge
+ *
+ * Thay vì skip hẳn variant khi tổng quantity vượt stock (Phương án A cũ),
+ * step này sẽ tính toán "maxAddableQty" — số lượng tối đa từ Guest Cart
+ * có thể thêm vào Customer Cart mà không vượt quá tồn kho.
+ *
+ * Kết quả có 3 trường hợp cho mỗi variant:
+ * 1. Đủ hàng hoàn toàn → valid_items (giữ nguyên quantity)
+ * 2. Đủ hàng 1 phần → valid_items (quantity đã giảm) + skipped_items (có adjusted_quantity)
+ * 3. Hết hàng hoàn toàn → skipped_items (adjusted_quantity = undefined)
+ */
 export const validateInventoryForMergeStep = createStep(
   "validate-inventory-for-merge",
   async (input: ValidateInventoryForMergeInput, { container }) => {
-    console.log("[Step: validate-inventory-for-merge] Starting validation...")
+    console.log("[Step: validate-inventory-for-merge] Starting validation (Plan E: Smart Partial Merge)...")
     console.log(`[Step: validate-inventory-for-merge] guest_items count: ${input.guest_items?.length ?? 0}`)
     console.log(`[Step: validate-inventory-for-merge] existing_items count: ${input.existing_items?.length ?? 0}`)
     console.log(`[Step: validate-inventory-for-merge] sales_channel_id: ${input.sales_channel_id}`)
@@ -88,8 +133,12 @@ export const validateInventoryForMergeStep = createStep(
 
     const variantMap = new Map<string, any>((variants || []).map((v: any) => [v.id, v]))
 
-    // 4. Validate each variant against combined quantity (Cart A + Cart B)
-    const variantValidity = new Map<string, { isValid: boolean; reason?: string }>()
+    // 4. Validate each variant — Smart Partial Merge
+    // variantResult chứa kết quả cho từng variant: full (đủ hết), partial (đủ 1 phần), hoặc none (hết sạch)
+    const variantResult = new Map<
+      string,
+      { status: "full" | "partial" | "none"; maxAddableQty?: number; reason?: string }
+    >()
 
     for (const variantId of variantIds) {
       const variant = variantMap.get(variantId)
@@ -97,107 +146,175 @@ export const validateInventoryForMergeStep = createStep(
       const guestQty = guestQtyMap.get(variantId) ?? 0
       const totalNeeded = Number(MathBN.add(existingQty, guestQty))
 
+      // --- Các trường hợp đặc biệt: Luôn cho phép thêm hết ---
+
       if (!variant) {
-        variantValidity.set(variantId, { isValid: false, reason: "VARIANT_NOT_FOUND" })
+        variantResult.set(variantId, { status: "none", reason: "VARIANT_NOT_FOUND" })
         continue
       }
 
-      // If inventory is not managed, item is always available
+      // Sản phẩm không quản lý tồn kho (VD: sản phẩm số, dịch vụ)
       if (!variant.manage_inventory) {
-        variantValidity.set(variantId, { isValid: true })
+        variantResult.set(variantId, { status: "full" })
         continue
       }
 
-      // If backorder is allowed, item is always available
+      // Cho phép đặt hàng khi hết stock
       if (variant.allow_backorder) {
-        variantValidity.set(variantId, { isValid: true })
+        variantResult.set(variantId, { status: "full" })
         continue
       }
 
       const inventoryItems = variant.inventory_items ?? []
       if (inventoryItems.length === 0) {
-        // Managed inventory without inventory item records cannot be fulfilled
-        variantValidity.set(variantId, { isValid: false, reason: "NO_INVENTORY_ITEMS" })
+        variantResult.set(variantId, { status: "none", reason: "NO_INVENTORY_ITEMS" })
         continue
       }
 
-      let allCovered = true
+      // --- Tính toán maxAddableQty cho variant này ---
+      // Logic: Duyệt qua từng inventory item (linh kiện kho) cấu thành variant.
+      // Với mỗi linh kiện, tìm số lượng khả dụng (available) trong các kho hợp lệ.
+      // Từ đó tính ra: Mỗi linh kiện cho phép bán tối đa bao nhiêu "sản phẩm variant"?
+      // maxAddableQty = min(cho phép theo linh kiện A, theo linh kiện B, ...) - existingQty trong cart
+      // Chính là "bottleneck" (linh kiện ít nhất sẽ giới hạn cả combo).
+
+      let variantMaxSellable = Infinity // Số lượng variant tối đa có thể bán (dựa trên TẤT CẢ linh kiện)
+      let hasLocationIssue = false
+
       for (const invItem of inventoryItems) {
         const locationLevels = invItem.inventory?.location_levels ?? []
-
-        // Filter location IDs associated with the target sales channel
-        let locationIds: string[] = []
-        if (input.sales_channel_id) {
-          locationIds = locationLevels
-            .filter((lvl: any) => {
-              const stockLocations = Array.isArray(lvl.stock_locations)
-                ? lvl.stock_locations
-                : lvl.stock_locations
-                ? [lvl.stock_locations]
-                : []
-              return stockLocations.some((loc: any) => {
-                const salesChannels = Array.isArray(loc.sales_channels)
-                  ? loc.sales_channels
-                  : loc.sales_channels
-                  ? [loc.sales_channels]
-                  : []
-                return salesChannels.some((sc: any) => sc.id === input.sales_channel_id)
-              })
-            })
-            .map((lvl: any) => lvl.location_id)
-        } else {
-          locationIds = locationLevels.map((lvl: any) => lvl.location_id)
-        }
+        const locationIds = getLocationIdsForSalesChannel(locationLevels, input.sales_channel_id)
 
         if (locationIds.length === 0) {
           console.log(
             `[Step: validate-inventory-for-merge] Variant ${variantId} has no location for sales channel ${input.sales_channel_id}`
           )
-          allCovered = false
+          hasLocationIssue = true
+          variantMaxSellable = 0
           break
         }
 
         const requiredQty = invItem.required_quantity ?? 1
-        const itemTotalNeeded = MathBN.mult(totalNeeded, requiredQty)
 
-        const hasCoverage = await inventoryService.confirmInventory(
+        // Lấy số lượng thực sự còn trong kho (stocked - reserved)
+        const availableQty = await inventoryService.retrieveAvailableQuantity(
           invItem.inventory_item_id,
-          locationIds,
-          itemTotalNeeded
+          locationIds
         )
+
+        // Tính: Với lượng available này, linh kiện này cho phép bán tối đa bao nhiêu sản phẩm?
+        // VD: available = 8, requiredQty = 4 (ghế trong combo bàn ăn) → maxUnitsFromThisItem = 8 / 4 = 2 bộ
+        const maxUnitsFromThisItem = Math.floor(Number(availableQty) / requiredQty)
 
         console.log(
-          `[Step: validate-inventory-for-merge] Variant ${variantId} (item ${invItem.inventory_item_id}): needed=${itemTotalNeeded} (existing=${existingQty}, guest=${guestQty}), hasCoverage=${hasCoverage}`
+          `[Step: validate-inventory-for-merge] Variant ${variantId} (item ${invItem.inventory_item_id}): ` +
+          `available=${availableQty}, requiredQty=${requiredQty}, maxUnits=${maxUnitsFromThisItem}, ` +
+          `existingInCart=${existingQty}, guestWants=${guestQty}`
         )
 
-        if (!hasCoverage) {
-          allCovered = false
-          break
-        }
+        // Cập nhật bottleneck
+        variantMaxSellable = Math.min(variantMaxSellable, maxUnitsFromThisItem)
       }
 
-      if (allCovered) {
-        variantValidity.set(variantId, { isValid: true })
+      if (hasLocationIssue || variantMaxSellable <= 0) {
+        // Kho không hỗ trợ kênh bán này hoặc đã hết hàng hoàn toàn
+        variantResult.set(variantId, {
+          status: "none",
+          reason: existingQty > 0 ? "EXCEEDS_AVAILABLE_STOCK" : "OUT_OF_STOCK",
+        })
+        continue
+      }
+
+      // maxAddableQty = Số lượng kho cho phép bán tổng cộng - Số lượng đã có sẵn trong Cart A
+      // VD: Kho cho phép bán 3, Cart A đã có 2 → chỉ được thêm tối đa 1 cái nữa
+      const maxAddableQty = Math.max(0, variantMaxSellable - existingQty)
+
+      if (maxAddableQty <= 0) {
+        // Cart A đã chiếm hết stock rồi, không thể thêm gì từ Guest Cart
+        variantResult.set(variantId, {
+          status: "none",
+          reason: "EXCEEDS_AVAILABLE_STOCK",
+        })
+      } else if (maxAddableQty >= guestQty) {
+        // Đủ stock cho toàn bộ số lượng Guest muốn thêm
+        variantResult.set(variantId, { status: "full" })
       } else {
-        const reason = existingQty > 0 ? "EXCEEDS_AVAILABLE_STOCK" : "OUT_OF_STOCK"
-        variantValidity.set(variantId, { isValid: false, reason })
+        // Chỉ đủ 1 phần → Partial Merge!
+        // VD: Guest muốn thêm 3, nhưng chỉ thêm được 1
+        variantResult.set(variantId, {
+          status: "partial",
+          maxAddableQty,
+          reason: "PARTIAL_STOCK",
+        })
       }
     }
 
-    // 5. Separate guest items into valid_items and skipped_items
+    // 5. Phân loại guest items thành valid_items và skipped_items
     const valid_items: ValidateInventoryForMergeOutput["valid_items"] = []
     const skipped_items: SkippedCartItem[] = []
 
+    // Vì có thể Guest Cart chứa nhiều dòng cùng 1 variant_id,
+    // ta cần track còn bao nhiêu "quota" cho variant đó khi duyệt từng dòng.
+    const remainingQuota = new Map<string, number>()
+    for (const [variantId, result] of variantResult) {
+      if (result.status === "full") {
+        remainingQuota.set(variantId, Infinity)
+      } else if (result.status === "partial") {
+        remainingQuota.set(variantId, result.maxAddableQty!)
+      } else {
+        remainingQuota.set(variantId, 0)
+      }
+    }
+
     for (const item of input.guest_items) {
-      const status = variantValidity.get(item.variant_id)
-      if (status?.isValid) {
+      const result = variantResult.get(item.variant_id)
+      const quota = remainingQuota.get(item.variant_id) ?? 0
+      const variant = variantMap.get(item.variant_id)
+
+      if (result?.status === "full") {
+        // Đủ hàng hoàn toàn → thêm nguyên vẹn
         valid_items.push({
           variant_id: item.variant_id,
           quantity: item.quantity,
           metadata: item.metadata,
         })
+      } else if (result?.status === "partial" && quota > 0) {
+        // Còn quota → thêm được 1 phần hoặc toàn bộ dòng này
+
+        const addableForThisLine = Math.min(item.quantity, quota)
+        remainingQuota.set(item.variant_id, quota - addableForThisLine)
+
+        if (addableForThisLine === item.quantity) {
+          // Dòng này vẫn được thêm đủ (nhưng tổng variant vẫn bị partial)
+          valid_items.push({
+            variant_id: item.variant_id,
+            quantity: item.quantity,
+            metadata: item.metadata,
+          })
+        } else {
+          // Dòng này bị cắt bớt quantity
+          valid_items.push({
+            variant_id: item.variant_id,
+            quantity: addableForThisLine,
+            metadata: item.metadata,
+          })
+
+          // Thông báo phần bị cắt
+          const title = item.title || item.product_title || variant?.product?.title || "Sản phẩm"
+          const variant_title =
+            item.variant_title || (variant?.title === "Default" ? undefined : variant?.title)
+
+          skipped_items.push({
+            variant_id: item.variant_id,
+            title,
+            variant_title,
+            quantity: item.quantity,
+            reason: "PARTIAL_STOCK",
+            adjusted_quantity: addableForThisLine,
+          })
+        }
       } else {
-        const variant = variantMap.get(item.variant_id)
+        // status === "none" hoặc quota đã hết → skip hoàn toàn
         const title = item.title || item.product_title || variant?.product?.title || "Sản phẩm"
         const variant_title =
           item.variant_title || (variant?.title === "Default" ? undefined : variant?.title)
@@ -207,13 +324,15 @@ export const validateInventoryForMergeStep = createStep(
           title,
           variant_title,
           quantity: item.quantity,
-          reason: status?.reason ?? "INSUFFICIENT_INVENTORY",
+          reason: result?.reason ?? "INSUFFICIENT_INVENTORY",
         })
       }
     }
 
     console.log(
-      `[Step: validate-inventory-for-merge] Validation completed. Valid: ${valid_items.length}, Skipped: ${skipped_items.length}`
+      `[Step: validate-inventory-for-merge] Validation completed (Plan E). ` +
+      `Valid: ${valid_items.length}, Skipped: ${skipped_items.length}, ` +
+      `Partial: ${skipped_items.filter(s => s.adjusted_quantity !== undefined).length}`
     )
 
     return new StepResponse<ValidateInventoryForMergeOutput>({
