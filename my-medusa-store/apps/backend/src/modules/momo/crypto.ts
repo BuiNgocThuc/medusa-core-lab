@@ -86,11 +86,13 @@ export function buildQuerySignatureData(input: {
   accessKey: string
   orderId: string
   partnerCode: string
+  requestId: string
 }) {
   return [
     `accessKey=${input.accessKey}`,
     `orderId=${input.orderId}`,
     `partnerCode=${input.partnerCode}`,
+    `requestId=${input.requestId}`,
   ].join("&")
 }
 

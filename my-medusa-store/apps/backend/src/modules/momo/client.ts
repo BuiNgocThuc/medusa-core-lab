@@ -95,6 +95,7 @@ export class MomoClient {
       accessKey: this.options_.accessKey,
       orderId: input.orderId,
       partnerCode: this.options_.partnerCode,
+      requestId: input.requestId,
     })
     const body: MomoQueryRequest = {
       partnerCode: this.options_.partnerCode,
@@ -159,9 +160,14 @@ export class MomoClient {
     const data = (await response.json().catch(() => ({}))) as TResponse
 
     if (!response.ok) {
+      const momoMessage =
+        typeof (data as Record<string, unknown>).message === "string"
+          ? `: ${(data as Record<string, unknown>).message}`
+          : ""
+
       throw new MedusaError(
         MedusaError.Types.UNEXPECTED_STATE,
-        `MoMo API ${path} failed with HTTP ${response.status}`
+        `MoMo API ${path} failed with HTTP ${response.status}${momoMessage}`
       )
     }
 

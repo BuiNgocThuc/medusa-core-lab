@@ -1,6 +1,7 @@
 import {
   buildCreatePaymentSignatureData,
   buildIpnSignatureData,
+  buildQuerySignatureData,
   signMomoPayload,
   timingSafeStringEqual,
 } from "../crypto"
@@ -45,6 +46,17 @@ describe("MoMo crypto helpers", () => {
     ).toBe(
       "accessKey=access&amount=10000&extraData=&message=Successful.&orderId=MM123&orderInfo=Order MM123&orderType=momo_wallet&partnerCode=MOMO&payType=qr&requestId=MR123&responseTime=1710000000000&resultCode=0&transId=123456789"
     )
+  })
+
+  it("builds query signature data in MoMo field order", () => {
+    expect(
+      buildQuerySignatureData({
+        accessKey: "access",
+        orderId: "MM123",
+        partnerCode: "MOMO",
+        requestId: "MR123",
+      })
+    ).toBe("accessKey=access&orderId=MM123&partnerCode=MOMO&requestId=MR123")
   })
 
   it("signs and compares HMAC strings safely", () => {
