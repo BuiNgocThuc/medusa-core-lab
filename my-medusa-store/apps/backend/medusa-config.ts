@@ -19,6 +19,9 @@ module.exports = defineConfig({
   },
 
   modules: [
+    {
+      resolve: "./src/modules/loyalty",
+    },
     // --- STORAGE: Dùng Cloudflare R2 để lưu ảnh sản phẩm ---- Bỏ vào modules[]
     ...(process.env.S3_BUCKET
         ? [
