@@ -225,6 +225,113 @@
               ]
             }
           }
+        },
+        {
+          "name": "0.4 Get Variant Stock — Channel A (Core API)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('Lấy thông tin Variant và Stock thành công', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(json.variant).to.be.an('object');",
+                  "});",
+                  "if (json.variant) {",
+                  "    console.log('=== VARIANT STOCK INFO (CHANNEL A) ===');",
+                  "    console.log('Product ID:', json.variant.product?.id || json.variant.product_id);",
+                  "    console.log('Product Title:', json.variant.product?.title || '(N/A)');",
+                  "    console.log('Variant ID:', json.variant.id);",
+                  "    console.log('Variant Title:', json.variant.title);",
+                  "    console.log('Manage Inventory:', json.variant.manage_inventory);",
+                  "    console.log('Allow Backorder:', json.variant.allow_backorder);",
+                  "    console.log('Inventory Quantity (Channel A):', json.variant.inventory_quantity);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_a}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/store/product-variants/{{variant_id}}?fields=+inventory_quantity,product.*",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "product-variants",
+                "{{variant_id}}"
+              ],
+              "query": [
+                {
+                  "key": "fields",
+                  "value": "+inventory_quantity,product.*"
+                }
+              ]
+            },
+            "description": "API Core của Medusa v2: Lấy thông tin variant, tên sản phẩm (product.*) và số lượng tồn kho (inventory_quantity) khả dụng cho Sales Channel A."
+          }
+        },
+        {
+          "name": "0.5 Get Variant Stock — Channel B (Core API)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('Lấy thông tin Variant và Stock thành công', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(json.variant).to.be.an('object');",
+                  "});",
+                  "if (json.variant) {",
+                  "    console.log('=== VARIANT STOCK INFO (CHANNEL B) ===');",
+                  "    console.log('Product Title:', json.variant.product?.title || '(N/A)');",
+                  "    console.log('Variant ID:', json.variant.id);",
+                  "    console.log('Variant Title:', json.variant.title);",
+                  "    console.log('Inventory Quantity (Channel B):', json.variant.inventory_quantity);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{pk_channel_b}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/store/product-variants/{{variant_id}}?fields=+inventory_quantity,product.*",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "store",
+                "product-variants",
+                "{{variant_id}}"
+              ],
+              "query": [
+                {
+                  "key": "fields",
+                  "value": "+inventory_quantity,product.*"
+                }
+              ]
+            },
+            "description": "API Core của Medusa v2: Lấy thông tin variant, tên sản phẩm (product.*) và số lượng tồn kho (inventory_quantity) khả dụng cho Sales Channel B để so sánh."
+          }
         }
       ]
     },

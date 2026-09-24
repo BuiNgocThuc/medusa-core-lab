@@ -7,7 +7,17 @@ export default defineMiddlewares({
     {
       matcher: "/store/carts",
       middlewares: [allowFields("custom", "custom.custom_name"),],
-
+    },
+    {
+      matcher: "/store/product-variants*",
+      middlewares: [
+        allowFields(
+          "product.title",
+          "product.handle",
+          "product.thumbnail",
+          "product.description"
+        ),
+      ],
     },
     {
       matcher: "/store/carts/:id/merge-customer",
