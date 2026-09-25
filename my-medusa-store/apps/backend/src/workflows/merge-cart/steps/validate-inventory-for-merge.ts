@@ -79,10 +79,6 @@ function getLocationIdsForSalesChannel(
 export const validateInventoryForMergeStep = createStep(
   "validate-inventory-for-merge",
   async (input: ValidateInventoryForMergeInput, { container }) => {
-    console.log("[Step: validate-inventory-for-merge] Starting validation (Plan E: Smart Partial Merge)...")
-    console.log(`[Step: validate-inventory-for-merge] guest_items count: ${input.guest_items?.length ?? 0}`)
-    console.log(`[Step: validate-inventory-for-merge] existing_items count: ${input.existing_items?.length ?? 0}`)
-    console.log(`[Step: validate-inventory-for-merge] sales_channel_id: ${input.sales_channel_id}`)
 
     if (!input.guest_items || input.guest_items.length === 0) {
       return new StepResponse<ValidateInventoryForMergeOutput>({
@@ -102,6 +98,9 @@ export const validateInventoryForMergeStep = createStep(
         existingQtyMap.set(item.variant_id, Number(MathBN.add(curr, item.quantity)))
       }
     }
+    // lấy ra key value với key là 
+    // variant_id và value là số lượng của variant đó trong cart A 
+
 
     // 2. Map guest quantity by variant_id (aggregate multiple lines if any)
     const guestQtyMap = new Map<string, number>()
@@ -130,7 +129,7 @@ export const validateInventoryForMergeStep = createStep(
         id: variantIds,
       },
     })
-
+    console.log("variant", variants)
     const variantMap = new Map<string, any>((variants || []).map((v: any) => [v.id, v]))
 
     // 4. Validate each variant — Smart Partial Merge
@@ -212,7 +211,7 @@ export const validateInventoryForMergeStep = createStep(
           `existingInCart=${existingQty}, guestWants=${guestQty}`
         )
 
-        // Cập nhật bottleneck
+        // Cập nhật bottleneck, quantity của variant của shop tối đa có thể bán
         variantMaxSellable = Math.min(variantMaxSellable, maxUnitsFromThisItem)
       }
 

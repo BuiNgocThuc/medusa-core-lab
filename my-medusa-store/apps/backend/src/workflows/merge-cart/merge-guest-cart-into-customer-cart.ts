@@ -162,6 +162,8 @@ export const mergeGuestCartIntoCustomerCartWorkflow = createWorkflow(
           isList: false,
         },
       }).config({ name: "get-guest-cart" })
+      // -> lấy ra cart và  list line items 
+      // core-origin/medusa/packages/modules/cart/src/models/cart.ts
 
       // Validate: Guest cart phải cùng Sales Channel với request hiện tại
       const mismatchInput = transform(
