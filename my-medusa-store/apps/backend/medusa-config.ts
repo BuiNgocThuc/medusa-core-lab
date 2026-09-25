@@ -189,6 +189,38 @@ module.exports = defineConfig({
             },
         },
         {
+            resolve: "@medusajs/medusa/fulfillment",
+            options: {
+                providers: [
+                    {
+                        resolve: "@medusajs/medusa/fulfillment-manual",
+                        id: "manual",
+                    },
+                    {
+                        resolve: "./src/modules/giao-hang-nhanh",
+                        id: "ghn",
+                        options: {
+                            token: process.env.GHN_API_TOKEN || "",
+                            shopId: Number(process.env.GHN_SHOP_ID || 0),
+                            fromDistrictId: Number(
+                                process.env.GHN_FROM_DISTRICT_ID || 1442
+                            ),
+                            fromWardCode:
+                                process.env.GHN_FROM_WARD_CODE || "20101",
+                            endpoint:
+                                process.env.GHN_ENDPOINT ||
+                                "https://dev-online-gateway.ghn.vn/shiip/public-api",
+                            mockEnabled:
+                                process.env.GHN_MOCK_ENABLED !== "false",
+                            requiredNote: "CHOXEMHANGKHONGTHU",
+                            paymentTypeId: 1,
+                            defaultWeight: 500,
+                        },
+                    },
+                ],
+            },
+        },
+        {
             resolve: "@medusajs/medusa/caching",
             options: {
                 ttl: 3600,
