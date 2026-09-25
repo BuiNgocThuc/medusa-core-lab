@@ -1,5 +1,4 @@
 import {
-    allowFields,
     authenticate,
     defineMiddlewares,
     validateAndTransformBody,
@@ -125,8 +124,13 @@ export default defineMiddlewares({
         },
         {
             matcher: "/store/carts",
-            middlewares: [allowFields("custom", "custom.custom_name"),],
-
+            middlewares: [
+                (req: any, _res: any, next: any) => {
+                    req.allowed = req.allowed || [];
+                    req.allowed.push("custom", "custom.custom_name");
+                    next();
+                },
+            ],
         },
         //..
     ],
