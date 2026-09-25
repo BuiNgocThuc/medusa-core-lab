@@ -1,1 +1,4 @@
 /.idea/
+.agents/mcp_config.json
+.vscode/
+.antigravitycli/

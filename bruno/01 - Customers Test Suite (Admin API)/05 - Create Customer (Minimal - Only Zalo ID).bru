@@ -1,0 +1,64 @@
+meta {
+  name: 05 - Create Customer (Minimal - Only Zalo ID)
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/admin/customers
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "placeholder@example.com",
+    "first_name": "Zalo",
+    "last_name": "Only",
+    "additional_data": {
+      "zalo_id": "0123456789"
+    }
+  }
+}
+
+script:pre-request {
+  const uniqueEmail = `cust_zalo_${Date.now()}_${Math.random().toString(36).substring(2, 8)}@example.com`;
+  const body = req.getBody();
+  body.email = uniqueEmail;
+  req.setBody(body);
+}
+
+script:post-response {
+  const json = res.getBody();
+  if (json && json.customer && json.customer.id) {
+    bru.setVar('customerId2', json.customer.id);
+    bru.setEnvVar('customerId2', json.customer.id);
+  }
+}
+
+tests {
+  test("200 OK", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("persisted zalo_id", function () {
+    expect(res.getBody().customer.metadata.zalo_id).to.equal("0123456789");
+  });
+  test("avatar_url is undefined (minimal patch)", function () {
+    expect(res.getBody().customer.metadata?.avatar_url).to.be.undefined;
+  });
+}
+
+docs {
+  # 05 - Create Customer (Minimal - Only Zalo ID)
+
+  Kiểm chứng cơ chế **Minimal Patch** của Hook Task 3: Chỉ lưu các trường thực sự có giá trị (`!== undefined`).
+
+  ## Mục đích kiểm thử:
+  - Khi client chỉ truyền `zalo_id` mà không truyền `avatar_url`, hook chỉ tạo object `{ zalo_id }` để cập nhật.
+  - Assert xác nhận `metadata.zalo_id === "0123456789"` và `metadata.avatar_url` hoàn toàn không tồn tại (`undefined`), tránh ghi các trường rác vào JSONB.
+  - ID của khách hàng này được lưu vào biến `{{customerId2}}`.
+}

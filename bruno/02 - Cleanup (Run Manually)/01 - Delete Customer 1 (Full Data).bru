@@ -1,0 +1,45 @@
+meta {
+  name: 01 - Delete Customer 1 (Full Data)
+  type: http
+  seq: 1
+}
+
+delete {
+  url: {{baseUrl}}/admin/customers/{{customerId1}}
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  if (req.getExecutionMode() === "runner") {
+    bru.runner.skipRequest();
+  }
+}
+
+tests {
+  test("200 OK", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("deleted is true", function () {
+    expect(res.getBody().deleted).to.equal(true);
+  });
+  test("id matches customerId1", function () {
+    const expectedId = bru.getVar('customerId1') || bru.getEnvVar('customerId1');
+    expect(res.getBody().id).to.equal(expectedId);
+  });
+}
+
+docs {
+  # 01 - Delete Customer 1 (Full Data)
+
+  Xoa ban ghi khach hang day du du lieu (tao tu request 03 trong Test Suite) qua endpoint DELETE /admin/customers/:id.
+
+  ## Co che bao ve:
+  - Pre-request script kiem tra che do thuc thi: neu chay trong Runner (req.getExecutionMode() === "runner"), Bruno se tu dong bo qua (bru.runner.skipRequest()).
+  - Chi thuc thi khi bam nut Send thu cong.
+
+  ## Kiem chung:
+  - HTTP Status: 200 OK
+  - Body: deleted: true
+  - Body id khop voi customerId1
+}
