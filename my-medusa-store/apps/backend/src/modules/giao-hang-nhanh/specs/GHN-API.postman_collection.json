@@ -1,0 +1,331 @@
+{
+  "info": {
+    "_postman_id": "ghn-v2-api-collection",
+    "name": "GHN Open API v2 - Shipping & Fulfillment",
+    "description": "Bộ Postman Collection chuẩn tích hợp Giao Hàng Nhanh (GHN) cho Medusa v2 Fulfillment Provider. Bao gồm: Lấy danh sách Shop, Master Data (Tỉnh/Huyện/Xã), Dịch vụ, Tính cước phí và Vòng đời đơn hàng.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://dev-online-gateway.ghn.vn/shiip/public-api",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "063d85d8-b89d-11f1-b944-42faa0331861",
+      "type": "string"
+    },
+    {
+      "key": "shopId",
+      "value": "225452",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01. Shop Management",
+      "item": [
+        {
+          "name": "Lấy danh sách Cửa hàng (Get All Shops)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Token",
+                "value": "{{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"offset\": 0,\n  \"limit\": 10,\n  \"client_phone\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v2/shop/all",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "shop", "all"]
+            },
+            "description": "API lấy danh sách các Shop thuộc về Token này. Trường `_id` trong kết quả chính là `ShopId`."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "02. Master Data (Địa giới hành chính)",
+      "item": [
+        {
+          "name": "Lấy danh sách Tỉnh / Thành phố (Get Provinces)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Token",
+                "value": "{{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/master-data/province",
+              "host": ["{{baseUrl}}"],
+              "path": ["master-data", "province"]
+            },
+            "description": "Trả về danh sách 63 Tỉnh/Thành phố của Việt Nam cùng `ProvinceID`."
+          },
+          "response": []
+        },
+        {
+          "name": "Lấy danh sách Quận / Huyện (Get Districts)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Token",
+                "value": "{{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"province_id\": 202\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/master-data/district",
+              "host": ["{{baseUrl}}"],
+              "path": ["master-data", "district"]
+            },
+            "description": "Lấy danh sách Quận/Huyện theo `province_id` (Ví dụ 202: TP. Hồ Chí Minh, 201: Hà Nội)."
+          },
+          "response": []
+        },
+        {
+          "name": "Lấy danh sách Phường / Xã (Get Wards)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Token",
+                "value": "{{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"district_id\": 1442\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/master-data/ward?district_id=1442",
+              "host": ["{{baseUrl}}"],
+              "path": ["master-data", "ward"],
+              "query": [
+                {
+                  "key": "district_id",
+                  "value": "1442"
+                }
+              ]
+            },
+            "description": "Lấy danh sách Phường/Xã theo `district_id` (Ví dụ 1442: Quận 1)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "03. Fees & Services (Tính cước & Gói dịch vụ)",
+      "item": [
+        {
+          "name": "Lấy gói dịch vụ khả dụng (Available Services)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Token",
+                "value": "{{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shop_id\": {{shopId}},\n  \"from_district\": 1442,\n  \"to_district\": 1442\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v2/shipping-order/available-services",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "shipping-order", "available-services"]
+            },
+            "description": "Kiểm tra các gói vận chuyển GHN hỗ trợ giữa tuyến gửi và tuyến nhận."
+          },
+          "response": []
+        },
+        {
+          "name": "Tính cước vận chuyển (Calculate Fee)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Token",
+                "value": "{{token}}"
+              },
+              {
+                "key": "ShopId",
+                "value": "{{shopId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"from_district_id\": 1442,\n  \"from_ward_code\": \"20101\",\n  \"service_type_id\": 2,\n  \"to_district_id\": 1442,\n  \"to_ward_code\": \"20101\",\n  \"weight\": 500,\n  \"length\": 10,\n  \"width\": 10,\n  \"height\": 10,\n  \"insurance_value\": 0\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v2/shipping-order/fee",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "shipping-order", "fee"]
+            },
+            "description": "Tính phí vận chuyển chuẩn theo tuyến đường và cân nặng (gram)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "04. Orders & Fulfillment (Tạo & Quản lý đơn)",
+      "item": [
+        {
+          "name": "Tạo đơn vận chuyển (Create Shipping Order)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Token",
+                "value": "{{token}}"
+              },
+              {
+                "key": "ShopId",
+                "value": "{{shopId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"payment_type_id\": 1,\n  \"note\": \"Medusa Order Test\",\n  \"required_note\": \"CHOXEMHANGKHONGTHU\",\n  \"from_name\": \"Medusa Store\",\n  \"from_phone\": \"0901234567\",\n  \"from_address\": \"123 Kho Hang\",\n  \"from_ward_name\": \"Phường Bến Nghé\",\n  \"from_district_name\": \"Quận 1\",\n  \"from_province_name\": \"Hồ Chí Minh\",\n  \"to_name\": \"Nguyen Linh\",\n  \"to_phone\": \"0901234567\",\n  \"to_address\": \"123 Nguyen Hue\",\n  \"to_ward_code\": \"20101\",\n  \"to_district_id\": 1442,\n  \"weight\": 500,\n  \"length\": 10,\n  \"width\": 10,\n  \"height\": 10,\n  \"service_type_id\": 2,\n  \"items\": [\n    {\n      \"name\": \"Yonex Nanoflare 800\",\n      \"code\": \"YONEX-NF800\",\n      \"quantity\": 1,\n      \"price\": 4100000,\n      \"weight\": 500\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v2/shipping-order/create",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "shipping-order", "create"]
+            },
+            "description": "Tạo đơn hàng sang GHN để nhận về `order_code` (Mã vận đơn)."
+          },
+          "response": []
+        },
+        {
+          "name": "Tạo Token In phiếu gửi hàng A5 (Gen Print Token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Token",
+                "value": "{{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_codes\": [\"LBNH4567\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v2/a5/gen-token",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "a5", "gen-token"]
+            },
+            "description": "Sinh token để mở link in phiếu A5: `https://dev-online-gateway.ghn.vn/a5/public-api/printA5?token_code={token}`."
+          },
+          "response": []
+        },
+        {
+          "name": "Chi tiết đơn hàng / Tracking (Order Detail)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Token",
+                "value": "{{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_code\": \"LBNH4567\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v2/shipping-order/detail",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "shipping-order", "detail"]
+            },
+            "description": "Tra cứu thông tin trạng thái vận đơn GHN."
+          },
+          "response": []
+        },
+        {
+          "name": "Hủy đơn vận chuyển (Cancel Order)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Token",
+                "value": "{{token}}"
+              },
+              {
+                "key": "ShopId",
+                "value": "{{shopId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_codes\": [\"LBNH4567\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v2/switch-status/cancel",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "switch-status", "cancel"]
+            },
+            "description": "Hủy đơn hàng khi khách hoặc Admin hủy fulfillment."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
