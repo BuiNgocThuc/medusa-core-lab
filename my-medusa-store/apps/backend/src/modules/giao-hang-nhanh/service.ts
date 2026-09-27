@@ -52,24 +52,32 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
   }
 
   /**
-   * Trả về danh sách các dịch vụ giao hàng mà GHN hỗ trợ
+   * Trả về 1 tùy chọn giao hàng ở cấp Medusa Configuration.
+   *
+   * Ý nghĩa: "GHN Delivery" là cấu hình Medusa — nó KHÔNG embed service_type_id vì
+   * service_type_id là GHN Runtime Data, phụ thuộc vào from_district + to_district + weight.
+   * service_type_id sẽ được resolve động tại checkout qua API getAvailableServices().
+   *
+   * Medusa                              GHN
+   * ─────────────────────────────────────────────
+   * ghn-delivery   ─────────►  Delivery integration
+   *                                    │
+   *                                    ▼
+   *                             available-services
+   *                                    │  (from_district + to_district)
+   *                                    ▼
+   *                              service_type_id
+   *                                ├── 2 (Hàng nhẹ < 20kg)
+   *                                └── 5 (Hàng nặng ≥ 20kg)
+   *                                    │
+   *                                    ▼
+   *                               calculate-fee
    */
   async getFulfillmentOptions(): Promise<FulfillmentOption[]> {
     return [
       {
-        id: "ghn-standard",
-        name: "Giao Hàng Nhanh - Chuẩn",
-        service_type_id: 2,
-      },
-      {
-        id: "ghn-fast",
-        name: "Giao Hàng Nhanh - Tiết Kiệm / Nhanh",
-        service_type_id: 1,
-      },
-      {
-        id: "ghn-express",
-        name: "Giao Hàng Nhanh - Hỏa Tốc",
-        service_type_id: 3,
+        id: "ghn-delivery",
+        name: "GHN Delivery",
       },
     ]
   }
@@ -82,17 +90,15 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
   }
 
   /**
-   * Xác thực và làm giàu dữ liệu shipping method khi khách hàng chọn method
+   * Xác thực và làm giàu dữ liệu shipping method khi khách hàng chọn method.
+   * Không cần resolve service_type_id ở đây — nó sẽ được tính tại calculatePrice().
    */
   async validateFulfillmentData(
     optionData: Record<string, unknown>,
     data: Record<string, unknown>,
     context: ValidateFulfillmentDataContext
   ): Promise<any> {
-    return {
-      ...data,
-      service_type_id: optionData?.service_type_id || 2,
-    }
+    return { ...data }
   }
 
   /**
@@ -103,7 +109,62 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
   }
 
   /**
-   * Tính phí vận chuyển theo thời gian thực từ GHN API
+   * Resolve service_type_id từ danh sách dịch vụ khả dụng của GHN.
+   *
+   * Logic:
+   * 1. Hỏi GHN xem tuyến này hỗ trợ gói nào
+   * 2. Nếu hàng nặng (>= 20.000g) → chọn gói service_type_id 5 (Hàng nặng)
+   * 3. Nếu hàng nhẹ → chọn gói service_type_id 2 (Hàng nhẹ)
+   * 4. Fallback vào gói đầu tiên khả dụng nếu không tìm được mẩu nhỳ
+   */
+  private async resolveServiceTypeId(
+    fromDistrictId: number,
+    toDistrictId: number,
+    totalWeightGrams: number
+  ): Promise<number> {
+    const services = await this.client_.getAvailableServices(fromDistrictId, toDistrictId)
+
+    if (!services || services.length === 0) {
+      throw new MedusaError(
+        MedusaError.Types.UNEXPECTED_STATE,
+        `[GHN Fulfillment] No GHN service available for route ${fromDistrictId} → ${toDistrictId}. Cannot calculate shipping fee.`
+      )
+    }
+
+    const isHeavy = totalWeightGrams >= 20_000
+    const preferredTypeId = isHeavy ? 5 : 2
+
+    // Tìm đúng gói phù hợp dựa theo cân nặng
+    const matched = services.find((s) => s.service_type_id === preferredTypeId)
+    if (matched) {
+      this.logger_.info?.(
+        `[GHN Fulfillment] Resolved service_type_id=${matched.service_type_id} (${matched.short_name}) for weight=${totalWeightGrams}g`
+      )
+      return matched.service_type_id
+    }
+
+    // Fallback: lấy gói đầu tiên khả dụng
+    const fallback = services[0]
+    this.logger_.warn?.(
+      `[GHN Fulfillment] Preferred service_type_id=${preferredTypeId} not found. Falling back to service_type_id=${fallback.service_type_id} (${fallback.short_name})`
+    )
+    return fallback.service_type_id
+  }
+
+  /**
+   * Tính phí vận chuyển theo thời gian thực từ GHN API.
+   *
+   * Flow:
+   *   Cart → from_district + to_district + weight
+   *     │
+   *     ▼
+   *   getAvailableServices() → resolve service_type_id
+   *     │
+   *     ▼
+   *   calculateFee() → GHN giá cước thực tế
+   *     │
+   *     ▼
+   *   Medusa calculated_amount
    */
   async calculatePrice(
     optionData: CalculateShippingOptionPriceDTO["optionData"],
@@ -123,10 +184,6 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
         shippingAddress?.city ||
         metadata?.ghn_province_name ||
         metadata?.province_name
-      const toWardName =
-        metadata?.ghn_ward_name ||
-        metadata?.ward_name ||
-        shippingAddress?.address_2
 
       // Tính tổng cân nặng từ các items trong giỏ hàng
       const items = ((context as any)?.items || (context as any)?.cart?.items || []) as any[]
@@ -142,25 +199,29 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
         totalWeight = this.options_.defaultWeight || 500
       }
 
-      const serviceTypeId = Number(
-        (data as any)?.service_type_id ||
-          (optionData as any)?.service_type_id ||
-          2
-      )
-
       const fromDistrictId = this.options_.fromDistrictId || 1442
       const fromWardCode = this.options_.fromWardCode
 
-      // Nếu không có district_id và cũng không có province_name -> dùng phí tạm tính
+      // Fallback giá tạm tính khi không có địa chỉ người nhận nào
       if (!toDistrictId && !toProvinceName) {
         this.logger_.warn?.(
-          "[GHN Fulfillment] Neither toDistrictId nor toProvinceName found. Returning fallback fee."
+          "[GHN Fulfillment] No destination address found. Returning fallback fee 30.000₫."
         )
         return {
           calculated_amount: 30000,
           is_calculated_price_tax_inclusive: true,
         }
       }
+
+      // Resolve service_type_id động dựa vào tuyến đưỜng và cân nặng
+      let serviceTypeId: number
+      const effectiveToDistrict = toDistrictId || 1442 // Fallback Quận 1 nếu dung form mặc định
+
+      serviceTypeId = await this.resolveServiceTypeId(
+        fromDistrictId,
+        effectiveToDistrict,
+        totalWeight
+      )
 
       const feePayload: any = {
         from_district_id: fromDistrictId,
@@ -176,9 +237,11 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
         feePayload.to_district_id = toDistrictId
         if (toWardCode) feePayload.to_ward_code = String(toWardCode)
       } else {
+        // Không có district_id (form mặc định), dùng Quận 1 làm fallback
+        feePayload.to_district_id = 1442
+        feePayload.to_ward_code = "20101"
         feePayload.is_new_to_address = true
-        feePayload.to_province_name = toProvinceName
-        if (toWardName) feePayload.to_ward_name = toWardName
+        if (toProvinceName) feePayload.to_province_name = toProvinceName
       }
 
       const feeData = await this.client_.calculateFee(feePayload)
@@ -188,7 +251,10 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
         is_calculated_price_tax_inclusive: true,
       }
     } catch (error: any) {
-      this.logger_.error?.(`[GHN Fulfillment] Calculate price failed: ${error?.message}`, error)
+      this.logger_.error?.(
+        `[GHN Fulfillment] Calculate price failed: ${error?.message}`,
+        error
+      )
       return {
         calculated_amount: 35000,
         is_calculated_price_tax_inclusive: true,
@@ -280,9 +346,20 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       0
     )
 
-    const serviceTypeId = Number(
-      (data as any)?.service_type_id || 2
-    )
+    // Resolve service_type_id động tại thời điểm tạo đơn
+    let serviceTypeId = 2 // Default fallback
+    const effectiveToDistrict = toDistrictId || 1442
+    try {
+      serviceTypeId = await this.resolveServiceTypeId(
+        this.options_.fromDistrictId || 1442,
+        effectiveToDistrict,
+        totalWeight
+      )
+    } catch (err: any) {
+      this.logger_.warn?.(
+        `[GHN Fulfillment] Could not resolve service type, defaulting to 2: ${err?.message}`
+      )
+    }
 
     const createOrderPayload: GhnCreateOrderRequest = {
       payment_type_id: this.options_.paymentTypeId || 1,

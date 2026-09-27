@@ -77,6 +77,22 @@ export interface GhnApiResponse<T = any> {
   data: T
 }
 
+/**
+ * Gói dịch vụ vận chuyển khả dụng trả về từ GHN API (/v2/shipping-order/available-services)
+ * Đây là GHN Runtime Data — phụ thuộc vào from_district + to_district + shop_id.
+ * Tách biệt hoàn toàn với Medusa Configuration (ghn-delivery).
+ *
+ * service_type_id:
+ *   2 = Hàng nhẹ / Standard (< 20kg)
+ *   5 = Hàng nặng / Heavy (≥ 20kg hoặc nhiều kiện)
+ *   ...
+ */
+export interface GhnAvailableService {
+  service_id: number
+  short_name: string
+  service_type_id: number
+}
+
 export interface GhnFeeRequest {
   from_district_id?: number
   from_ward_code?: string

@@ -5,6 +5,7 @@ import { MedusaError } from "@medusajs/framework/utils"
 import type { Logger } from "@medusajs/framework/types"
 import type {
   GhnApiResponse,
+  GhnAvailableService,
   GhnCancelOrderResponseData,
   GhnCreateOrderRequest,
   GhnCreateOrderResponseData,
@@ -78,6 +79,34 @@ export class GhnClient {
         `GHN Network Error: ${err?.message || "Unknown error"}`
       )
     }
+  }
+
+  /**
+   * Lấy danh sách gói dịch vụ khả dụng cho tuyến giao hàng cụ thể.
+   * Đây là GHN Runtime Data — gọi TRƯỚC khi tính phí để resolve đúng service_type_id.
+   * Required: shop_id (từ config), from_district (từ Stock Location), to_district (từ cart address).
+   */
+  async getAvailableServices(
+    fromDistrict: number,
+    toDistrict: number
+  ): Promise<GhnAvailableService[]> {
+    if (this.mockEnabled || !this.token) {
+      this.logger?.info?.(
+        `[GHN Mock] Returning mock available services for ${fromDistrict} → ${toDistrict}`
+      )
+      // Mock trả về 2 gói phổ biến nhất của GHN
+      return [
+        { service_id: 53320, short_name: "Hàng nhẹ", service_type_id: 2 },
+        { service_id: 53321, short_name: "Hàng nặng", service_type_id: 5 },
+      ]
+    }
+
+    return await this.request<GhnAvailableService[]>(
+      "/v2/shipping-order/available-services",
+      "POST",
+      { shop_id: this.shopId, from_district: fromDistrict, to_district: toDistrict },
+      false // Không cần ShopId header ở đây, đã truyền trong body
+    )
   }
 
   /**
