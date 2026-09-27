@@ -4,6 +4,7 @@
 import {
   AbstractFulfillmentProviderService,
   MedusaError,
+  Modules,
 } from "@medusajs/framework/utils"
 import type {
   CalculatedShippingOptionPrice,
@@ -13,15 +14,20 @@ import type {
   FulfillmentItemDTO,
   FulfillmentOption,
   FulfillmentOrderDTO,
+  ICachingModuleService,
   Logger,
   ValidateFulfillmentDataContext,
 } from "@medusajs/framework/types"
 
 import { GhnClient } from "./client"
-import type { GhnCreateOrderRequest, GhnModuleOptions, GhnOrderItem } from "./types"
+import type { GhnAvailableService, GhnCreateOrderRequest, GhnModuleOptions, GhnOrderItem } from "./types"
+
+/** TTL cho cache tuyến đường GHN (giây). Mặc định 1 giờ. */
+const GHN_ROUTE_CACHE_TTL_SECONDS = 60 * 60
 
 type InjectedDependencies = {
   logger: Logger
+  [Modules.CACHING]: ICachingModuleService
 }
 
 export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderService {
@@ -30,11 +36,13 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
   protected readonly logger_: Logger
   protected readonly options_: GhnModuleOptions
   protected readonly client_: GhnClient
+  protected readonly cache_: ICachingModuleService
 
   constructor(container: InjectedDependencies, options: GhnModuleOptions) {
     super()
 
     this.logger_ = container.logger
+    this.cache_ = container[Modules.CACHING]
     this.options_ = {
       endpoint: "https://dev-online-gateway.ghn.vn/shiip/public-api",
       paymentTypeId: 1,
@@ -112,17 +120,18 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
    * Resolve service_type_id từ danh sách dịch vụ khả dụng của GHN.
    *
    * Logic:
-   * 1. Hỏi GHN xem tuyến này hỗ trợ gói nào
-   * 2. Nếu hàng nặng (>= 20.000g) → chọn gói service_type_id 5 (Hàng nặng)
-   * 3. Nếu hàng nhẹ → chọn gói service_type_id 2 (Hàng nhẹ)
-   * 4. Fallback vào gói đầu tiên khả dụng nếu không tìm được mẩu nhỳ
+   * 1. Kiểm tra Redis cache theo key `ghn:available-services:{fromId}:{toId}` (TTL 1 giờ)
+   * 2. Cache miss → Hỏi GHN xem tuyến này hỗ trợ gói nào → ghi vào cache
+   * 3. Nếu hàng nặng (>= 20.000g) → chọn gói service_type_id 5 (Hàng nặng)
+   * 4. Nếu hàng nhẹ → chọn gói service_type_id 2 (Hàng nhẹ)
+   * 5. Fallback vào gói đầu tiên khả dụng nếu không tìm được match
    */
   private async resolveServiceTypeId(
     fromDistrictId: number,
     toDistrictId: number,
     totalWeightGrams: number
   ): Promise<number> {
-    const services = await this.client_.getAvailableServices(fromDistrictId, toDistrictId)
+    const services = await this.getAvailableServicesWithCache_(fromDistrictId, toDistrictId)
 
     if (!services || services.length === 0) {
       throw new MedusaError(
@@ -149,6 +158,60 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       `[GHN Fulfillment] Preferred service_type_id=${preferredTypeId} not found. Falling back to service_type_id=${fallback.service_type_id} (${fallback.short_name})`
     )
     return fallback.service_type_id
+  }
+
+  /**
+   * Lấy danh sách dịch vụ khả dụng của GHN theo tuyến đường, có cache Redis.
+   *
+   * Cache key: `ghn:available-services:{fromDistrictId}:{toDistrictId}`
+   * Cache TTL: 1 giờ (GHN_ROUTE_CACHE_TTL_SECONDS)
+   *
+   * Flow:
+   *   cache hit  → trả về ngay (0 network call)
+   *   cache miss → gọi GHN API → ghi cache → trả về
+   *   cache lỗi  → log warn, bỏ qua cache, gọi thẳng API (graceful degradation)
+   */
+  private async getAvailableServicesWithCache_(
+    fromDistrictId: number,
+    toDistrictId: number
+  ): Promise<GhnAvailableService[]> {
+    const cacheKey = `ghn:available-services:${fromDistrictId}:${toDistrictId}`
+
+    // Cache read
+    try {
+      const cached = await this.cache_.get({ key: cacheKey })
+      if (cached) {
+        this.logger_.debug?.(
+          `[GHN Cache] HIT — available-services for route ${fromDistrictId}→${toDistrictId}`
+        )
+        return cached as GhnAvailableService[]
+      }
+    } catch (cacheErr: any) {
+      this.logger_.warn?.(
+        `[GHN Cache] Read failed, bypassing cache: ${cacheErr?.message}`
+      )
+    }
+
+    // Cache miss → fetch from GHN
+    this.logger_.debug?.(
+      `[GHN Cache] MISS — fetching available-services for route ${fromDistrictId}→${toDistrictId}`
+    )
+    const services = await this.client_.getAvailableServices(fromDistrictId, toDistrictId)
+
+    // Cache write (non-blocking, fire-and-forget)
+    if (services && services.length > 0) {
+      this.cache_
+        .set({
+          key: cacheKey,
+          data: services as unknown as object,
+          ttl: GHN_ROUTE_CACHE_TTL_SECONDS,
+        })
+        .catch((err: any) => {
+          this.logger_.warn?.(`[GHN Cache] Write failed (non-critical): ${err?.message}`)
+        })
+    }
+
+    return services
   }
 
   /**
