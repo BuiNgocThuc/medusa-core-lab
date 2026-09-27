@@ -249,3 +249,31 @@ export interface GhnWard {
   DistrictID: number
   WardName: string
 }
+
+/**
+ * Mô hình Tỉnh/Thành phố mới nhất của GHN (v3 - 34 Tỉnh/Thành phố)
+ * Endpoint: GET /v3/master-data/province/all
+ * Có trường extension_names chứa các biến thể (không dấu, viết tắt, tiền tố...) dùng để autocomplete / gợi ý.
+ */
+export interface GhnProvinceV3 {
+  _id: number
+  name: string
+  extension_names: string[]
+  type: string
+  parent_id: number
+  status: number
+}
+
+/**
+ * Mô hình Phường/Xã mới nhất của GHN (v3)
+ * Endpoint: GET /v3/master-data/ward/all-by-province-id?province_id={province_id}
+ * Có trường extension_names chứa các biến thể dùng để autocomplete / gợi ý.
+ */
+export interface GhnWardV3 {
+  _id: number
+  name: string
+  extension_names: string[]
+  type: string
+  parent_id: number
+  status: number
+}

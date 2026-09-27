@@ -14,7 +14,9 @@ import type {
   GhnFeeResponseData,
   GhnModuleOptions,
   GhnProvince,
+  GhnProvinceV3,
   GhnWard,
+  GhnWardV3,
 } from "./types"
 
 const DEFAULT_ENDPOINT = "https://dev-online-gateway.ghn.vn/shiip/public-api"
@@ -251,13 +253,39 @@ export class GhnClient {
   }
 
   /**
-   * Lấy danh sách Phường/Xã theo Quận/Huyện
+   * Lấy danh sách Phường/Xã theo Quận/Huyện (Legacy API cũ)
    */
   async getWards(districtId: number): Promise<GhnWard[]> {
     return await this.request<GhnWard[]>(
       "/master-data/ward",
       "POST",
       { district_id: districtId },
+      false
+    )
+  }
+
+  /**
+   * Lấy danh sách 34 Tỉnh/Thành phố mới nhất (GHN API v3)
+   * Có extension_names phục vụ so khớp và gợi ý tự động.
+   */
+  async getProvincesV3(): Promise<GhnProvinceV3[]> {
+    return await this.request<GhnProvinceV3[]>(
+      "/v3/master-data/province/all",
+      "GET",
+      undefined,
+      false
+    )
+  }
+
+  /**
+   * Lấy danh sách Phường/Xã mới nhất theo ID Tỉnh/Thành (GHN API v3)
+   * Có extension_names phục vụ so khớp và gợi ý tự động.
+   */
+  async getWardsV3(provinceId: number): Promise<GhnWardV3[]> {
+    return await this.request<GhnWardV3[]>(
+      `/v3/master-data/ward/all-by-province-id?province_id=${provinceId}`,
+      "GET",
+      undefined,
       false
     )
   }

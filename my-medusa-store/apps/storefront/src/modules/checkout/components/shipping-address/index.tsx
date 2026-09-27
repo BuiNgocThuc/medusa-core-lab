@@ -6,6 +6,7 @@ import { mapKeys } from 'lodash'
 import React, { useEffect, useMemo, useState } from 'react'
 import AddressSelect from '../address-select'
 import CountrySelect from '../country-select'
+import VietnamAddressSelect from './vietnam-address-select'
 
 const ShippingAddress = ({
     customer,
@@ -144,32 +145,6 @@ const ShippingAddress = ({
                     required
                     data-testid="shipping-address-input"
                 />
-                <Input
-                    label="Company"
-                    name="shipping_address.company"
-                    value={formData['shipping_address.company']}
-                    onChange={handleChange}
-                    autoComplete="organization"
-                    data-testid="shipping-company-input"
-                />
-                <Input
-                    label="Postal code"
-                    name="shipping_address.postal_code"
-                    autoComplete="postal-code"
-                    value={formData['shipping_address.postal_code']}
-                    onChange={handleChange}
-                    required
-                    data-testid="shipping-postal-code-input"
-                />
-                <Input
-                    label="City"
-                    name="shipping_address.city"
-                    autoComplete="address-level2"
-                    value={formData['shipping_address.city']}
-                    onChange={handleChange}
-                    required
-                    data-testid="shipping-city-input"
-                />
                 <CountrySelect
                     name="shipping_address.country_code"
                     autoComplete="country"
@@ -180,13 +155,63 @@ const ShippingAddress = ({
                     data-testid="shipping-country-select"
                 />
                 <Input
-                    label="State / Province"
-                    name="shipping_address.province"
-                    autoComplete="address-level1"
-                    value={formData['shipping_address.province']}
+                    label="Company"
+                    name="shipping_address.company"
+                    value={formData['shipping_address.company']}
                     onChange={handleChange}
-                    data-testid="shipping-province-input"
+                    autoComplete="organization"
+                    data-testid="shipping-company-input"
                 />
+
+                {formData['shipping_address.country_code']?.toLowerCase() ===
+                'vn' ? (
+                    <VietnamAddressSelect
+                        initialProvince={formData['shipping_address.province']}
+                        initialWard={formData['shipping_address.city']}
+                        onProvinceSelect={(province) => {
+                            setFormData((prev) => ({
+                                ...prev,
+                                'shipping_address.province':
+                                    province?.name || '',
+                            }))
+                        }}
+                        onWardSelect={(ward) => {
+                            setFormData((prev) => ({
+                                ...prev,
+                                'shipping_address.city': ward?.name || '',
+                            }))
+                        }}
+                    />
+                ) : (
+                    <>
+                        <Input
+                            label="Postal code"
+                            name="shipping_address.postal_code"
+                            autoComplete="postal-code"
+                            value={formData['shipping_address.postal_code']}
+                            onChange={handleChange}
+                            required
+                            data-testid="shipping-postal-code-input"
+                        />
+                        <Input
+                            label="City"
+                            name="shipping_address.city"
+                            autoComplete="address-level2"
+                            value={formData['shipping_address.city']}
+                            onChange={handleChange}
+                            required
+                            data-testid="shipping-city-input"
+                        />
+                        <Input
+                            label="State / Province"
+                            name="shipping_address.province"
+                            autoComplete="address-level1"
+                            value={formData['shipping_address.province']}
+                            onChange={handleChange}
+                            data-testid="shipping-province-input"
+                        />
+                    </>
+                )}
             </div>
             <div className="my-8">
                 <Checkbox

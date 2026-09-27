@@ -358,7 +358,11 @@ export async function setAddresses(currentState: unknown, formData: FormData) {
                 address_1: formData.get('shipping_address.address_1'),
                 address_2: '',
                 company: formData.get('shipping_address.company'),
-                postal_code: formData.get('shipping_address.postal_code'),
+                postal_code:
+                    formData.get('shipping_address.postal_code') ||
+                    (formData.get('shipping_address.country_code') === 'vn'
+                        ? '700000'
+                        : ''),
                 city: formData.get('shipping_address.city'),
                 country_code: formData.get('shipping_address.country_code'),
                 province: formData.get('shipping_address.province'),
@@ -366,6 +370,34 @@ export async function setAddresses(currentState: unknown, formData: FormData) {
             },
             email: formData.get('email'),
         } as any
+
+        // GHN v3 Master Data metadata
+        const ghnProvinceId = formData.get(
+            'shipping_address.metadata.ghn_province_id'
+        )
+        const ghnProvinceName = formData.get(
+            'shipping_address.metadata.ghn_province_name'
+        )
+        const ghnWardId = formData.get('shipping_address.metadata.ghn_ward_id')
+        const ghnWardName = formData.get(
+            'shipping_address.metadata.ghn_ward_name'
+        )
+
+        const addressMetadata: Record<string, any> = {}
+        if (ghnProvinceId)
+            addressMetadata.ghn_province_id = Number(ghnProvinceId)
+        if (ghnProvinceName)
+            addressMetadata.ghn_province_name = String(ghnProvinceName)
+        if (ghnWardId) addressMetadata.ghn_ward_id = Number(ghnWardId)
+        if (ghnWardName) addressMetadata.ghn_ward_name = String(ghnWardName)
+
+        if (Object.keys(addressMetadata).length > 0) {
+            data.shipping_address.metadata = addressMetadata
+            data.metadata = {
+                ...(data.metadata || {}),
+                ...addressMetadata,
+            }
+        }
 
         const sameAsBilling = formData.get('same_as_billing')
         if (sameAsBilling === 'on') data.billing_address = data.shipping_address

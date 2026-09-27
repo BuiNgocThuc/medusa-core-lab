@@ -264,14 +264,23 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
         (context as any)?.shipping_address ||
         (context as any)?.cart?.shipping_address
 
-      const metadata = (shippingAddress?.metadata || {}) as Record<string, any>
+      const metadata = (
+        shippingAddress?.metadata ||
+        (context as any)?.cart?.metadata ||
+        (context as any)?.metadata ||
+        {}
+      ) as Record<string, any>
       const toDistrictId = Number(metadata?.ghn_district_id || metadata?.district_id)
       const toWardCode = metadata?.ghn_ward_code || metadata?.ward_code
       const toProvinceName =
         shippingAddress?.province ||
-        shippingAddress?.city ||
         metadata?.ghn_province_name ||
-        metadata?.province_name
+        metadata?.province_name ||
+        shippingAddress?.city
+      const toWardName =
+        metadata?.ghn_ward_name ||
+        metadata?.ward_name ||
+        shippingAddress?.city
 
       // Tính tổng cân nặng từ các items trong giỏ hàng
       const items = ((context as any)?.items || (context as any)?.cart?.items || []) as any[]
@@ -472,17 +481,22 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
     additionalData?: Record<string, unknown>
   ): Promise<CreateFulfillmentResult> {
     const shippingAddress = (order as any)?.shipping_address
-    const metadata = (shippingAddress?.metadata || {}) as Record<string, any>
+    const metadata = (
+      shippingAddress?.metadata ||
+      (order as any)?.metadata ||
+      {}
+    ) as Record<string, any>
 
     const toDistrictId = Number(metadata?.ghn_district_id || metadata?.district_id)
     const toWardCode = String(metadata?.ghn_ward_code || metadata?.ward_code || "")
     const toProvinceName =
       shippingAddress?.province ||
-      shippingAddress?.city ||
       metadata?.ghn_province_name ||
-      metadata?.province_name
+      metadata?.province_name ||
+      shippingAddress?.city
     const toWardName =
       metadata?.ghn_ward_name ||
+      shippingAddress?.city ||
       metadata?.ward_name ||
       shippingAddress?.address_2 ||
       ""
