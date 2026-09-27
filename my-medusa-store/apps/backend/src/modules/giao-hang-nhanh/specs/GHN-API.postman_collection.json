@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "ghn-v2-api-collection",
     "name": "GHN Open API v2 - Shipping & Fulfillment",
-    "description": "Bộ Postman Collection chuẩn tích hợp Giao Hàng Nhanh (GHN) cho Medusa v2 Fulfillment Provider. Bao gồm: Lấy danh sách Shop, Master Data (Tỉnh/Huyện/Xã), Dịch vụ, Tính cước phí và Vòng đời đơn hàng.",
+    "description": "Bộ Postman Collection chuẩn tích hợp Giao Hàng Nhanh (GHN) cho Medusa v2 Fulfillment Provider. Bao gồm: Lấy danh sách Shop, Master Data (Tỉnh/Huyện/Xã), Dịch vụ khả dụng, Tính cước phí (Gói Chuẩn Type 2 & Hàng Nặng Type 5), Vòng đời đơn hàng GHN, và API Medusa Storefront.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -19,6 +19,26 @@
     {
       "key": "shopId",
       "value": "225452",
+      "type": "string"
+    },
+    {
+      "key": "medusaUrl",
+      "value": "http://localhost:9099",
+      "type": "string"
+    },
+    {
+      "key": "publishableApiKey",
+      "value": "pk_d76fd481184ee26b3f5c44a365ea696e375d364ec81b12ddfa0ce4cdf93449cd",
+      "type": "string"
+    },
+    {
+      "key": "cartId",
+      "value": "cart_01M3H2W9NH6F4085GRBV3GQ9GR",
+      "type": "string"
+    },
+    {
+      "key": "shippingOptionId",
+      "value": "so_01M3H162Y54AXYPQX2EAG9758M",
       "type": "string"
     }
   ],
@@ -169,12 +189,12 @@
               "host": ["{{baseUrl}}"],
               "path": ["v2", "shipping-order", "available-services"]
             },
-            "description": "Kiểm tra các gói vận chuyển GHN hỗ trợ giữa tuyến gửi và tuyến nhận."
+            "description": "Kiểm tra các gói vận chuyển GHN hỗ trợ giữa tuyến gửi và tuyến nhận. Trả về danh sách gói dịch vụ kèm `service_type_id`."
           },
           "response": []
         },
         {
-          "name": "Tính cước vận chuyển (Calculate Fee)",
+          "name": "Tính cước - Gói Chuẩn < 20kg (service_type_id = 2)",
           "request": {
             "method": "POST",
             "header": [
@@ -193,14 +213,45 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"from_district_id\": 1442,\n  \"from_ward_code\": \"20101\",\n  \"service_type_id\": 2,\n  \"to_district_id\": 1442,\n  \"to_ward_code\": \"20101\",\n  \"weight\": 500,\n  \"length\": 10,\n  \"width\": 10,\n  \"height\": 10,\n  \"insurance_value\": 0\n}"
+              "raw": "{\n  \"from_district_id\": 1442,\n  \"from_ward_code\": \"20101\",\n  \"to_district_id\": 1442,\n  \"to_ward_code\": \"20101\",\n  \"service_type_id\": 2,\n  \"weight\": 500,\n  \"length\": 10,\n  \"width\": 10,\n  \"height\": 10,\n  \"insurance_value\": 0\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/v2/shipping-order/fee",
               "host": ["{{baseUrl}}"],
               "path": ["v2", "shipping-order", "fee"]
             },
-            "description": "Tính phí vận chuyển chuẩn theo tuyến đường và cân nặng (gram)."
+            "description": "Tính phí vận chuyển cho hàng nhẹ (< 20kg). GHN chỉ yêu cầu kích thước ở cấp đơn hàng (root: weight, length, width, height). Miễn phí COD."
+          },
+          "response": []
+        },
+        {
+          "name": "Tính cước - Gói Hàng nặng >= 20kg (service_type_id = 5, kèm items[])",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Token",
+                "value": "{{token}}"
+              },
+              {
+                "key": "ShopId",
+                "value": "{{shopId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"from_district_id\": 1442,\n  \"from_ward_code\": \"20101\",\n  \"to_district_id\": 1442,\n  \"to_ward_code\": \"20101\",\n  \"service_type_id\": 5,\n  \"weight\": 22000,\n  \"items\": [\n    {\n      \"name\": \"Yonex Nanoflare 800\",\n      \"quantity\": 1,\n      \"weight\": 22000,\n      \"length\": 10,\n      \"width\": 10,\n      \"height\": 10\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v2/shipping-order/fee",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "shipping-order", "fee"]
+            },
+            "description": "Tính phí vận chuyển cho hàng nặng (>= 20kg hoặc đơn nhiều kiện). GHN BẮT BUỘC có mảng `items[]` với đầy đủ length, width, height, weight của từng kiện."
           },
           "response": []
         }
@@ -210,7 +261,7 @@
       "name": "04. Orders & Fulfillment (Tạo & Quản lý đơn)",
       "item": [
         {
-          "name": "Tạo đơn vận chuyển (Create Shipping Order)",
+          "name": "Tạo đơn - Gói Chuẩn < 20kg (service_type_id = 2)",
           "request": {
             "method": "POST",
             "header": [
@@ -229,14 +280,45 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"payment_type_id\": 1,\n  \"note\": \"Medusa Order Test\",\n  \"required_note\": \"CHOXEMHANGKHONGTHU\",\n  \"from_name\": \"Medusa Store\",\n  \"from_phone\": \"0901234567\",\n  \"from_address\": \"123 Kho Hang\",\n  \"from_ward_name\": \"Phường Bến Nghé\",\n  \"from_district_name\": \"Quận 1\",\n  \"from_province_name\": \"Hồ Chí Minh\",\n  \"to_name\": \"Nguyen Linh\",\n  \"to_phone\": \"0901234567\",\n  \"to_address\": \"123 Nguyen Hue\",\n  \"to_ward_code\": \"20101\",\n  \"to_district_id\": 1442,\n  \"weight\": 500,\n  \"length\": 10,\n  \"width\": 10,\n  \"height\": 10,\n  \"service_type_id\": 2,\n  \"items\": [\n    {\n      \"name\": \"Yonex Nanoflare 800\",\n      \"code\": \"YONEX-NF800\",\n      \"quantity\": 1,\n      \"price\": 4100000,\n      \"weight\": 500\n    }\n  ]\n}"
+              "raw": "{\n  \"payment_type_id\": 1,\n  \"note\": \"Medusa Order Standard\",\n  \"required_note\": \"CHOXEMHANGKHONGTHU\",\n  \"from_name\": \"Medusa Store\",\n  \"from_phone\": \"0901234567\",\n  \"from_address\": \"123 Kho Hang\",\n  \"from_ward_name\": \"Phường Bến Nghé\",\n  \"from_district_name\": \"Quận 1\",\n  \"from_province_name\": \"Hồ Chí Minh\",\n  \"to_name\": \"Nguyen Linh\",\n  \"to_phone\": \"0901234567\",\n  \"to_address\": \"123 Nguyen Hue\",\n  \"to_ward_code\": \"20101\",\n  \"to_district_id\": 1442,\n  \"weight\": 500,\n  \"length\": 10,\n  \"width\": 10,\n  \"height\": 10,\n  \"service_type_id\": 2,\n  \"items\": [\n    {\n      \"name\": \"Vợt Yonex Nanoflare 800 (Light)\",\n      \"code\": \"YONEX-NF800\",\n      \"quantity\": 1,\n      \"price\": 4100000,\n      \"weight\": 500,\n      \"length\": 10,\n      \"width\": 10,\n      \"height\": 10\n    }\n  ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/v2/shipping-order/create",
               "host": ["{{baseUrl}}"],
               "path": ["v2", "shipping-order", "create"]
             },
-            "description": "Tạo đơn hàng sang GHN để nhận về `order_code` (Mã vận đơn)."
+            "description": "Tạo đơn hàng GHN với gói dịch vụ chuẩn service_type_id = 2."
+          },
+          "response": []
+        },
+        {
+          "name": "Tạo đơn - Gói Hàng nặng >= 20kg (service_type_id = 5)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Token",
+                "value": "{{token}}"
+              },
+              {
+                "key": "ShopId",
+                "value": "{{shopId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"payment_type_id\": 1,\n  \"note\": \"Medusa Order Heavy Goods\",\n  \"required_note\": \"CHOXEMHANGKHONGTHU\",\n  \"from_name\": \"Medusa Store\",\n  \"from_phone\": \"0901234567\",\n  \"from_address\": \"123 Kho Hang\",\n  \"from_ward_name\": \"Phường Bến Nghé\",\n  \"from_district_name\": \"Quận 1\",\n  \"from_province_name\": \"Hồ Chí Minh\",\n  \"to_name\": \"Nguyen Linh\",\n  \"to_phone\": \"0901234567\",\n  \"to_address\": \"123 Nguyen Hue\",\n  \"to_ward_code\": \"20101\",\n  \"to_district_id\": 1442,\n  \"weight\": 22000,\n  \"length\": 10,\n  \"width\": 10,\n  \"height\": 10,\n  \"service_type_id\": 5,\n  \"items\": [\n    {\n      \"name\": \"Yonex Nanoflare 800 (22kg)\",\n      \"code\": \"YONEX-NF800-HEAVY\",\n      \"quantity\": 1,\n      \"price\": 4100000,\n      \"weight\": 22000,\n      \"length\": 10,\n      \"width\": 10,\n      \"height\": 10\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v2/shipping-order/create",
+              "host": ["{{baseUrl}}"],
+              "path": ["v2", "shipping-order", "create"]
+            },
+            "description": "Tạo đơn hàng GHN với gói dịch vụ hàng nặng service_type_id = 5."
           },
           "response": []
         },
@@ -322,6 +404,38 @@
               "path": ["v2", "switch-status", "cancel"]
             },
             "description": "Hủy đơn hàng khi khách hoặc Admin hủy fulfillment."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "05. Medusa Store API (Shipping Option Calculation)",
+      "item": [
+        {
+          "name": "Medusa Store - Tính cước Shipping Option cho Cart",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{publishableApiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cart_id\": \"{{cartId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{medusaUrl}}/store/shipping-options/{{shippingOptionId}}/calculate",
+              "host": ["{{medusaUrl}}"],
+              "path": ["store", "shipping-options", "{{shippingOptionId}}", "calculate"]
+            },
+            "description": "Gọi endpoint Storefront Medusa để hệ thống tự động invoke GHN Provider tính cước thời gian thực theo trọng lượng cart."
           },
           "response": []
         }

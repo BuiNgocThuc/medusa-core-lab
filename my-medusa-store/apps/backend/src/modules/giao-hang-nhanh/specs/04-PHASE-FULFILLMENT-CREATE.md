@@ -124,20 +124,37 @@ const useNewFormat = Boolean(
 
 ---
 
-## 7. Code Đã Hoàn Thành
+## 7. Business Rules: Dynamic service_type_id & Items Payload
 
-| Method | File | Dòng | Trạng thái |
-|---|---|---|---|
-| `createFulfillment()` | `service.ts` | L205-L343 | ✅ Done |
-| `cancelFulfillment()` | `service.ts` | L348-L359 | ✅ Done |
-| `createReturnFulfillment()` | `service.ts` | L364-L369 | ⚠️ Stub (trả về rỗng) |
-| `createOrder()` | `client.ts` | L116-L147 | ✅ Done |
-| `cancelOrder()` | `client.ts` | L152-L168 | ✅ Done |
-| `getPrintToken()` | `client.ts` | L173-L185 | ✅ Done |
+### 7.1 Quy tắc xác định service_type_id khi tạo đơn
+- **`totalWeight < 20kg`**: Tự động chọn `service_type_id = 2` (Gói Chuẩn / Hàng nhẹ).
+- **`totalWeight >= 20kg`**: Tự động chọn `service_type_id = 5` (Hàng nặng).
+- Mặc định luôn giả định tuyến đường hỗ trợ 2 type 2 và 5. Nếu tạo đơn với type 5 thất bại (do Shop chưa ký bảng giá), hệ thống tự động retry với type 2.
+
+### 7.2 Cấu trúc items[] khi tạo đơn
+Mỗi item trong `items[]` gửi sang GHN tuân thủ DTO:
+- `name`: Tên sản phẩm
+- `quantity`: Số lượng
+- `price`: Đơn giá
+- `weight`: Ưu tiên `variant.weight` > `product.weight` > `defaultWeight (500g)`
+- `length, width, height`: Ưu tiên `variant.[dim]` > `product.[dim]` > `defaultDimensions (10x10x10cm)`
 
 ---
 
-## 8. Acceptance Criteria
+## 8. Code Đã Hoàn Thành
+
+| Method | File | Trạng thái |
+|---|---|---|
+| `createFulfillment()` | `service.ts` | ✅ Done (Kèm fallback 5 → 2 & full dimensions) |
+| `cancelFulfillment()` | `service.ts` | ✅ Done |
+| `createReturnFulfillment()` | `service.ts` | ⚠️ Stub (trả về rỗng) |
+| `createOrder()` | `client.ts` | ✅ Done |
+| `cancelOrder()` | `client.ts` | ✅ Done |
+| `getPrintToken()` | `client.ts` | ✅ Done |
+
+---
+
+## 9. Acceptance Criteria
 
 - [ ] Admin tạo fulfillment thành công từ Order detail
 - [ ] Mã vận đơn GHN hiển thị trên Admin UI
@@ -146,3 +163,4 @@ const useNewFormat = Boolean(
 - [ ] Hủy fulfillment hoạt động
 - [ ] Partial fulfillment (giao nhiều lần) hoạt động
 - [ ] Mock mode tạo đơn mock thành công
+- [ ] Tự động fallback giữa service_type_id 5 và 2 nếu shop chưa kích hoạt bảng giá hàng nặng

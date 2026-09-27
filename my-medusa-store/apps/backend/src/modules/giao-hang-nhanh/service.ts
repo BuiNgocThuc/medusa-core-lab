@@ -20,7 +20,13 @@ import type {
 } from "@medusajs/framework/types"
 
 import { GhnClient } from "./client"
-import type { GhnAvailableService, GhnCreateOrderRequest, GhnModuleOptions, GhnOrderItem } from "./types"
+import type {
+  GhnAvailableService,
+  GhnCreateOrderRequest,
+  GhnFeeRequest,
+  GhnModuleOptions,
+  GhnOrderItem,
+} from "./types"
 
 /** TTL cho cache tuyến đường GHN (giây). Mặc định 1 giờ. */
 const GHN_ROUTE_CACHE_TTL_SECONDS = 60 * 60
@@ -119,51 +125,69 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
   /**
    * Resolve service_type_id từ danh sách dịch vụ khả dụng của GHN.
    *
-   * Logic:
-   * 1. Kiểm tra Redis cache theo key `ghn:available-services:{fromId}:{toId}` (TTL 1 giờ)
-   * 2. Cache miss → Hỏi GHN xem tuyến này hỗ trợ gói nào → ghi vào cache
-   * 3. Nếu hàng nặng (>= 20.000g) → chọn gói service_type_id 5 (Hàng nặng)
-   * 4. Nếu hàng nhẹ → chọn gói service_type_id 2 (Hàng nhẹ)
-   * 5. Fallback vào gói đầu tiên khả dụng nếu không tìm được match
+   * Business Rules:
+   * 1. Phân loại dịch vụ theo tổng khối lượng:
+   *    - Tổng khối lượng < 20.000g (dưới 20kg): chọn service_type_id = 2 (Gói Chuẩn / Hàng nhẹ)
+   *    - Tổng khối lượng >= 20.000g (từ 20kg trở lên hoặc nhiều kiện): chọn service_type_id = 5 (Hàng nặng)
+   * 2. Luôn giả định hệ thống có sẵn 2 type là 2 và 5:
+   *    - Kiểm tra danh sách dịch vụ khả dụng từ GHN (có cache Redis)
+   *    - Nếu tìm thấy preferredTypeId → chọn preferredTypeId
+   *    - Nếu tuyến đường không có preferredTypeId → thử lấy gói đối ứng còn lại (2 hoặc 5)
+   *    - Nếu API không trả về hoặc lỗi → mặc định chọn preferredTypeId (không throw lỗi chặn luồng checkout,
+   *      cơ chế fallback retry khi tính phí sẽ đảm bảo luôn có kết quả)
    */
   private async resolveServiceTypeId(
     fromDistrictId: number,
     toDistrictId: number,
     totalWeightGrams: number
   ): Promise<number> {
-    const services = await this.getAvailableServicesWithCache_(fromDistrictId, toDistrictId)
-
-    if (!services || services.length === 0) {
-      throw new MedusaError(
-        MedusaError.Types.UNEXPECTED_STATE,
-        `[GHN Fulfillment] No GHN service available for route ${fromDistrictId} → ${toDistrictId}. Cannot calculate shipping fee.`
-      )
-    }
-
     const isHeavy = totalWeightGrams >= 20_000
     const preferredTypeId = isHeavy ? 5 : 2
 
-    // Tìm đúng gói phù hợp dựa theo cân nặng
-    const matched = services.find((s) => s.service_type_id === preferredTypeId)
-    if (matched) {
-      this.logger_.info?.(
-        `[GHN Fulfillment] Resolved service_type_id=${matched.service_type_id} (${matched.short_name}) for weight=${totalWeightGrams}g`
+    try {
+      const services = await this.getAvailableServicesWithCache_(fromDistrictId, toDistrictId)
+
+      if (services && services.length > 0) {
+        // Tìm đúng gói phù hợp dựa theo cân nặng (2 hoặc 5)
+        const matched = services.find((s) => s.service_type_id === preferredTypeId)
+        if (matched) {
+          this.logger_.info?.(
+            `[GHN Fulfillment] Resolved service_type_id=${matched.service_type_id} (${matched.short_name}) for weight=${totalWeightGrams}g`
+          )
+          return matched.service_type_id
+        }
+
+        // Nếu tuyến đường không có gói ưu tiên, tìm gói đối ứng (2 hoặc 5)
+        const otherTypeId = isHeavy ? 2 : 5
+        const alternateMatched = services.find((s) => s.service_type_id === otherTypeId)
+        if (alternateMatched) {
+          this.logger_.warn?.(
+            `[GHN Fulfillment] Preferred service_type_id=${preferredTypeId} not available for route. Using alternate service_type_id=${alternateMatched.service_type_id} (${alternateMatched.short_name})`
+          )
+          return alternateMatched.service_type_id
+        }
+
+        // Fallback: lấy gói đầu tiên khả dụng
+        const fallback = services[0]
+        this.logger_.warn?.(
+          `[GHN Fulfillment] Neither type 2 nor 5 found in available services. Falling back to service_type_id=${fallback.service_type_id} (${fallback.short_name})`
+        )
+        return fallback.service_type_id
+      }
+    } catch (err: any) {
+      this.logger_.warn?.(
+        `[GHN Fulfillment] getAvailableServices failed (${err?.message}), defaulting to preferred service_type_id=${preferredTypeId}`
       )
-      return matched.service_type_id
     }
 
-    // Fallback: lấy gói đầu tiên khả dụng
-    const fallback = services[0]
-    this.logger_.warn?.(
-      `[GHN Fulfillment] Preferred service_type_id=${preferredTypeId} not found. Falling back to service_type_id=${fallback.service_type_id} (${fallback.short_name})`
-    )
-    return fallback.service_type_id
+    // Mặc định luôn giả định hệ thống có sẵn 2 type là 2 và 5
+    return preferredTypeId
   }
 
   /**
    * Lấy danh sách dịch vụ khả dụng của GHN theo tuyến đường, có cache Redis.
    *
-   * Cache key: `ghn:available-services:{fromDistrictId}:{toDistrictId}`
+   * Cache key: `ghn:available-services:{shopId}:{fromDistrictId}:{toDistrictId}`
    * Cache TTL: 1 giờ (GHN_ROUTE_CACHE_TTL_SECONDS)
    *
    * Flow:
@@ -175,7 +199,8 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
     fromDistrictId: number,
     toDistrictId: number
   ): Promise<GhnAvailableService[]> {
-    const cacheKey = `ghn:available-services:${fromDistrictId}:${toDistrictId}`
+    const shopId = this.options_.shopId
+    const cacheKey = `ghn:available-services:${shopId}:${fromDistrictId}:${toDistrictId}`
 
     // Cache read
     try {
@@ -253,13 +278,70 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       let totalWeight = 0
 
       for (const item of items) {
-        const itemWeight = Number(item?.variant?.weight || item?.weight || 0)
+        // Thứ tự ưu tiên cân nặng chuẩn Medusa v2:
+        // 1. Variant weight (Authoritative): Biến thể/SKU thực tế
+        // 2. Product weight (Fallback): Thông tin tham khảo/mẫu từ sản phẩm cha
+        // 3. defaultWeight (System fallback): Mặc định 500g
+        const variantWeight = Number(item?.variant?.weight || 0)
+        const productWeight = Number(item?.product?.weight || item?.variant?.product?.weight || 0)
+        const fallbackWeight = this.options_.defaultWeight || 500
+
+        const itemWeight = variantWeight > 0 ? variantWeight : (productWeight > 0 ? productWeight : fallbackWeight)
         const qty = Number(item?.quantity || 1)
-        totalWeight += (itemWeight > 0 ? itemWeight : (this.options_.defaultWeight || 500)) * qty
+        totalWeight += itemWeight * qty
       }
 
       if (totalWeight <= 0) {
         totalWeight = this.options_.defaultWeight || 500
+      }
+
+      this.logger_.info?.(
+        `[GHN Fulfillment] Calculated total cart weight: ${totalWeight}g from ${items.length} items`
+      )
+
+      // Map items sang cấu trúc GHN DTO (chuẩn bị cho cả tính phí service_type_id 5 và tạo đơn)
+      const ghnItems: GhnOrderItem[] = items.map((item: any) => {
+        const variantWeight = Number(item?.variant?.weight || 0)
+        const productWeight = Number(item?.product?.weight || item?.variant?.product?.weight || 0)
+        const fallbackWeight = this.options_.defaultWeight || 500
+        const itemWeight = variantWeight > 0 ? variantWeight : (productWeight > 0 ? productWeight : fallbackWeight)
+
+        const variantLength = Number(item?.variant?.length || 0)
+        const productLength = Number(item?.product?.length || item?.variant?.product?.length || 0)
+        const fallbackLength = this.options_.defaultDimensions?.length || 10
+        const itemLength = variantLength > 0 ? variantLength : (productLength > 0 ? productLength : fallbackLength)
+
+        const variantWidth = Number(item?.variant?.width || 0)
+        const productWidth = Number(item?.product?.width || item?.variant?.product?.width || 0)
+        const fallbackWidth = this.options_.defaultDimensions?.width || 10
+        const itemWidth = variantWidth > 0 ? variantWidth : (productWidth > 0 ? productWidth : fallbackWidth)
+
+        const variantHeight = Number(item?.variant?.height || 0)
+        const productHeight = Number(item?.product?.height || item?.variant?.product?.height || 0)
+        const fallbackHeight = this.options_.defaultDimensions?.height || 10
+        const itemHeight = variantHeight > 0 ? variantHeight : (productHeight > 0 ? productHeight : fallbackHeight)
+
+        return {
+          name: item?.title || item?.variant?.title || "Sản phẩm",
+          code: item?.variant?.sku || undefined,
+          quantity: Math.max(1, Number(item?.quantity || 1)),
+          price: Math.max(0, Number(item?.unit_price || 0)),
+          weight: Math.round(itemWeight),
+          length: Math.round(itemLength),
+          width: Math.round(itemWidth),
+          height: Math.round(itemHeight),
+        }
+      })
+
+      if (ghnItems.length === 0) {
+        ghnItems.push({
+          name: "Kiện hàng",
+          quantity: 1,
+          weight: Math.round(totalWeight),
+          length: this.options_.defaultDimensions?.length || 10,
+          width: this.options_.defaultDimensions?.width || 10,
+          height: this.options_.defaultDimensions?.height || 10,
+        })
       }
 
       const fromDistrictId = this.options_.fromDistrictId || 1442
@@ -276,9 +358,9 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
         }
       }
 
-      // Resolve service_type_id động dựa vào tuyến đưỜng và cân nặng
+      // Resolve service_type_id động dựa vào tuyến đường và cân nặng
       let serviceTypeId: number
-      const effectiveToDistrict = toDistrictId || 1442 // Fallback Quận 1 nếu dung form mặc định
+      const effectiveToDistrict = toDistrictId || 1442 // Fallback Quận 1 nếu dùng form mặc định
 
       serviceTypeId = await this.resolveServiceTypeId(
         fromDistrictId,
@@ -286,28 +368,77 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
         totalWeight
       )
 
-      const feePayload: any = {
+      const feePayload: GhnFeeRequest = {
         from_district_id: fromDistrictId,
         from_ward_code: fromWardCode,
         service_type_id: serviceTypeId,
         weight: Math.round(totalWeight),
-        length: this.options_.defaultDimensions?.length || 10,
-        width: this.options_.defaultDimensions?.width || 10,
-        height: this.options_.defaultDimensions?.height || 10,
       }
 
       if (toDistrictId) {
         feePayload.to_district_id = toDistrictId
         if (toWardCode) feePayload.to_ward_code = String(toWardCode)
       } else {
-        // Không có district_id (form mặc định), dùng Quận 1 làm fallback
+        // Không có district_id (form mặc định), dùng Quận 1 làm fallback để tính cước
         feePayload.to_district_id = 1442
         feePayload.to_ward_code = "20101"
-        feePayload.is_new_to_address = true
-        if (toProvinceName) feePayload.to_province_name = toProvinceName
       }
 
-      const feeData = await this.client_.calculateFee(feePayload)
+      // BUSINESS RULE TÍNH PHÍ GHN:
+      // - Với service_type_id = 5 (tổng khối lượng ≥ 20 kg hoặc nhiều kiện):
+      //   GHN tính phí theo từng kiện từ items[], nên mỗi item bắt buộc có length, width, height, weight.
+      // - Với service_type_id = 2 (dưới 20 kg):
+      //   Chỉ cần kích thước ở cấp đơn hàng (root: weight, length, width, height).
+      if (serviceTypeId === 5) {
+        feePayload.items = ghnItems
+      } else {
+        feePayload.length = this.options_.defaultDimensions?.length || 10
+        feePayload.width = this.options_.defaultDimensions?.width || 10
+        feePayload.height = this.options_.defaultDimensions?.height || 10
+      }
+
+      this.logger_.info?.(
+        `[GHN Fulfillment] Requesting fee calculation: route ${fromDistrictId} → ${feePayload.to_district_id} | service_type_id=${feePayload.service_type_id} | weight=${feePayload.weight}g | items=${feePayload.items?.length || 0}`
+      )
+
+      let feeData: any
+      try {
+        feeData = await this.client_.calculateFee(feePayload)
+      } catch (err: any) {
+        // Cơ chế Fallback 2 chiều giữa service_type_id 5 và 2:
+        // 1. Nếu gói 5 fail (ví dụ shop chưa kích hoạt bảng giá hàng nặng), tự động retry với gói chuẩn 2
+        // 2. Nếu gói 2 fail nhưng có items, thử fallback sang gói 5
+        if (feePayload.service_type_id === 5) {
+          this.logger_.warn?.(
+            `[GHN Fulfillment] Calculate fee failed with service_type_id=5 (${err?.message}), falling back to service_type_id=2`
+          )
+          const fallbackPayload: GhnFeeRequest = {
+            ...feePayload,
+            service_type_id: 2,
+            length: this.options_.defaultDimensions?.length || 10,
+            width: this.options_.defaultDimensions?.width || 10,
+            height: this.options_.defaultDimensions?.height || 10,
+          }
+          delete fallbackPayload.items
+          feeData = await this.client_.calculateFee(fallbackPayload)
+        } else if (feePayload.service_type_id === 2 && ghnItems.length > 0) {
+          this.logger_.warn?.(
+            `[GHN Fulfillment] Calculate fee failed with service_type_id=2 (${err?.message}), retrying with service_type_id=5`
+          )
+          const fallbackPayload: GhnFeeRequest = {
+            ...feePayload,
+            service_type_id: 5,
+            items: ghnItems,
+          }
+          feeData = await this.client_.calculateFee(fallbackPayload)
+        } else {
+          throw err
+        }
+      }
+
+      this.logger_.info?.(
+        `[GHN Fulfillment] Fee calculation result: total=${feeData.total}₫ (service_fee=${feeData.service_fee}₫, cod_fee=${feeData.cod_fee || 0}₫, insurance_fee=${feeData.insurance_fee || 0}₫)`
+      )
 
       return {
         calculated_amount: Number(feeData.total || 0),
@@ -393,16 +524,39 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       .filter(Boolean)
       .join(", ")
 
-    // Map items sang cấu trúc GHN
-    const ghnItems: GhnOrderItem[] = (items || []).map((item: any) => ({
-      name: item.title || item.line_item?.title || "Sản phẩm",
-      quantity: Number(item.quantity || 1),
-      price: Number(item.unit_price || 0),
-      weight: Number(item.line_item?.variant?.weight || this.options_.defaultWeight || 500),
-      length: this.options_.defaultDimensions?.length || 10,
-      width: this.options_.defaultDimensions?.width || 10,
-      height: this.options_.defaultDimensions?.height || 10,
-    }))
+    // Map items sang cấu trúc GHN (ưu tiên variant > product > fallback)
+    const ghnItems: GhnOrderItem[] = (items || []).map((item: any) => {
+      const variantWeight = Number(item.line_item?.variant?.weight || 0)
+      const productWeight = Number(item.line_item?.product?.weight || item.line_item?.variant?.product?.weight || 0)
+      const fallbackWeight = this.options_.defaultWeight || 500
+      const itemWeight = variantWeight > 0 ? variantWeight : (productWeight > 0 ? productWeight : fallbackWeight)
+
+      const variantLength = Number(item.line_item?.variant?.length || 0)
+      const productLength = Number(item.line_item?.product?.length || item.line_item?.variant?.product?.length || 0)
+      const fallbackLength = this.options_.defaultDimensions?.length || 10
+      const itemLength = variantLength > 0 ? variantLength : (productLength > 0 ? productLength : fallbackLength)
+
+      const variantWidth = Number(item.line_item?.variant?.width || 0)
+      const productWidth = Number(item.line_item?.product?.width || item.line_item?.variant?.product?.width || 0)
+      const fallbackWidth = this.options_.defaultDimensions?.width || 10
+      const itemWidth = variantWidth > 0 ? variantWidth : (productWidth > 0 ? productWidth : fallbackWidth)
+
+      const variantHeight = Number(item.line_item?.variant?.height || 0)
+      const productHeight = Number(item.line_item?.product?.height || item.line_item?.variant?.product?.height || 0)
+      const fallbackHeight = this.options_.defaultDimensions?.height || 10
+      const itemHeight = variantHeight > 0 ? variantHeight : (productHeight > 0 ? productHeight : fallbackHeight)
+
+      return {
+        name: item.title || item.line_item?.title || "Sản phẩm",
+        code: item.line_item?.variant?.sku || undefined,
+        quantity: Math.max(1, Number(item.quantity || 1)),
+        price: Math.max(0, Number(item.unit_price || 0)),
+        weight: Math.round(itemWeight),
+        length: Math.round(itemLength),
+        width: Math.round(itemWidth),
+        height: Math.round(itemHeight),
+      }
+    })
 
     const totalWeight = ghnItems.reduce(
       (sum, item) => sum + (item.weight || 500) * item.quantity,
@@ -451,8 +605,30 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       createOrderPayload.to_ward_code = toWardCode
     }
 
-    const ghnOrder = await this.client_.createOrder(createOrderPayload)
+    this.logger_.info?.(
+      `[GHN Fulfillment] Submitting createOrder to GHN: recipient="${recipientName}" | phone="${recipientPhone}" | service_type_id=${createOrderPayload.service_type_id} | totalWeight=${createOrderPayload.weight}g | items=${createOrderPayload.items.length}`
+    )
+
+    let ghnOrder: any
+    try {
+      ghnOrder = await this.client_.createOrder(createOrderPayload)
+    } catch (createErr: any) {
+      // Nếu tạo đơn bằng service_type_id 5 bị lỗi, tự động thử lại với gói chuẩn 2
+      if (createOrderPayload.service_type_id === 5) {
+        this.logger_.warn?.(
+          `[GHN Fulfillment] createOrder failed with service_type_id=5 (${createErr?.message}), retrying with service_type_id=2`
+        )
+        createOrderPayload.service_type_id = 2
+        ghnOrder = await this.client_.createOrder(createOrderPayload)
+      } else {
+        throw createErr
+      }
+    }
     const orderCode = ghnOrder.order_code
+
+    this.logger_.info?.(
+      `[GHN Fulfillment] Order created successfully: order_code=${orderCode} | total_fee=${ghnOrder.total_fee}₫ | sort_code=${ghnOrder.sort_code}`
+    )
 
     // Lấy token in phiếu gửi A5
     let labelUrl = ""

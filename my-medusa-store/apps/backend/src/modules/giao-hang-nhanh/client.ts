@@ -51,7 +51,9 @@ export class GhnClient {
       headers["ShopId"] = String(this.shopId)
     }
 
-    this.logger?.debug?.(`[GHN Client] ${method} ${url} - Body: ${JSON.stringify(body || {})}`)
+    this.logger?.info?.(
+      `[GHN Client] ➔ ${method} ${url} | Payload: ${JSON.stringify(body || {})}`
+    )
 
     try {
       const response = await fetch(url, {
@@ -64,9 +66,15 @@ export class GhnClient {
 
       if (!response.ok || (json.code !== 200 && json.code !== 201)) {
         const errorMsg = json.message || `GHN API Error status: ${response.status}`
-        this.logger?.error?.(`[GHN Client] Request error: ${errorMsg}`, new Error(JSON.stringify(json)))
+        this.logger?.error?.(
+          `[GHN Client] ✖ ${method} ${url} | HTTP ${response.status} | Code: ${json.code} | Message: ${errorMsg} | Response: ${JSON.stringify(json)}`
+        )
         throw new MedusaError(MedusaError.Types.UNEXPECTED_STATE, `GHN Error: ${errorMsg}`)
       }
+
+      this.logger?.info?.(
+        `[GHN Client] ✔ ${method} ${url} | HTTP ${response.status} | Code: ${json.code} | Response: ${JSON.stringify(json.data || {})}`
+      )
 
       return json.data
     } catch (err: any) {

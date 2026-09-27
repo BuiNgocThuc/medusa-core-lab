@@ -93,6 +93,16 @@ export interface GhnAvailableService {
   service_type_id: number
 }
 
+/**
+ * Tham số tính phí vận chuyển từ GHN API (/v2/shipping-order/fee)
+ *
+ * Business Rules theo tài liệu GHN Developer:
+ * - service_type_id = 2 (Gói Chuẩn / Hàng nhẹ < 20kg):
+ *   Chỉ cần kích thước ở cấp đơn hàng (root: weight, length, width, height).
+ * - service_type_id = 5 (Hàng nặng ≥ 20kg hoặc đơn nhiều kiện):
+ *   BẮT BUỘC phải truyền mảng `items[]`. Hệ thống GHN sẽ tính phí theo từng kiện từ items[],
+ *   mỗi item bắt buộc có đầy đủ length, width, height, weight, name, quantity.
+ */
 export interface GhnFeeRequest {
   from_district_id?: number
   from_ward_code?: string
@@ -109,6 +119,11 @@ export interface GhnFeeRequest {
   weight: number
   insurance_value?: number
   coupon?: string | null
+  /**
+   * Bắt buộc khi service_type_id = 5 (hàng nặng >= 20kg hoặc nhiều kiện).
+   * GHN tính phí chi tiết theo từng kiện từ mảng này.
+   */
+  items?: GhnOrderItem[]
 }
 
 export interface GhnFeeResponseData {
