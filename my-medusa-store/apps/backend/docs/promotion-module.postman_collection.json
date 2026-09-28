@@ -2,7 +2,7 @@
   "info": {
     "name": "Promotion Module — Manual API Tests",
     "_postman_id": "promotion-module-manual-tests-001",
-    "description": "Collection kiểm thử thủ công cho Promotion Module. Bao phủ toàn bộ 16 API custom file-based hiện có trong apps/backend/src/api, cùng các API Medusa chuẩn cần để tạo dữ liệu và chạy luồng promotion.\n\nCách dùng:\n1. Import file này vào Postman.\n2. Điền base_url, publishable_key, admin_email và admin_password.\n3. Nếu cần dữ liệu mẫu, chạy từ root: pnpm run seed:promotions và pnpm run seed:customer-tiers.\n4. Chạy folder 00 Setup từ trên xuống. Các request có script sẽ tự lưu token/ID vào Collection Variables.\n5. Các request tạo/sửa/xóa có nhãn [MUTATION] thay đổi dữ liệu; chỉ chạy khi cần. Request complete cart tạo order.\n\nKhông đưa toàn bộ Store/Admin API lõi của Medusa vào collection vì framework cung cấp số lượng lớn endpoint. Các endpoint lõi trong đây chỉ là dependency trực tiếp của luồng promotion/cart.",
+    "description": "Collection kiểm thử thủ công cho Promotion Module. Bao phủ toàn bộ 16 API custom file-based hiện có trong apps/backend/src/api, cùng các API Medusa chuẩn cần để tạo dữ liệu và chạy luồng promotion.\n\nCách dùng:\n1. Import file này vào Postman.\n2. Điền base_url, admin_email và admin_password. Publishable key được tự lấy trong folder 00 Setup.\n3. Nếu cần dữ liệu mẫu, chạy từ root: pnpm run seed:promotions và pnpm run seed:customer-tiers.\n4. Chạy folder 00 Setup từ trên xuống. Các request có script sẽ tự lưu token/ID vào Collection Variables.\n5. Các request tạo/sửa/xóa có nhãn [MUTATION] thay đổi dữ liệu; chỉ chạy khi cần. Request complete cart tạo order.\n\nKhông đưa toàn bộ Store/Admin API lõi của Medusa vào collection vì framework cung cấp số lượng lớn endpoint. Các endpoint lõi trong đây chỉ là dependency trực tiếp của luồng promotion/cart.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -32,6 +32,11 @@
           "name": "Admin login — lưu admin_token",
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Admin login thành công', () => pm.response.to.have.status(200));", "const body = pm.response.json();", "pm.expect(body.token).to.be.a('string');", "pm.collectionVariables.set('admin_token', body.token);"] } }],
           "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}" }, "url": "{{base_url}}/auth/user/emailpass" }
+        },
+        {
+          "name": "List publishable API keys — lưu publishable_key",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Lấy publishable API key thành công', () => pm.response.to.have.status(200));", "const body = pm.response.json();", "const key = (body.api_keys || []).find((item) => item.type === 'publishable' && !item.revoked_at && item.token);", "pm.expect(key, 'Cần có publishable API key active').to.exist;", "pm.collectionVariables.set('publishable_key', key.token);"] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }], "url": "{{base_url}}/admin/api-keys?type=publishable&limit=100" }
         },
         {
           "name": "Customer login — lưu customer_token",

@@ -429,12 +429,21 @@ export async function placeOrder(cartId?: string) {
     if (cartRes?.type === 'order') {
         const countryCode =
             cartRes.order.shipping_address?.country_code?.toLowerCase()
+        const earnedPoints = Number(
+            (cartRes as typeof cartRes & {
+                loyalty?: { earned_points?: number; skipped?: boolean }
+            }).loyalty?.earned_points ?? 0
+        )
 
         const orderCacheTag = await getCacheTag('orders')
         revalidateTag(orderCacheTag)
 
         await removeCartId()
-        redirect(`/${countryCode}/order/${cartRes?.order.id}/confirmed`)
+        const loyaltyPointsQuery =
+            earnedPoints > 0 ? `?loyalty_points=${earnedPoints}` : ''
+        redirect(
+            `/${countryCode}/order/${cartRes?.order.id}/confirmed${loyaltyPointsQuery}`
+        )
     }
 
     return cartRes.cart

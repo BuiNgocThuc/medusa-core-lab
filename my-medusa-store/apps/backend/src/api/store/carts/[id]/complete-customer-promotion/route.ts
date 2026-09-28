@@ -13,5 +13,5 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         filters: { id: result.id },
     })
 
-    res.status(200).json({ type: "order", order: orders[0] })
+    res.status(200).json({ type: "order", order: orders[0], loyalty: result.loyalty })
 }
