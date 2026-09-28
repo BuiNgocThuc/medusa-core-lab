@@ -353,8 +353,31 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
         })
       }
 
-      const fromDistrictId = this.options_.fromDistrictId || 1442
-      const fromWardCode = this.options_.fromWardCode
+      // Lấy thông tin kho gửi hàng (Ship From):
+      // 1. Ưu tiên lấy từ Stock Location trong context (địa chỉ kho thực tế)
+      // 2. Fallback về cấu hình options trong medusa-config.ts
+      const fromLocation = (context as any)?.from_location
+      const fromMeta = (
+        fromLocation?.address?.metadata ||
+        fromLocation?.metadata ||
+        {}
+      ) as Record<string, any>
+      const fromGhn = (fromMeta?.ghn || {}) as Record<string, any>
+
+      const fromDistrictId = Number(
+        fromGhn?.district_id ||
+        fromMeta?.ghn_district_id ||
+        fromMeta?.district_id ||
+        this.options_.fromDistrictId ||
+        1442
+      )
+      const fromWardCode = String(
+        fromGhn?.ward_code ||
+        fromMeta?.ghn_ward_code ||
+        fromMeta?.ward_code ||
+        this.options_.fromWardCode ||
+        "20101"
+      )
 
       // Fallback giá tạm tính khi không có địa chỉ người nhận nào
       if (!toDistrictId && !toProvinceName) {

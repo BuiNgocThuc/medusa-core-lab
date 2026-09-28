@@ -24,11 +24,52 @@ export async function seedStockAndShipping(
         input: {
             locations: [
                 {
-                    name: "HCMC Warehouse",
+                    name: "Kho Củ Chi SOC (HCM Mega SOC)",
                     address: {
-                        city: "Ho Chi Minh City",
-                        country_code: "VN",
-                        address_1: "",
+                        address_1: "Đường N13, KCN Tân Phú Trung, Quốc Lộ 22, Ấp Trạm Bơm",
+                        address_2: "Đối diện Bệnh viện Đa khoa Xuyên Á",
+                        city: "Xã Tân Phú Trung, Huyện Củ Chi",
+                        province: "Hồ Chí Minh",
+                        postal_code: "71608",
+                        country_code: "vn",
+                        phone: "0901234567",
+                        metadata: {
+                            company: "Shopee Củ Chi SOC / Ralley Badminton Warehouse",
+                            ghn: {
+                                district_id: 1460,
+                                ward_code: "22114",
+                                ward_name: "Xã Tân Phú Trung",
+                                district_name: "Huyện Củ Chi",
+                                province_name: "Hồ Chí Minh",
+                                name_extension: [
+                                    "Xã Tân Phú Trung",
+                                    "X.Tân Phú Trung",
+                                    "X Tân Phú Trung",
+                                    "Tân Phú Trung",
+                                    "Tan Phu Trung",
+                                    "Xa Tan Phu Trung",
+                                    "tanphutrung",
+                                ],
+                            },
+                            ghn_district_id: 1460,
+                            ghn_ward_code: "22114",
+                            district_id: 1460,
+                            ward_code: "22114",
+                        },
+                    },
+                    metadata: {
+                        company: "Shopee Củ Chi SOC / Ralley Badminton Warehouse",
+                        ghn: {
+                            district_id: 1460,
+                            ward_code: "22114",
+                            ward_name: "Xã Tân Phú Trung",
+                            district_name: "Huyện Củ Chi",
+                            province_name: "Hồ Chí Minh",
+                        },
+                        ghn_district_id: 1460,
+                        ghn_ward_code: "22114",
+                        district_id: 1460,
+                        ward_code: "22114",
                     },
                 },
             ],
@@ -36,10 +77,17 @@ export async function seedStockAndShipping(
     });
     const stockLocation = stockLocationResult[0];
 
-    await link.create({
-        [Modules.STOCK_LOCATION]: { stock_location_id: stockLocation.id },
-        [Modules.FULFILLMENT]: { fulfillment_provider_id: "manual_manual" },
-    });
+    // Link fulfillment providers: GHN và Manual cho stock location
+    await link.create([
+        {
+            [Modules.STOCK_LOCATION]: { stock_location_id: stockLocation.id },
+            [Modules.FULFILLMENT]: { fulfillment_provider_id: "ghn_ghn" },
+        },
+        {
+            [Modules.STOCK_LOCATION]: { stock_location_id: stockLocation.id },
+            [Modules.FULFILLMENT]: { fulfillment_provider_id: "manual_manual" },
+        },
+    ]);
 
     const { data: shippingProfileResult } = await query.graph({
         entity: "shipping_profile",
@@ -57,6 +105,7 @@ export async function seedStockAndShipping(
             },
         ],
     });
+
     await link.create({
         [Modules.STOCK_LOCATION]: { stock_location_id: stockLocation.id },
         [Modules.FULFILLMENT]: { fulfillment_set_id: fulfillmentSet.id },
@@ -64,6 +113,30 @@ export async function seedStockAndShipping(
 
     await createShippingOptionsWorkflow(container).run({
         input: [
+            {
+                name: "Giao Hàng Nhanh Shipping",
+                price_type: "calculated",
+                provider_id: "ghn_ghn",
+                service_zone_id: fulfillmentSet.service_zones[0].id,
+                shipping_profile_id: shippingProfile.id,
+                type: {
+                    label: "Giao Hàng Nhanh",
+                    description: "Giao hàng qua GHN (tính cước thời gian thực).",
+                    code: "giao-hang-nhanh-type",
+                },
+                data: {
+                    id: "ghn-delivery",
+                    name: "GHN Delivery",
+                },
+                rules: [
+                    {
+                        attribute: "enabled_in_store",
+                        value: "true",
+                        operator: "eq",
+                    },
+                    { attribute: "is_return", value: "false", operator: "eq" },
+                ],
+            },
             {
                 name: "Standard Shipping",
                 price_type: "flat",
