@@ -1,8 +1,8 @@
 {
   "info": {
     "_postman_id": "ghn-v2-api-collection",
-    "name": "GHN Open API v2 - Shipping & Fulfillment",
-    "description": "Bộ Postman Collection chuẩn tích hợp Giao Hàng Nhanh (GHN) cho Medusa v2 Fulfillment Provider. Bao gồm: Lấy danh sách Shop, Master Data (Tỉnh/Huyện/Xã), Dịch vụ khả dụng, Tính cước phí (Gói Chuẩn Type 2 & Hàng Nặng Type 5), Vòng đời đơn hàng GHN, và API Medusa Storefront.",
+    "name": "GHN Open API - Shipping & Fulfillment (34 Tỉnh Thành Mới)",
+    "description": "Bộ Postman Collection chuẩn tích hợp Giao Hàng Nhanh (GHN) cho Medusa v2 Fulfillment Provider. Đã cập nhật 100% sang API Địa giới hành chính mới (34 Tỉnh/Thành phố & Phường/Xã theo mô hình 2 cấp của GHN áp dụng từ 01/07/2025, thay cho mô hình 63/64 tỉnh thành cũ). Bao gồm: Lấy danh sách Shop, Master Data Mới (34 Tỉnh/Thành & Phường/Xã theo ID), Dịch vụ khả dụng, Tính cước phí (Gói Chuẩn Type 2 & Hàng Nặng Type 5), Vòng đời đơn hàng GHN (is_new_to_address), và API Medusa Storefront Proxy (Redis Cache 24h).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -19,6 +19,11 @@
     {
       "key": "shopId",
       "value": "225452",
+      "type": "string"
+    },
+    {
+      "key": "provinceIdV3",
+      "value": "1000001",
       "type": "string"
     },
     {
@@ -76,10 +81,10 @@
       ]
     },
     {
-      "name": "02. Master Data (Địa giới hành chính)",
+      "name": "02. Master Data (Địa giới hành chính 2 cấp - Mới)",
       "item": [
         {
-          "name": "Lấy danh sách Tỉnh / Thành phố (Get Provinces)",
+          "name": "Lấy danh sách Tỉnh / Thành phố mới - 34 Tỉnh/Thành (Get Provinces - New)",
           "request": {
             "method": "GET",
             "header": [
@@ -90,74 +95,74 @@
               {
                 "key": "Token",
                 "value": "{{token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/master-data/province",
-              "host": ["{{baseUrl}}"],
-              "path": ["master-data", "province"]
-            },
-            "description": "Trả về danh sách 63 Tỉnh/Thành phố của Việt Nam cùng `ProvinceID`."
-          },
-          "response": []
-        },
-        {
-          "name": "Lấy danh sách Quận / Huyện (Get Districts)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
               },
               {
-                "key": "Token",
-                "value": "{{token}}"
+                "key": "ShopId",
+                "value": "{{shopId}}"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"province_id\": 202\n}"
-            },
             "url": {
-              "raw": "{{baseUrl}}/master-data/district",
+              "raw": "{{baseUrl}}/v3/master-data/province/all?offset=0&limit=200",
               "host": ["{{baseUrl}}"],
-              "path": ["master-data", "district"]
-            },
-            "description": "Lấy danh sách Quận/Huyện theo `province_id` (Ví dụ 202: TP. Hồ Chí Minh, 201: Hà Nội)."
-          },
-          "response": []
-        },
-        {
-          "name": "Lấy danh sách Phường / Xã (Get Wards)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Token",
-                "value": "{{token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"district_id\": 1442\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/master-data/ward?district_id=1442",
-              "host": ["{{baseUrl}}"],
-              "path": ["master-data", "ward"],
+              "path": ["v3", "master-data", "province", "all"],
               "query": [
                 {
-                  "key": "district_id",
-                  "value": "1442"
+                  "key": "offset",
+                  "value": "0",
+                  "description": "Vị trí bắt đầu khi phân trang. Mặc định: 0"
+                },
+                {
+                  "key": "limit",
+                  "value": "200",
+                  "description": "Số phần tử tối đa, không quá 200. Bỏ trống hoặc 0 để lấy tất cả (hiện có 34 tỉnh/thành nên một lần gọi là đủ)"
                 }
               ]
             },
-            "description": "Lấy danh sách Phường/Xã theo `district_id` (Ví dụ 1442: Quận 1)."
+            "description": "API lấy danh sách 34 Tỉnh/Thành phố mới nhất theo mô hình hành chính 2 cấp (mới sau 01/07/2025 theo GHN Developer Docs: https://developer.ghn.dev/vi/docs/master-data/get-province-new). `name` trả về được dùng trực tiếp cho `to_province_name` khi Tạo đơn với `is_new_to_address: true`. `_id` dùng truyền vào `province_id` khi gọi API Lấy Phường/Xã mới."
+          },
+          "response": []
+        },
+        {
+          "name": "Lấy danh sách Phường / Xã mới theo Tỉnh/Thành (Get Wards - New)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Token",
+                "value": "{{token}}"
+              },
+              {
+                "key": "ShopId",
+                "value": "{{shopId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v3/master-data/ward/all-by-province-id?province_id={{provinceIdV3}}&offset=0&limit=200",
+              "host": ["{{baseUrl}}"],
+              "path": ["v3", "master-data", "ward", "all-by-province-id"],
+              "query": [
+                {
+                  "key": "province_id",
+                  "value": "{{provinceIdV3}}",
+                  "description": "Mã tỉnh/thành hệ 2 cấp (_id từ API get-province-new, ví dụ 1000001: TP. Hồ Chí Minh, 1000000: Hà Nội, 1000003: Đà Nẵng...)"
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": "Vị trí bắt đầu khi phân trang. Mặc định: 0"
+                },
+                {
+                  "key": "limit",
+                  "value": "200",
+                  "description": "Số phần tử tối đa, không quá 200 (TP.HCM có 168 phường/xã nên limit 200 là đủ)"
+                }
+              ]
+            },
+            "description": "API lấy danh sách Phường/Xã trực thuộc thẳng Tỉnh/Thành phố theo mô hình hành chính 2 cấp (không còn cấp quận/huyện theo GHN Developer Docs: https://developer.ghn.dev/vi/docs/master-data/get-ward-new). `name` trả về được dùng trực tiếp cho `to_ward_name` khi Tạo đơn với `is_new_to_address: true`."
           },
           "response": []
         }
@@ -261,7 +266,7 @@
       "name": "04. Orders & Fulfillment (Tạo & Quản lý đơn)",
       "item": [
         {
-          "name": "Tạo đơn - Gói Chuẩn < 20kg (service_type_id = 2)",
+          "name": "Tạo đơn - Gói Chuẩn < 20kg (service_type_id = 2, Địa chỉ mới 34 Tỉnh)",
           "request": {
             "method": "POST",
             "header": [
@@ -280,19 +285,19 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"payment_type_id\": 1,\n  \"note\": \"Medusa Order Standard\",\n  \"required_note\": \"CHOXEMHANGKHONGTHU\",\n  \"from_name\": \"Medusa Store\",\n  \"from_phone\": \"0901234567\",\n  \"from_address\": \"123 Kho Hang\",\n  \"from_ward_name\": \"Phường Bến Nghé\",\n  \"from_district_name\": \"Quận 1\",\n  \"from_province_name\": \"Hồ Chí Minh\",\n  \"to_name\": \"Nguyen Linh\",\n  \"to_phone\": \"0901234567\",\n  \"to_address\": \"123 Nguyen Hue\",\n  \"to_ward_code\": \"20101\",\n  \"to_district_id\": 1442,\n  \"weight\": 500,\n  \"length\": 10,\n  \"width\": 10,\n  \"height\": 10,\n  \"service_type_id\": 2,\n  \"items\": [\n    {\n      \"name\": \"Vợt Yonex Nanoflare 800 (Light)\",\n      \"code\": \"YONEX-NF800\",\n      \"quantity\": 1,\n      \"price\": 4100000,\n      \"weight\": 500,\n      \"length\": 10,\n      \"width\": 10,\n      \"height\": 10\n    }\n  ]\n}"
+              "raw": "{\n  \"payment_type_id\": 1,\n  \"note\": \"Medusa Order Standard (Địa chỉ mới 34 Tỉnh thành)\",\n  \"required_note\": \"CHOXEMHANGKHONGTHU\",\n  \"from_name\": \"Medusa Store\",\n  \"from_phone\": \"0901234567\",\n  \"from_address\": \"123 Kho Hang\",\n  \"from_ward_name\": \"Phường Bến Nghé\",\n  \"from_district_name\": \"Quận 1\",\n  \"from_province_name\": \"Hồ Chí Minh\",\n  \"to_name\": \"Nguyen Linh\",\n  \"to_phone\": \"0901234567\",\n  \"to_address\": \"123 Đường 30/4\",\n  \"to_province_name\": \"Hồ Chí Minh\",\n  \"to_ward_name\": \"Phường Tam Thắng\",\n  \"is_new_to_address\": true,\n  \"weight\": 500,\n  \"length\": 10,\n  \"width\": 10,\n  \"height\": 10,\n  \"service_type_id\": 2,\n  \"items\": [\n    {\n      \"name\": \"Vợt Yonex Nanoflare 800 (Light)\",\n      \"code\": \"YONEX-NF800\",\n      \"quantity\": 1,\n      \"price\": 4100000,\n      \"weight\": 500,\n      \"length\": 10,\n      \"width\": 10,\n      \"height\": 10\n    }\n  ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/v2/shipping-order/create",
               "host": ["{{baseUrl}}"],
               "path": ["v2", "shipping-order", "create"]
             },
-            "description": "Tạo đơn hàng GHN với gói dịch vụ chuẩn service_type_id = 2."
+            "description": "Tạo đơn hàng GHN với gói dịch vụ chuẩn service_type_id = 2 theo định dạng địa chỉ 2 cấp mới (`is_new_to_address: true`, không cần `to_district_id` và `to_ward_code`)."
           },
           "response": []
         },
         {
-          "name": "Tạo đơn - Gói Hàng nặng >= 20kg (service_type_id = 5)",
+          "name": "Tạo đơn - Gói Hàng nặng >= 20kg (service_type_id = 5, Địa chỉ mới 34 Tỉnh)",
           "request": {
             "method": "POST",
             "header": [
@@ -311,14 +316,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"payment_type_id\": 1,\n  \"note\": \"Medusa Order Heavy Goods\",\n  \"required_note\": \"CHOXEMHANGKHONGTHU\",\n  \"from_name\": \"Medusa Store\",\n  \"from_phone\": \"0901234567\",\n  \"from_address\": \"123 Kho Hang\",\n  \"from_ward_name\": \"Phường Bến Nghé\",\n  \"from_district_name\": \"Quận 1\",\n  \"from_province_name\": \"Hồ Chí Minh\",\n  \"to_name\": \"Nguyen Linh\",\n  \"to_phone\": \"0901234567\",\n  \"to_address\": \"123 Nguyen Hue\",\n  \"to_ward_code\": \"20101\",\n  \"to_district_id\": 1442,\n  \"weight\": 22000,\n  \"length\": 10,\n  \"width\": 10,\n  \"height\": 10,\n  \"service_type_id\": 5,\n  \"items\": [\n    {\n      \"name\": \"Yonex Nanoflare 800 (22kg)\",\n      \"code\": \"YONEX-NF800-HEAVY\",\n      \"quantity\": 1,\n      \"price\": 4100000,\n      \"weight\": 22000,\n      \"length\": 10,\n      \"width\": 10,\n      \"height\": 10\n    }\n  ]\n}"
+              "raw": "{\n  \"payment_type_id\": 1,\n  \"note\": \"Medusa Order Heavy Goods (Địa chỉ mới 34 Tỉnh thành)\",\n  \"required_note\": \"CHOXEMHANGKHONGTHU\",\n  \"from_name\": \"Medusa Store\",\n  \"from_phone\": \"0901234567\",\n  \"from_address\": \"123 Kho Hang\",\n  \"from_ward_name\": \"Phường Bến Nghé\",\n  \"from_district_name\": \"Quận 1\",\n  \"from_province_name\": \"Hồ Chí Minh\",\n  \"to_name\": \"Nguyen Linh\",\n  \"to_phone\": \"0901234567\",\n  \"to_address\": \"123 Đường 30/4\",\n  \"to_province_name\": \"Hồ Chí Minh\",\n  \"to_ward_name\": \"Phường Tam Thắng\",\n  \"is_new_to_address\": true,\n  \"weight\": 22000,\n  \"length\": 10,\n  \"width\": 10,\n  \"height\": 10,\n  \"service_type_id\": 5,\n  \"items\": [\n    {\n      \"name\": \"Yonex Nanoflare 800 (22kg)\",\n      \"code\": \"YONEX-NF800-HEAVY\",\n      \"quantity\": 1,\n      \"price\": 4100000,\n      \"weight\": 22000,\n      \"length\": 10,\n      \"width\": 10,\n      \"height\": 10\n    }\n  ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/v2/shipping-order/create",
               "host": ["{{baseUrl}}"],
               "path": ["v2", "shipping-order", "create"]
             },
-            "description": "Tạo đơn hàng GHN với gói dịch vụ hàng nặng service_type_id = 5."
+            "description": "Tạo đơn hàng GHN với gói dịch vụ hàng nặng service_type_id = 5 theo định dạng địa chỉ 2 cấp mới (`is_new_to_address: true`)."
           },
           "response": []
         },
@@ -410,8 +415,80 @@
       ]
     },
     {
-      "name": "05. Medusa Store API (Shipping Option Calculation)",
+      "name": "05. Medusa Store API (Shipping & Address)",
       "item": [
+        {
+          "name": "Medusa Store - Lấy danh sách 34 Tỉnh/Thành (Cache Redis 24h)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{publishableApiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{medusaUrl}}/store/ghn/provinces",
+              "host": ["{{medusaUrl}}"],
+              "path": ["store", "ghn", "provinces"]
+            },
+            "description": "Endpoint proxy của Medusa Backend, gọi GHN v3 API `/v3/master-data/province/all` và lưu cache Redis với TTL 24 giờ. Phục vụ Storefront hiển thị danh mục 34 tỉnh/thành."
+          },
+          "response": []
+        },
+        {
+          "name": "Medusa Store - Lấy danh sách Phường/Xã theo Tỉnh (Cache Redis 24h)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{publishableApiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{medusaUrl}}/store/ghn/wards?province_id={{provinceIdV3}}",
+              "host": ["{{medusaUrl}}"],
+              "path": ["store", "ghn", "wards"],
+              "query": [
+                {
+                  "key": "province_id",
+                  "value": "{{provinceIdV3}}",
+                  "description": "ID Tỉnh/Thành phố (ví dụ 1000001: TP. Hồ Chí Minh)"
+                }
+              ]
+            },
+            "description": "Endpoint proxy của Medusa Backend, gọi GHN v3 API `/v3/master-data/ward/all-by-province-id` và lưu cache Redis với TTL 24 giờ. Phục vụ Storefront hiển thị danh mục phường/xã theo tỉnh."
+          },
+          "response": []
+        },
+        {
+          "name": "Medusa Store - Cập nhật địa chỉ nhận hàng 34 Tỉnh/Thành vào Cart",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{publishableApiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shipping_address\": {\n    \"first_name\": \"Nguyen\",\n    \"last_name\": \"Linh\",\n    \"address_1\": \"123 Đường 30/4\",\n    \"city\": \"Hồ Chí Minh\",\n    \"province\": \"Hồ Chí Minh\",\n    \"country_code\": \"vn\",\n    \"postal_code\": \"700000\",\n    \"phone\": \"0901234567\",\n    \"metadata\": {\n      \"ghn_province_id\": 1000001,\n      \"ghn_province_name\": \"Hồ Chí Minh\",\n      \"ghn_ward_id\": 1003645,\n      \"ghn_ward_name\": \"Phường Tam Thắng\"\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{medusaUrl}}/store/carts/{{cartId}}",
+              "host": ["{{medusaUrl}}"],
+              "path": ["store", "carts", "{{cartId}}"]
+            },
+            "description": "Lưu địa chỉ nhận hàng Việt Nam kèm metadata chuẩn GHN v3 (`ghn_province_id`, `ghn_province_name`, `ghn_ward_id`, `ghn_ward_name`) vào cart để GHN Provider tính cước thời gian thực."
+          },
+          "response": []
+        },
         {
           "name": "Medusa Store - Tính cước Shipping Option cho Cart",
           "request": {

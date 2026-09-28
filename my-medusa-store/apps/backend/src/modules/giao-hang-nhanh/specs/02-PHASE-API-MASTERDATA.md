@@ -14,47 +14,53 @@ GHN API tính phí (`/v2/shipping-order/fee`) **bắt buộc** `to_district_id` 
 
 ---
 
-## 2. API Endpoints Cần Tạo
+## 2. API Endpoints (Mô hình 2 cấp mới — 34 Tỉnh/Thành)
+
+> **Cập nhật:** GHN đã chuyển đổi sang mô hình hành chính 2 cấp (Tỉnh/Thành → Phường/Xã, bỏ cấp Quận/Huyện) theo tài liệu chính thức:
+> - Tỉnh/Thành mới: https://developer.ghn.dev/vi/docs/master-data/get-province-new
+> - Phường/Xã mới: https://developer.ghn.dev/vi/docs/master-data/get-ward-new
 
 ### 2.1 `GET /store/ghn/provinces`
 ```
-Mô tả: Lấy danh sách tất cả Tỉnh/Thành phố
-Proxy:  GHN GET /master-data/province
+Mô tả: Lấy danh sách 34 Tỉnh/Thành phố mới nhất
+Proxy:  GHN GET /v3/master-data/province/all
 
 Response:
 {
-  "provinces": [
-    { "ProvinceID": 202, "ProvinceName": "Hồ Chí Minh", "Code": "SG" },
-    { "ProvinceID": 201, "ProvinceName": "Hà Nội", "Code": "HN" },
+  "code": 200,
+  "message": "Success",
+  "data": [
+    {
+      "_id": 1000001,
+      "name": "Hồ Chí Minh",
+      "extension_names": ["hồ chí minh", "tp.hồ chí minh", "hcm", "ho chi minh"],
+      "type": "province",
+      "parent_id": 1,
+      "status": 1
+    },
     ...
   ]
 }
 ```
 
-### 2.2 `GET /store/ghn/districts?province_id=202`
+### 2.2 `GET /store/ghn/wards?province_id=1000001`
 ```
-Mô tả: Lấy danh sách Quận/Huyện theo Tỉnh
-Proxy:  GHN POST /master-data/district { province_id: 202 }
+Mô tả: Lấy danh sách Phường/Xã trực thuộc Tỉnh/Thành (không qua Quận/Huyện)
+Proxy:  GHN GET /v3/master-data/ward/all-by-province-id?province_id=1000001
 
 Response:
 {
-  "districts": [
-    { "DistrictID": 2009, "DistrictName": "Quận 1", "ProvinceID": 202 },
-    { "DistrictID": 2010, "DistrictName": "Quận 7", "ProvinceID": 202 },
-    ...
-  ]
-}
-```
-
-### 2.3 `GET /store/ghn/wards?district_id=2009`
-```
-Mô tả: Lấy danh sách Phường/Xã theo Quận/Huyện
-Proxy:  GHN POST /master-data/ward { district_id: 2009 }
-
-Response:
-{
-  "wards": [
-    { "WardCode": "20308", "WardName": "Phường Bến Nghé", "DistrictID": 2009 },
+  "code": 200,
+  "message": "Success",
+  "data": [
+    {
+      "_id": 1003646,
+      "name": "Phường Vũng Tàu",
+      "extension_names": ["phường vũng tàu", "p.vũng tàu", "vung tau"],
+      "type": "ward",
+      "parent_id": 1000001,
+      "status": 1
+    },
     ...
   ]
 }
