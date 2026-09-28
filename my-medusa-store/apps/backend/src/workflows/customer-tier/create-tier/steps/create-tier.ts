@@ -25,7 +25,7 @@ export const createTierStep = createStep(
             return;
         }
 
-        const tierModuleService = container.resolve(TIER_MODULE);
+        const tierModuleService = container.resolve(TIER_MODULE) as TierModuleService;
         await tierModuleService.deleteTiers(tier.id);
     },
 );

@@ -7,6 +7,7 @@ import {
 import { updateCartPromotionsWorkflow, useQueryGraphStep } from "@medusajs/medusa/core-flows";
 import { FIRST_PURCHASE_PROMOTION_CODE } from "@/src/constant";
 import { PromotionActions } from "@medusajs/framework/utils";
+import { isEligibleForFirstPurchasePromotion } from "../eligibility";
 
 const APPLY_FIRST_PURCHASE_PROMO_WORKFLOW_ID = "apply-first-purchase-promo";
 
@@ -40,14 +41,12 @@ export const applyFirstPurchasePromoWorkflow = createWorkflow(
                 promotions,
             },
             (data) => {
-                return (
-                    data.promotions.length > 0 &&
-                    data.promotions[0].status === "active" &&
-                    !data.carts[0].promotions?.some(
+                return isEligibleForFirstPurchasePromotion(
+                    data.carts[0].customer,
+                    data.promotions[0],
+                    data.carts[0].promotions?.some(
                         (promo) => promo?.id === data.promotions[0].id,
-                    ) &&
-                    data.carts[0].customer?.has_account === true &&
-                    (data.carts[0].customer.orders?.length ?? 0) === 0
+                    ) ?? false,
                 );
             },
         ).then(() => {

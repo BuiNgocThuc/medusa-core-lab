@@ -12,8 +12,8 @@ import { processOrderLoyaltyStep } from "./steps";
 
 type WorkflowInput = { order_id: string };
 
-export const handleOrderPointsWorkflow = createWorkflow(
-    "handle-order-points",
+export const handleOrderRedemptionWorkflow = createWorkflow(
+    "handle-order-redemption",
     ({ order_id }: WorkflowInput) => {
         const { data: orders } = useQueryGraphStep({
             entity: "order",
