@@ -32,13 +32,13 @@ export default async function initial_data_seed({ container }: { container: Medu
     const logger = container.resolve(ContainerRegistrationKeys.LOGGER);
     const salesChannelModule = container.resolve(Modules.SALES_CHANNEL);
 
-    const already = await salesChannelModule.listSalesChannels({
-        name: "Default Sales Channel",
-    });
-    if (already.length) {
-        logger.warn("[seed] Default Sales Channel already exists — DB looks seeded. Skipping.");
-        return;
-    }
+    // const already = await salesChannelModule.listSalesChannels({
+    //     name: "Default Sales Channel",
+    // });
+    // if (already.length) {
+    //     logger.warn("[seed] Default Sales Channel already exists — DB looks seeded. Skipping.");
+    //     return;
+    // }
 
     logger.info("[seed] store + sales channel + region...");
     const { defaultSalesChannel, region } = await seedStoreAndRegion(container);
