@@ -7,3 +7,4 @@ export default ModuleProvider(Modules.FULFILLMENT, {
 
 export { GiaoHangNhanhProviderService }
 export * from "./types"
+export * from "./address-mapper"

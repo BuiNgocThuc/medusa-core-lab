@@ -383,6 +383,13 @@ export async function setAddresses(currentState: unknown, formData: FormData) {
             'shipping_address.metadata.ghn_ward_name'
         )
 
+        const ghnDistrictId = formData.get(
+            'shipping_address.metadata.ghn_district_id'
+        )
+        const ghnWardCode = formData.get(
+            'shipping_address.metadata.ghn_ward_code'
+        )
+
         const addressMetadata: Record<string, any> = {}
         if (ghnProvinceId)
             addressMetadata.ghn_province_id = Number(ghnProvinceId)
@@ -390,6 +397,8 @@ export async function setAddresses(currentState: unknown, formData: FormData) {
             addressMetadata.ghn_province_name = String(ghnProvinceName)
         if (ghnWardId) addressMetadata.ghn_ward_id = Number(ghnWardId)
         if (ghnWardName) addressMetadata.ghn_ward_name = String(ghnWardName)
+        if (ghnDistrictId) addressMetadata.ghn_district_id = Number(ghnDistrictId)
+        if (ghnWardCode) addressMetadata.ghn_ward_code = String(ghnWardCode)
 
         if (Object.keys(addressMetadata).length > 0) {
             data.shipping_address.metadata = addressMetadata

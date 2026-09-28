@@ -20,6 +20,7 @@ import type {
 } from "@medusajs/framework/types"
 
 import { GhnClient } from "./client"
+import { resolveLegacyAddress } from "./address-mapper"
 import type {
   GhnAvailableService,
   GhnCreateOrderRequest,
@@ -270,15 +271,32 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
         (context as any)?.metadata ||
         {}
       ) as Record<string, any>
-      const toDistrictId = Number(metadata?.ghn_district_id || metadata?.district_id)
-      const toWardCode = metadata?.ghn_ward_code || metadata?.ward_code
+
+      // Ánh xạ địa chỉ người nhận (hỗ trợ cả mô hình 2 cấp GHN v3 và 3 cấp truyền thống)
+      const mappedAddress = resolveLegacyAddress({
+        provinceId: metadata?.ghn_province_id,
+        provinceName: metadata?.ghn_province_name || shippingAddress?.province,
+        province: shippingAddress?.province,
+        districtId: metadata?.ghn_district_id || metadata?.district_id,
+        districtName: metadata?.ghn_district_name,
+        wardId: metadata?.ghn_ward_id,
+        wardName: metadata?.ghn_ward_name || shippingAddress?.city,
+        wardCode: metadata?.ghn_ward_code || metadata?.ward_code,
+        city: shippingAddress?.city,
+        address1: shippingAddress?.address_1,
+      })
+
+      const toDistrictId = Number(mappedAddress?.districtId || metadata?.ghn_district_id || metadata?.district_id)
+      const toWardCode = mappedAddress?.wardCode || metadata?.ghn_ward_code || metadata?.ward_code
       const toProvinceName =
         shippingAddress?.province ||
         metadata?.ghn_province_name ||
+        mappedAddress?.provinceName ||
         metadata?.province_name ||
         shippingAddress?.city
       const toWardName =
         metadata?.ghn_ward_name ||
+        mappedAddress?.wardName ||
         metadata?.ward_name ||
         shippingAddress?.city
 
@@ -510,15 +528,30 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       {}
     ) as Record<string, any>
 
-    const toDistrictId = Number(metadata?.ghn_district_id || metadata?.district_id)
-    const toWardCode = String(metadata?.ghn_ward_code || metadata?.ward_code || "")
+    const mappedOrderAddress = resolveLegacyAddress({
+      provinceId: metadata?.ghn_province_id,
+      provinceName: metadata?.ghn_province_name || shippingAddress?.province,
+      province: shippingAddress?.province,
+      districtId: metadata?.ghn_district_id || metadata?.district_id,
+      districtName: metadata?.ghn_district_name,
+      wardId: metadata?.ghn_ward_id,
+      wardName: metadata?.ghn_ward_name || shippingAddress?.city,
+      wardCode: metadata?.ghn_ward_code || metadata?.ward_code,
+      city: shippingAddress?.city,
+      address1: shippingAddress?.address_1,
+    })
+
+    const toDistrictId = Number(mappedOrderAddress?.districtId || metadata?.ghn_district_id || metadata?.district_id)
+    const toWardCode = String(mappedOrderAddress?.wardCode || metadata?.ghn_ward_code || metadata?.ward_code || "")
     const toProvinceName =
       shippingAddress?.province ||
       metadata?.ghn_province_name ||
+      mappedOrderAddress?.provinceName ||
       metadata?.province_name ||
       shippingAddress?.city
     const toWardName =
       metadata?.ghn_ward_name ||
+      mappedOrderAddress?.wardName ||
       shippingAddress?.city ||
       metadata?.ward_name ||
       shippingAddress?.address_2 ||
