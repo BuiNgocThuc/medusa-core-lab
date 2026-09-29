@@ -225,6 +225,7 @@ module.exports = defineConfig({
                                 "https://dev-online-gateway.ghn.vn/shiip/public-api",
                             mockEnabled:
                                 process.env.GHN_MOCK_ENABLED !== "false",
+                            useNewAddressFormat: true,
                             requiredNote: "CHOXEMHANGKHONGTHU",
                             paymentTypeId: 1,
                             defaultWeight: 500,

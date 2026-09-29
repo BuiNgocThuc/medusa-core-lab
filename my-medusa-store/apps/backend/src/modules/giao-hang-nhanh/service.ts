@@ -541,7 +541,31 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       address1: shippingAddress?.address_1,
     })
 
+    // Khách hàng có chủ động nhập hoặc chọn Quận/Huyện từ trước hay không?
+    const hasExplicitDistrict = Boolean(
+      metadata?.ghn_district_id ||
+      metadata?.district_id ||
+      metadata?.ghn_district_name ||
+      metadata?.district_name
+    )
+
+    // Xác định định dạng địa chỉ người nhận:
+    // - true (mô hình 2 cấp GHN v3):
+    //    1. Bật cấu hình useNewAddressFormat: true trong plugin options
+    //    2. HOẶC metadata.is_new_to_address === true
+    //    3. HOẶC khách chọn từ danh sách 34 tỉnh v3 (ghn_province_id)
+    //    4. HOẶC khách không có thông tin quận/huyện cụ thể từ form (hasExplicitDistrict = false)
+    // - false (mô hình 3 cấp cũ): Khách có nhập rõ Quận/Huyện và không kích hoạt mô hình mới
+    const useNewAddress = Boolean(
+      this.options_.useNewAddressFormat ||
+      metadata?.is_new_to_address === true ||
+      metadata?.ghn_province_id ||
+      !hasExplicitDistrict
+    )
+
+    // Khi dùng địa chỉ mới 2 cấp (v3), ưu tiên tên tỉnh theo chuẩn 34 tỉnh mới (v3_name)
     const toProvinceName = String(
+      (useNewAddress ? (metadata?.ghn_province_name || mappedOrderAddress?.v3ProvinceName) : null) ||
       metadata?.ghn_province_name ||
       shippingAddress?.province ||
       mappedOrderAddress?.provinceName ||
@@ -552,27 +576,19 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
 
     const toDistrictName = String(
       metadata?.ghn_district_name ||
-      mappedOrderAddress?.districtName ||
       metadata?.district_name ||
+      (useNewAddress ? "" : mappedOrderAddress?.districtName) ||
       ""
     ).trim()
 
     const toWardName = String(
       metadata?.ghn_ward_name ||
+      shippingAddress?.city || // Trong Storefront mô hình 2 cấp, city chứa Tên Phường/Xã
       mappedOrderAddress?.wardName ||
       metadata?.ward_name ||
       shippingAddress?.address_2 ||
       ""
     ).trim()
-
-    // Xác định định dạng địa chỉ người nhận:
-    // - false (mặc định): Hệ cũ 3 cấp (phường/xã + quận/huyện + tỉnh) -> to_district_name là bắt buộc
-    // - true: Hệ mới 2 cấp (phường/xã + tỉnh) sau 01/07/2025 -> để trống to_district_name
-    const useNewAddress = Boolean(
-      this.options_.useNewAddressFormat ||
-      metadata?.is_new_to_address === true ||
-      (!toDistrictName && toProvinceName && toWardName)
-    )
 
     if (!toProvinceName) {
       throw new MedusaError(

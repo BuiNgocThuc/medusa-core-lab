@@ -46,6 +46,8 @@ export interface LegacyAddressResult {
   wardCode: string
   wardName: string
   matchedBy: "exact_district" | "district_in_ward" | "province_default" | "direct_input"
+  v3ProvinceId?: number
+  v3ProvinceName?: string
 }
 
 export interface NewAddressResult {
@@ -6745,6 +6747,8 @@ export function resolveLegacyAddress(input: AddressResolutionInput): LegacyAddre
       wardCode: String(input.wardCode || prov?.default_ward_code || "20101"),
       wardName: input.wardName || prov?.default_ward_name || "",
       matchedBy: "direct_input",
+      v3ProvinceId: prov?.v3_id,
+      v3ProvinceName: prov?.v3_name,
     }
   }
 
@@ -6824,6 +6828,8 @@ export function resolveLegacyAddress(input: AddressResolutionInput): LegacyAddre
       wardCode: String(input.wardCode || matchedProvince.default_ward_code),
       wardName: input.wardName || matchedProvince.default_ward_name,
       matchedBy: "district_in_ward",
+      v3ProvinceId: matchedProvince.v3_id,
+      v3ProvinceName: matchedProvince.v3_name,
     }
   }
 
@@ -6836,6 +6842,8 @@ export function resolveLegacyAddress(input: AddressResolutionInput): LegacyAddre
     wardCode: matchedProvince.default_ward_code,
     wardName: matchedProvince.default_ward_name,
     matchedBy: "province_default",
+    v3ProvinceId: matchedProvince.v3_id,
+    v3ProvinceName: matchedProvince.v3_name,
   }
 }
 

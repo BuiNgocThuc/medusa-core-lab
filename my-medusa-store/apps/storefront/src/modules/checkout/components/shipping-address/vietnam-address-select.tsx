@@ -220,6 +220,11 @@ export default function VietnamAddressSelect({
                 name="shipping_address.metadata.ghn_ward_name"
                 value={selectedWard?.name || ''}
             />
+            <input
+                type="hidden"
+                name="shipping_address.metadata.is_new_to_address"
+                value="true"
+            />
 
             {/* Ô 1: Chọn Tỉnh / Thành phố (34 Tỉnh/Thành GHN v3) */}
             <div className="relative flex flex-col" ref={provinceDropdownRef}>
