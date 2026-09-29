@@ -765,11 +765,18 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
     )
     const orderValue = Math.max(0, orderTotal)
 
-    const clientOrderCode = (
-      (order as any)?.display_id
-        ? `ORD-${(order as any)?.display_id}`
-        : (order as any)?.id || ""
-    ).slice(0, 50)
+    const orderRef = (order as any)?.display_id
+      ? `ORD-${(order as any)?.display_id}`
+      : (order as any)?.id || "FUL"
+
+    // Gắn suffix định danh fulfillment (8 ký tự cuối) để vừa chống tạo trùng (idempotent)
+    // khi retry cùng 1 fulfillment, vừa hỗ trợ giao hàng nhiều đợt (partial fulfillments)
+    // không bị GHN nhận nhầm thành đơn cũ. Tối đa 50 ký tự theo quy định GHN.
+    const fulfillmentSuffix = fulfillment?.id
+      ? `-${fulfillment.id.replace(/^ful_/, "").slice(-8)}`
+      : ""
+
+    const clientOrderCode = `${orderRef}${fulfillmentSuffix}`.slice(0, 50)
 
     const contentDescription = (
       `Đơn hàng #${(order as any)?.display_id || (order as any)?.id || ""}`
@@ -876,6 +883,7 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       data: {
         ...(data as object || {}),
         ghn_order_code: orderCode,
+        client_order_code: clientOrderCode,
         ghn_total_fee: ghnOrder.total_fee,
         ghn_sort_code: ghnOrder.sort_code,
         ghn_expected_delivery_time: ghnOrder.expected_delivery_time,
