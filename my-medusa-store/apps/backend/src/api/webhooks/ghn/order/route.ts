@@ -5,6 +5,7 @@
  */
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
+import { markOrderFulfillmentAsDeliveredWorkflow } from "@medusajs/medusa/core-flows"
 
 export interface GhnOrderWebhookPayload {
   ShopID: number
@@ -34,21 +35,11 @@ export interface GhnOrderWebhookPayload {
   PodURL?: string
 }
 
-/**
- * Danh sách trạng thái kết thúc (Terminal States) chuẩn xác theo Master-data GHN:
- * (Tham chiếu chính thức: https://developer.ghn.dev - mục "Mã trạng thái đơn hàng", cột "Trạng thái cuối" = ✓)
- * Khi vận đơn đạt một trong các trạng thái này, quy trình vận chuyển coi như đã hoàn tất vĩnh viễn,
- * không một sự kiện nào đến muộn (out-of-order) được phép ghi đè lùi lại trạng thái chính.
- */
-const GHN_TERMINAL_STATUSES = new Set([
-  "delivered",  // Giao hàng thành công (Trạng thái cuối ✓)
-  "returned",   // Đã hoàn trả hàng về cho người gửi thành công (Trạng thái cuối ✓)
-  "cancel",     // Đơn hàng đã bị hủy (Trạng thái cuối ✓)
-  "exception",  // Hàng sự cố — cần xử lý thủ công (Trạng thái cuối ✓)
-  "lost",       // Hàng bị thất lạc — đóng vận đơn chờ bồi thường (Trạng thái cuối ✓)
-  "damage",     // Hàng bị hư hỏng — đóng vận đơn chờ bồi thường (Trạng thái cuối ✓)
-  "scrap",      // Hàng đã bị tiêu hủy (Trạng thái cuối ✓)
-])
+import {
+  GhnOrderStatus,
+  GHN_TERMINAL_STATUSES,
+  resolveFulfillmentLifecycle,
+} from "../../../../modules/giao-hang-nhanh/types"
 
 export async function POST(req: MedusaRequest, res: MedusaResponse) {
   const logger = req.scope.resolve(ContainerRegistrationKeys.LOGGER)
@@ -97,6 +88,9 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
   logger.info(
     `[GHN Webhook] OrderCode: ${OrderCode} | ClientOrderCode: ${ClientOrderCode || "N/A"} | Type: ${Type} (${Description}) | Status: ${Status}`
   )
+
+  // Phân tích trạng thái sự kiện qua Lifecycle Resolver chuẩn hóa
+  const lifecycle = resolveFulfillmentLifecycle(Status, payload?.Time)
 
   try {
     const fulfillmentModule = req.scope.resolve(Modules.FULFILLMENT)
@@ -195,13 +189,26 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         ].slice(-20), // Giữ tối đa 20 log gần nhất
       }
 
-      await fulfillmentModule.updateFulfillment(matchedFulfillment.id, {
+      const fulfillmentUpdates: Record<string, any> = {
         data: updatedData,
-        // Nếu GHN báo đã giao hàng (delivered) hợp lệ và chưa có shipped_at thì ghi nhận
-        ...(Status === "delivered" && shouldUpdateMainStatus && !matchedFulfillment.shipped_at
-          ? { shipped_at: new Date(payload.Time || Date.now()) }
-          : {}),
-      })
+      }
+
+      // 1. Cập nhật shipped_at nếu kiện hàng đã rời kho và chưa có shipped_at
+      if (lifecycle.isShipped && !matchedFulfillment.shipped_at) {
+        fulfillmentUpdates.shipped_at = lifecycle.eventTime
+      }
+
+      // 2. Cập nhật delivered_at nếu giao hàng thành công và chưa có delivered_at
+      if (lifecycle.isDelivered && shouldUpdateMainStatus && !matchedFulfillment.delivered_at) {
+        fulfillmentUpdates.delivered_at = lifecycle.eventTime
+      }
+
+      // 3. Cập nhật canceled_at nếu đơn bị hủy
+      if (lifecycle.isCanceled && shouldUpdateMainStatus && !matchedFulfillment.canceled_at) {
+        fulfillmentUpdates.canceled_at = lifecycle.eventTime
+      }
+
+      await fulfillmentModule.updateFulfillment(matchedFulfillment.id, fulfillmentUpdates)
 
       logger.info(
         `[GHN Webhook] Successfully updated fulfillment ${matchedFulfillment.id} (main status: "${updatedData.ghn_status}")`
@@ -234,6 +241,22 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       }
 
       if (targetOrderId && shouldUpdateMainStatus) {
+        // Kích hoạt workflow giao hàng thành công của Medusa nếu sự kiện là delivered
+        if (lifecycle.isDelivered && matchedFulfillment?.id) {
+          try {
+            await markOrderFulfillmentAsDeliveredWorkflow(req.scope).run({
+              input: {
+                orderId: targetOrderId,
+                fulfillmentId: matchedFulfillment.id,
+              },
+            })
+          } catch (wfErr: any) {
+            logger.warn(
+              `[GHN Webhook] Notice: markOrderFulfillmentAsDeliveredWorkflow (${wfErr?.message})`
+            )
+          }
+        }
+
         const order = await orderModule.retrieveOrder(targetOrderId)
         const currentMeta = (order.metadata as Record<string, any>) || {}
         await orderModule.updateOrders(targetOrderId, {

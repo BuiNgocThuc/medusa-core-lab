@@ -634,3 +634,109 @@ export interface GhnWardV3 {
   parent_id: number
   status: number
 }
+
+/**
+ * Danh sách toàn bộ mã trạng thái đơn hàng chuẩn của GHN
+ * Tham chiếu chính thức: https://developer.ghn.dev - mục "Mã trạng thái đơn hàng"
+ */
+export enum GhnOrderStatus {
+  READY_TO_PICK = "ready_to_pick",
+  PICKING = "picking",
+  PICKED = "picked",
+  STORING = "storing",
+  TRANSPORTING = "transporting",
+  SORTING = "sorting",
+  DELIVERING = "delivering",
+  MONEY_COLLECT_DELIVERING = "money_collect_delivering",
+  DELIVERED = "delivered",
+  DELIVERY_FAIL = "delivery_fail",
+  WAITING_TO_RETURN = "waiting_to_return",
+  RETURN = "return",
+  RETURN_TRANSPORTING = "return_transporting",
+  RETURN_SORTING = "return_sorting",
+  RETURNING = "returning",
+  RETURN_FAIL = "return_fail",
+  RETURNED = "returned",
+  CANCEL = "cancel",
+  EXCEPTION = "exception",
+  DAMAGE = "damage",
+  LOST = "lost",
+  SCRAP = "scrap",
+}
+
+/**
+ * Trạng thái kết thúc (Terminal States) theo chuẩn GHN:
+ * Khi đơn đạt các trạng thái này, quy trình vận chuyển đã kết thúc vĩnh viễn,
+ * sự kiện đến sau không được ghi đè lùi lại trạng thái chính.
+ */
+export const GHN_TERMINAL_STATUSES = new Set<string>([
+  GhnOrderStatus.DELIVERED,
+  GhnOrderStatus.RETURNED,
+  GhnOrderStatus.CANCEL,
+  GhnOrderStatus.EXCEPTION,
+  GhnOrderStatus.LOST,
+  GhnOrderStatus.DAMAGE,
+  GhnOrderStatus.SCRAP,
+])
+
+/**
+ * Trạng thái biểu thị kiện hàng đã xuất kho hoặc đang trên đường vận chuyển
+ */
+export const GHN_IN_TRANSIT_STATUSES = new Set<string>([
+  GhnOrderStatus.PICKING,
+  GhnOrderStatus.PICKED,
+  GhnOrderStatus.STORING,
+  GhnOrderStatus.TRANSPORTING,
+  GhnOrderStatus.SORTING,
+  GhnOrderStatus.DELIVERING,
+  GhnOrderStatus.MONEY_COLLECT_DELIVERING,
+  GhnOrderStatus.DELIVERY_FAIL,
+  GhnOrderStatus.WAITING_TO_RETURN,
+  GhnOrderStatus.RETURN,
+  GhnOrderStatus.RETURN_TRANSPORTING,
+  GhnOrderStatus.RETURN_SORTING,
+  GhnOrderStatus.RETURNING,
+  GhnOrderStatus.RETURN_FAIL,
+])
+
+export interface FulfillmentLifecycleResult {
+  normalizedStatus: string
+  isShipped: boolean
+  isDelivered: boolean
+  isCanceled: boolean
+  isTerminal: boolean
+  eventTime: Date
+}
+
+/**
+ * Phân tích và chuẩn hóa vòng đời đơn hàng GHN sang Medusa Fulfillment lifecycle
+ */
+export function resolveFulfillmentLifecycle(
+  status?: string,
+  eventTimeInput?: string | Date
+): FulfillmentLifecycleResult {
+  const normalizedStatus = String(status || "").trim().toLowerCase()
+  const isDelivered = normalizedStatus === GhnOrderStatus.DELIVERED
+  const isShipped = isDelivered || GHN_IN_TRANSIT_STATUSES.has(normalizedStatus)
+  const isCanceled = normalizedStatus === GhnOrderStatus.CANCEL
+  const isTerminal = GHN_TERMINAL_STATUSES.has(normalizedStatus)
+
+  let eventTime: Date
+  if (eventTimeInput instanceof Date && !isNaN(eventTimeInput.getTime())) {
+    eventTime = eventTimeInput
+  } else if (eventTimeInput) {
+    const parsed = new Date(eventTimeInput)
+    eventTime = isNaN(parsed.getTime()) ? new Date() : parsed
+  } else {
+    eventTime = new Date()
+  }
+
+  return {
+    normalizedStatus,
+    isShipped,
+    isDelivered,
+    isCanceled,
+    isTerminal,
+    eventTime,
+  }
+}
