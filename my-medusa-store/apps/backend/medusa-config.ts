@@ -36,6 +36,19 @@ module.exports = defineConfig({
 
     admin: {
         disable: process.env.MEDUSA_ADMIN_DISABLED === "true",
+        backendUrl: process.env.MEDUSA_BACKEND_URL,
+        storefrontUrl: process.env.MEDUSA_STOREFRONT_URL,
+        vite: () => ({
+            server: {
+                allowedHosts: [
+                    "api.hailinh.id.vn",
+                    "ui.hailinh.id.vn",
+                    ".hailinh.id.vn",
+                    "localhost",
+                    "127.0.0.1",
+                ],
+            },
+        }),
     },
 
     modules: [
