@@ -3,6 +3,7 @@
  */
 import {
   AbstractFulfillmentProviderService,
+  createPgConnection,
   MedusaError,
   Modules,
 } from "@medusajs/framework/utils"
@@ -44,6 +45,100 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
   protected readonly options_: GhnModuleOptions
   protected readonly client_: GhnClient
   protected readonly cache_: ICachingModuleService
+  protected stockLocationCache_: Map<string, any> = new Map()
+  protected pgConnection_: any = null
+
+  protected getPgConnection() {
+    if (!this.pgConnection_) {
+      this.pgConnection_ = createPgConnection({
+        clientUrl:
+          process.env.DATABASE_URL ||
+          "postgres://admin:123456@localhost:5434/medusa_core_lab_db",
+      })
+    }
+    return this.pgConnection_
+  }
+
+  /**
+   * Truy vấn thông tin chi tiết của Stock Location (Kho gửi hàng) từ DB
+   * Hỗ trợ đa kho: Tự động lấy kho theo locationId hoặc kho mặc định
+   */
+  async resolveStockLocation(locationId?: string): Promise<{
+    id: string
+    name: string
+    company?: string
+    address_1?: string
+    city?: string
+    province?: string
+    phone?: string
+    districtId: number
+    wardCode: string
+    wardName: string
+    districtName: string
+    provinceName: string
+    isNewAddress: boolean
+  } | null> {
+    const cacheKey = locationId || "default_stock_location"
+    if (this.stockLocationCache_.has(cacheKey)) {
+      return this.stockLocationCache_.get(cacheKey)
+    }
+
+    try {
+      const knex = this.getPgConnection()
+      let query = knex("stock_location as sl")
+        .leftJoin("stock_location_address as sla", "sl.address_id", "sla.id")
+        .select(
+          "sl.id",
+          "sl.name",
+          "sl.metadata as sl_metadata",
+          "sla.address_1",
+          "sla.address_2",
+          "sla.city",
+          "sla.province",
+          "sla.phone",
+          "sla.metadata as sla_metadata"
+        )
+
+      if (locationId) {
+        query = query.where("sl.id", locationId)
+      }
+
+      const rows = await query.limit(1)
+      if (!rows || rows.length === 0) {
+        return null
+      }
+
+      const row = rows[0]
+      const meta = (row.sla_metadata || row.sl_metadata || {}) as Record<string, any>
+      const ghn = (meta.ghn || {}) as Record<string, any>
+
+      const result = {
+        id: row.id,
+        name: row.name,
+        company: meta.company,
+        address_1: row.address_1,
+        city: row.city,
+        province: row.province,
+        phone: row.phone || "0901234567",
+        districtId: Number(ghn.district_id || meta.district_id || meta.ghn_district_id || 1460),
+        wardCode: String(ghn.ward_code || meta.ward_code || meta.ghn_ward_code || "22114"),
+        wardName: String(ghn.ward_name || meta.ward_name || "Xã Củ Chi"),
+        districtName: String(ghn.district_name || meta.district_name || "Huyện Củ Chi"),
+        provinceName: String(ghn.province_name || meta.province_name || row.province || "Hồ Chí Minh"),
+        isNewAddress: Boolean(ghn.is_new_address ?? meta.is_new_address ?? true),
+      }
+
+      this.stockLocationCache_.set(cacheKey, result)
+      if (row.id) {
+        this.stockLocationCache_.set(row.id, result)
+      }
+
+      return result
+    } catch (err: any) {
+      this.logger_.warn?.(`[GHN Fulfillment] Failed to resolve stock location: ${err?.message}`)
+      return null
+    }
+  }
 
   constructor(container: InjectedDependencies, options: GhnModuleOptions) {
     super()
@@ -373,7 +468,7 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
 
       // Lấy thông tin kho gửi hàng (Ship From):
       // 1. Ưu tiên lấy từ Stock Location trong context (địa chỉ kho thực tế)
-      // 2. Fallback về cấu hình options trong medusa-config.ts
+      // 2. Tự động truy vấn từ Stock Location DB nếu context chưa có
       const fromLocation = (context as any)?.from_location
       const fromMeta = (
         fromLocation?.address?.metadata ||
@@ -382,20 +477,25 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       ) as Record<string, any>
       const fromGhn = (fromMeta?.ghn || {}) as Record<string, any>
 
-      const fromDistrictId = Number(
+      let fromDistrictId = Number(
         fromGhn?.district_id ||
         fromMeta?.ghn_district_id ||
-        fromMeta?.district_id ||
-        this.options_.fromDistrictId ||
-        1442
+        fromMeta?.district_id
       )
-      const fromWardCode = String(
+      let fromWardCode = String(
         fromGhn?.ward_code ||
         fromMeta?.ghn_ward_code ||
         fromMeta?.ward_code ||
-        this.options_.fromWardCode ||
-        "20101"
+        ""
       )
+
+      if (!fromDistrictId || !fromWardCode) {
+        const resolvedStockLocation = await this.resolveStockLocation(fromLocation?.id)
+        if (resolvedStockLocation) {
+          fromDistrictId = resolvedStockLocation.districtId
+          fromWardCode = resolvedStockLocation.wardCode
+        }
+      }
 
       // Fallback giá tạm tính khi không có địa chỉ người nhận nào
       if (!toDistrictId && !toProvinceName) {
@@ -842,15 +942,58 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       items: ghnItems,
     }
 
-    // Khối thông tin người gửi (from) - nếu shop có cấu hình
-    if (this.options_.fromName) createOrderPayload.from_name = this.options_.fromName.slice(0, 1024)
-    if (this.options_.fromPhone) createOrderPayload.from_phone = this.options_.fromPhone
+    // Khối thông tin người gửi (from) - lấy động từ Stock Location thực tế đang xuất hàng
+    const resolvedStockLocation = await this.resolveStockLocation(
+      (fulfillment as any)?.location_id
+    )
+
+    const fromName = String(
+      resolvedStockLocation?.company ||
+      resolvedStockLocation?.name ||
+      this.options_.fromName ||
+      "Kho Củ Chi SOC (HCM Mega SOC)"
+    ).slice(0, 1024)
+
+    const fromPhone = String(
+      resolvedStockLocation?.phone ||
+      this.options_.fromPhone ||
+      "0901234567"
+    )
+
+    const fromAddress = String(
+      resolvedStockLocation?.address_1 ||
+      this.options_.fromAddress ||
+      "WHC3+PH7, Đường N13, Củ Chi, Hồ Chí Minh"
+    ).slice(0, 1024)
+
+    const fromWardName = String(
+      resolvedStockLocation?.wardName ||
+      this.options_.fromWardName ||
+      "Xã Củ Chi"
+    )
+
+    const fromDistrictName = String(
+      resolvedStockLocation?.districtName ||
+      this.options_.fromDistrictName ||
+      "Huyện Củ Chi"
+    )
+
+    const fromProvinceName = String(
+      resolvedStockLocation?.provinceName ||
+      this.options_.fromProvinceName ||
+      "Hồ Chí Minh"
+    )
+
+    createOrderPayload.from_name = fromName
+    createOrderPayload.from_phone = fromPhone
     if (this.options_.fromHotline) createOrderPayload.from_hotline = this.options_.fromHotline
-    if (this.options_.fromAddress) createOrderPayload.from_address = this.options_.fromAddress.slice(0, 1024)
-    if (this.options_.fromWardName) createOrderPayload.from_ward_name = this.options_.fromWardName
-    if (this.options_.fromDistrictName) createOrderPayload.from_district_name = this.options_.fromDistrictName
-    if (this.options_.fromProvinceName) createOrderPayload.from_province_name = this.options_.fromProvinceName
-    if (this.options_.isNewFromAddress !== undefined) createOrderPayload.is_new_from_address = this.options_.isNewFromAddress
+    createOrderPayload.from_address = fromAddress
+    createOrderPayload.from_ward_name = fromWardName
+    createOrderPayload.from_district_name = fromDistrictName
+    createOrderPayload.from_province_name = fromProvinceName
+    createOrderPayload.is_new_from_address = Boolean(
+      this.options_.isNewFromAddress ?? resolvedStockLocation?.isNewAddress ?? true
+    )
 
     // Khối thông tin trả hàng (return) - nếu shop có cấu hình
     if (this.options_.returnName) createOrderPayload.return_name = this.options_.returnName.slice(0, 1024)

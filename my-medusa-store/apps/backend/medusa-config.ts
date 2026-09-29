@@ -215,19 +215,18 @@ module.exports = defineConfig({
                         options: {
                             token: process.env.GHN_API_TOKEN || "",
                             shopId: Number(process.env.GHN_SHOP_ID || 0),
-                            fromDistrictId: Number(
-                                process.env.GHN_FROM_DISTRICT_ID || 1442
-                            ),
-                            fromWardCode:
-                                process.env.GHN_FROM_WARD_CODE || "20101",
                             endpoint:
                                 process.env.GHN_ENDPOINT ||
                                 "https://dev-online-gateway.ghn.vn/shiip/public-api",
                             mockEnabled:
                                 process.env.GHN_MOCK_ENABLED !== "false",
                             useNewAddressFormat: true,
+                            // --- Các giá trị fallback toàn hệ thống (không bắt buộc truyền ở đây vì service đã có sẵn default) ---
+                            // 1. requiredNote: Chính sách xem hàng mặc định ("CHOXEMHANGKHONGTHU"). Chuẩn nên lấy động theo từng đơn/Admin khi fulfill hoặc metadata sản phẩm.
                             requiredNote: "CHOXEMHANGKHONGTHU",
+                            // 2. paymentTypeId: Người trả cước GHN (1: Shop trả, 2: Khách trả). Chuẩn nên nhận diện động theo đơn hàng (Đã thanh toán online vs Ship COD).
                             paymentTypeId: 1,
+                            // 3. defaultWeight: Cân nặng dự phòng (gram) khi sản phẩm thiếu weight. Service đã tự fallback 500g nếu không khai báo.
                             defaultWeight: 500,
                         },
                     },
