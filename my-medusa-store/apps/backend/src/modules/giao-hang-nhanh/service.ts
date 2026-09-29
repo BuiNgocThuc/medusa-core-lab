@@ -541,58 +541,87 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       address1: shippingAddress?.address_1,
     })
 
-    const toDistrictId = Number(mappedOrderAddress?.districtId || metadata?.ghn_district_id || metadata?.district_id)
-    const toWardCode = String(mappedOrderAddress?.wardCode || metadata?.ghn_ward_code || metadata?.ward_code || "")
-    const toProvinceName =
-      shippingAddress?.province ||
+    const toProvinceName = String(
       metadata?.ghn_province_name ||
+      shippingAddress?.province ||
       mappedOrderAddress?.provinceName ||
       metadata?.province_name ||
-      shippingAddress?.city
-    const toWardName =
+      shippingAddress?.city ||
+      ""
+    ).trim()
+
+    const toDistrictName = String(
+      metadata?.ghn_district_name ||
+      mappedOrderAddress?.districtName ||
+      metadata?.district_name ||
+      ""
+    ).trim()
+
+    const toWardName = String(
       metadata?.ghn_ward_name ||
       mappedOrderAddress?.wardName ||
-      shippingAddress?.city ||
       metadata?.ward_name ||
       shippingAddress?.address_2 ||
       ""
+    ).trim()
 
-    const useNewFormat = Boolean(
+    // Xác định định dạng địa chỉ người nhận:
+    // - false (mặc định): Hệ cũ 3 cấp (phường/xã + quận/huyện + tỉnh) -> to_district_name là bắt buộc
+    // - true: Hệ mới 2 cấp (phường/xã + tỉnh) sau 01/07/2025 -> để trống to_district_name
+    const useNewAddress = Boolean(
       this.options_.useNewAddressFormat ||
-        (!toDistrictId && toProvinceName)
+      metadata?.is_new_to_address === true ||
+      (!toDistrictName && toProvinceName && toWardName)
     )
 
-    if (!useNewFormat && (!toDistrictId || !toWardCode)) {
+    if (!toProvinceName) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
-        "Cannot create GHN fulfillment: to_district_id and to_ward_code are required when not using is_new_to_address format"
+        "Cannot create GHN fulfillment: to_province_name is required by GHN API"
       )
     }
 
-    if (useNewFormat && !toProvinceName) {
+    if (!toWardName) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
-        "Cannot create GHN fulfillment: to_province_name is required when using is_new_to_address format"
+        "Cannot create GHN fulfillment: to_ward_name is required by GHN API"
+      )
+    }
+
+    if (!useNewAddress && !toDistrictName) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "Cannot create GHN fulfillment: to_district_name is required when is_new_to_address is false"
       )
     }
 
     const recipientName =
       [shippingAddress?.first_name, shippingAddress?.last_name]
         .filter(Boolean)
-        .join(" ") || "Khách Hàng"
+        .join(" ")
+        .trim()
+        .slice(0, 1024) || "Khách Hàng"
 
-    const recipientPhone =
-      shippingAddress?.phone || (order as any)?.customer?.phone || "0900000000"
+    // SĐT người nhận: giữ nguyên giá trị không tự ý format / chuẩn hóa
+    const recipientPhone = String(
+      shippingAddress?.phone || (order as any)?.customer?.phone || ""
+    ).trim()
 
-    const recipientAddress = [
-      shippingAddress?.address_1,
-      shippingAddress?.address_2,
-      shippingAddress?.ward,
-      shippingAddress?.province,
-      shippingAddress?.city,
-    ]
-      .filter(Boolean)
-      .join(", ")
+    if (!recipientPhone) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "Cannot create GHN fulfillment: to_phone is required"
+      )
+    }
+
+    const recipientAddress = (
+      shippingAddress?.address_1 ||
+      [shippingAddress?.address_1, shippingAddress?.address_2].filter(Boolean).join(", ") ||
+      toWardName ||
+      "Địa chỉ nhận hàng"
+    )
+      .trim()
+      .slice(0, 1024)
 
     // Map items sang cấu trúc GHN (lấy dữ liệu thực từ order.items dựa theo line_item_id)
     const orderItems: any[] = (order as any)?.items || []
@@ -605,7 +634,7 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       const variant = lineItem?.variant
       const product = variant?.product || lineItem?.product
 
-      // 2. Tên sản phẩm chuẩn (ưu tiên Product title + Variant title nếu không phải "Default")
+      // 2. Tên sản phẩm chuẩn (tối đa 512 ký tự)
       const prodTitle =
         lineItem?.product_title || lineItem?.title || product?.title || "Sản phẩm"
       const varTitle =
@@ -615,7 +644,7 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
           ? `${prodTitle} (${varTitle})`
           : prodTitle
 
-      // 3. Mã SKU
+      // 3. Mã SKU (tối đa 50 ký tự)
       const finalSku =
         item.sku ||
         variant?.sku ||
@@ -623,7 +652,7 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
         item.barcode ||
         undefined
 
-      // 4. Đơn giá thực tế
+      // 4. Đơn giá thực tế (VND)
       const finalPrice = Math.max(
         0,
         Number(lineItem?.unit_price ?? item.unit_price ?? 0)
@@ -658,66 +687,159 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       )
 
       return {
-        name: finalName,
-        code: finalSku,
-        quantity: Math.max(1, Number(item.quantity || lineItem?.quantity || 1)),
+        name: finalName.slice(0, 512),
+        code: finalSku ? String(finalSku).slice(0, 50) : undefined,
+        quantity: Math.max(1, Math.round(Number(item.quantity || lineItem?.quantity || 1))),
         price: Math.round(finalPrice),
-        weight: Math.round(itemWeight),
-        length: Math.round(itemLength),
-        width: Math.round(itemWidth),
-        height: Math.round(itemHeight),
+        length: Math.max(1, Math.min(200, Math.round(itemLength))),
+        width: Math.max(1, Math.min(200, Math.round(itemWidth))),
+        height: Math.max(1, Math.min(200, Math.round(itemHeight))),
+        weight: Math.max(1, Math.min(50000, Math.round(itemWeight))),
       }
     })
 
-    const totalWeight = ghnItems.reduce(
-      (sum, item) => sum + (item.weight || 500) * item.quantity,
-      0
+    const totalWeight = Math.min(
+      50_000,
+      Math.max(
+        1,
+        ghnItems.reduce(
+          (sum, item) => sum + (item.weight || 500) * item.quantity,
+          0
+        )
+      )
     )
 
-    // Resolve service_type_id động tại thời điểm tạo đơn
-    let serviceTypeId = 2 // Default fallback
-    const effectiveToDistrict = toDistrictId || 1442
+    const orderLength = Math.max(
+      1,
+      Math.min(200, Math.round(this.options_.defaultDimensions?.length || 10))
+    )
+    const orderWidth = Math.max(
+      1,
+      Math.min(200, Math.round(this.options_.defaultDimensions?.width || 10))
+    )
+    const orderHeight = Math.max(
+      1,
+      Math.min(200, Math.round(this.options_.defaultDimensions?.height || 10))
+    )
+
+    // Resolve service_type_id động tại thời điểm tạo đơn: 2 (<20kg) hoặc 5 (>=20kg)
+    let serviceTypeId: 2 | 5 = totalWeight >= 20_000 ? 5 : 2
+    const toDistrictId = Number(
+      mappedOrderAddress?.districtId || metadata?.ghn_district_id || metadata?.district_id || 1442
+    )
     try {
-      serviceTypeId = await this.resolveServiceTypeId(
+      const resolved = await this.resolveServiceTypeId(
         this.options_.fromDistrictId || 1442,
-        effectiveToDistrict,
+        toDistrictId,
         totalWeight
       )
+      if (resolved === 2 || resolved === 5) {
+        serviceTypeId = resolved
+      }
     } catch (err: any) {
       this.logger_.warn?.(
-        `[GHN Fulfillment] Could not resolve service type, defaulting to 2: ${err?.message}`
+        `[GHN Fulfillment] Could not resolve service type, defaulting to ${serviceTypeId}: ${err?.message}`
       )
     }
 
+    // Giá trị đơn hàng & COD
+    const orderTotal = Math.round(Number((order as any)?.total ?? 0))
+    const isPaid = (order as any)?.payment_status === "captured"
+    const isCodPayment =
+      metadata?.payment_method === "cod" ||
+      additionalData?.is_cod === true ||
+      (!isPaid && metadata?.cod_amount !== undefined)
+
+    let codAmount = 0
+    if (additionalData?.cod_amount !== undefined) {
+      codAmount = Math.max(0, Math.round(Number(additionalData.cod_amount)))
+    } else if (metadata?.cod_amount !== undefined) {
+      codAmount = Math.max(0, Math.round(Number(metadata.cod_amount)))
+    } else if (isCodPayment && !isPaid && orderTotal > 0) {
+      codAmount = Math.min(50_000_000, orderTotal)
+    }
+
+    const insuranceValue = Math.min(
+      5_000_000,
+      Math.max(0, orderTotal)
+    )
+    const orderValue = Math.max(0, orderTotal)
+
+    const clientOrderCode = (
+      (order as any)?.display_id
+        ? `ORD-${(order as any)?.display_id}`
+        : (order as any)?.id || ""
+    ).slice(0, 50)
+
+    const contentDescription = (
+      `Đơn hàng #${(order as any)?.display_id || (order as any)?.id || ""}`
+    ).slice(0, 2000)
+
+    const driverNote = (
+      metadata?.note ||
+      (order as any)?.customer_note ||
+      additionalData?.note ||
+      ""
+    ).slice(0, 5000)
+
+    // Xây dựng payload đúng chuẩn theo tài liệu GHN: https://developer.ghn.dev/vi/docs/order/create#tham-so
     const createOrderPayload: GhnCreateOrderRequest = {
-      payment_type_id: this.options_.paymentTypeId || 1,
-      required_note: this.options_.requiredNote || "CHOXEMHANGKHONGTHU",
+      // 1. Khối người nhận (to)
       to_name: recipientName,
       to_phone: recipientPhone,
       to_address: recipientAddress,
+      to_ward_name: toWardName,
+      to_province_name: toProvinceName,
+      ...(useNewAddress
+        ? { is_new_to_address: true }
+        : { to_district_name: toDistrictName, is_new_to_address: false }
+      ),
+
+      // 2. Khối kiện hàng (Bắt buộc)
       weight: Math.round(totalWeight),
-      length: this.options_.defaultDimensions?.length || 10,
-      width: this.options_.defaultDimensions?.width || 10,
-      height: this.options_.defaultDimensions?.height || 10,
+      length: orderLength,
+      width: orderWidth,
+      height: orderHeight,
+
+      // 3. Khối dịch vụ & thanh toán (Bắt buộc)
       service_type_id: serviceTypeId,
-      client_order_code: (order as any)?.display_id
-        ? `ORD-${(order as any)?.display_id}`
-        : (order as any)?.id,
-      content: `Đơn hàng ${(order as any)?.display_id || (order as any)?.id}`,
+      payment_type_id: this.options_.paymentTypeId || 1,
+      required_note: this.options_.requiredNote || "CHOXEMHANGKHONGTHU",
+
+      // 4. Khối thông tin đơn hàng & thu hộ
+      client_order_code: clientOrderCode || undefined,
+      content: contentDescription,
+      note: driverNote || undefined,
+      cod_amount: codAmount,
+      cod_failed_amount: 0,
+      insurance_value: insuranceValue,
+      order_value: orderValue,
+
+      // 5. Danh sách sản phẩm
       items: ghnItems,
     }
 
-    if (useNewFormat) {
-      createOrderPayload.is_new_to_address = true
-      if (toProvinceName) createOrderPayload.to_province_name = String(toProvinceName)
-      if (toWardName) createOrderPayload.to_ward_name = String(toWardName)
-    } else {
-      createOrderPayload.to_district_id = toDistrictId
-      createOrderPayload.to_ward_code = toWardCode
-    }
+    // Khối thông tin người gửi (from) - nếu shop có cấu hình
+    if (this.options_.fromName) createOrderPayload.from_name = this.options_.fromName.slice(0, 1024)
+    if (this.options_.fromPhone) createOrderPayload.from_phone = this.options_.fromPhone
+    if (this.options_.fromHotline) createOrderPayload.from_hotline = this.options_.fromHotline
+    if (this.options_.fromAddress) createOrderPayload.from_address = this.options_.fromAddress.slice(0, 1024)
+    if (this.options_.fromWardName) createOrderPayload.from_ward_name = this.options_.fromWardName
+    if (this.options_.fromDistrictName) createOrderPayload.from_district_name = this.options_.fromDistrictName
+    if (this.options_.fromProvinceName) createOrderPayload.from_province_name = this.options_.fromProvinceName
+    if (this.options_.isNewFromAddress !== undefined) createOrderPayload.is_new_from_address = this.options_.isNewFromAddress
+
+    // Khối thông tin trả hàng (return) - nếu shop có cấu hình
+    if (this.options_.returnName) createOrderPayload.return_name = this.options_.returnName.slice(0, 1024)
+    if (this.options_.returnPhone) createOrderPayload.return_phone = this.options_.returnPhone
+    if (this.options_.returnAddress) createOrderPayload.return_address = this.options_.returnAddress.slice(0, 1024)
+    if (this.options_.returnWardName) createOrderPayload.return_ward_name = this.options_.returnWardName
+    if (this.options_.returnDistrictName) createOrderPayload.return_district_name = this.options_.returnDistrictName
+    if (this.options_.returnProvinceName) createOrderPayload.return_province_name = this.options_.returnProvinceName
+    if (this.options_.isNewReturnAddress !== undefined) createOrderPayload.is_new_return_address = this.options_.isNewReturnAddress
 
     this.logger_.info?.(
-      `[GHN Fulfillment] Submitting createOrder to GHN: recipient="${recipientName}" | phone="${recipientPhone}" | service_type_id=${createOrderPayload.service_type_id} | totalWeight=${createOrderPayload.weight}g | items=${createOrderPayload.items.length}`
+      `[GHN Fulfillment] Submitting createOrder to GHN: recipient="${recipientName}" | phone="${recipientPhone}" | province="${toProvinceName}" | district="${toDistrictName || '(none)'}" | ward="${toWardName}" | is_new_to_address=${createOrderPayload.is_new_to_address} | service_type_id=${createOrderPayload.service_type_id} | totalWeight=${createOrderPayload.weight}g | items=${createOrderPayload.items?.length || 0}`
     )
 
     let ghnOrder: any

@@ -69,6 +69,25 @@ export interface GhnModuleOptions {
    * Mặc định: auto (tự động bật nếu đơn không có mã district/ward)
    */
   useNewAddressFormat?: boolean
+
+  // Cấu hình thông tin người gửi mặc định (nếu muốn ghi đè thông tin hồ sơ Shop tại GHN)
+  fromName?: string
+  fromPhone?: string
+  fromHotline?: string
+  fromAddress?: string
+  fromWardName?: string
+  fromDistrictName?: string
+  fromProvinceName?: string
+  isNewFromAddress?: boolean
+
+  // Cấu hình thông tin trả hàng mặc định
+  returnName?: string
+  returnPhone?: string
+  returnAddress?: string
+  returnWardName?: string
+  returnDistrictName?: string
+  returnProvinceName?: string
+  isNewReturnAddress?: boolean
 }
 
 export interface GhnApiResponse<T = any> {
@@ -141,82 +160,420 @@ export interface GhnFeeResponseData {
   cod_failed_fee: number
 }
 
+/**
+ * Chi tiết từng sản phẩm trong đơn hàng GHN
+ * Tài liệu chính thức: https://developer.ghn.dev/vi/docs/order/create#cau-truc-items
+ */
 export interface GhnOrderItem {
+  /**
+   * Tên sản phẩm. Tối đa 512 ký tự.
+   * [Bắt buộc]
+   */
   name: string
+
+  /**
+   * Mã sản phẩm. Mặc định: không có.
+   * [Tùy chọn]
+   */
   code?: string
+
+  /**
+   * Số lượng. Tối thiểu là 1.
+   * [Bắt buộc]
+   */
   quantity: number
+
+  /**
+   * Giá sản phẩm (VND). Mặc định: không có.
+   * [Tùy chọn]
+   */
   price?: number
+
+  /**
+   * Chiều dài (cm). Bắt buộc khi service_type_id = 5.
+   * [Tùy chọn khi service_type_id = 2]
+   */
   length?: number
+
+  /**
+   * Chiều rộng (cm). Bắt buộc khi service_type_id = 5.
+   * [Tùy chọn khi service_type_id = 2]
+   */
   width?: number
+
+  /**
+   * Chiều cao (cm). Bắt buộc khi service_type_id = 5.
+   * [Tùy chọn khi service_type_id = 2]
+   */
   height?: number
+
+  /**
+   * Khối lượng (gram). Bắt buộc khi service_type_id = 5.
+   * [Tùy chọn khi service_type_id = 2]
+   */
   weight?: number
+
+  /**
+   * Phân loại danh mục sản phẩm (tùy chọn)
+   */
   category?: {
     level1?: string
   }
 }
 
+/**
+ * Tham số tạo đơn hàng vận chuyển qua GHN API
+ * Endpoint: POST https://online-gateway.ghn.vn/shiip/public-api/v2/shipping-order/create
+ * Tài liệu chính thức: https://developer.ghn.dev/vi/docs/order/create#tham-so
+ */
 export interface GhnCreateOrderRequest {
-  payment_type_id: 1 | 2
-  note?: string
-  required_note: "CHOTHUHANG" | "CHOXEMHANGKHONGTHU" | "KHONGCHOXEMHANG"
-  from_name?: string
-  from_phone?: string
-  from_address?: string
-  from_ward_name?: string
-  from_district_name?: string
-  from_province_name?: string
-  return_phone?: string
-  return_address?: string
-  return_district_id?: number | null
-  return_ward_code?: string
-  client_order_code?: string
-  to_name: string
-  to_phone: string
-  to_address: string
+  // ==========================================
+  // KHỐI THÔNG TIN NGƯỜI NHẬN (TO)
+  // ==========================================
+
   /**
-   * Định dạng mới (sau 01/07/2025): Bật is_new_to_address: true
-   * Cho phép không truyền to_district_id và to_ward_code.
+   * Tên người nhận. Tối đa 1024 ký tự.
+   * [Bắt buộc]
+   */
+  to_name: string
+
+  /**
+   * Số điện thoại người nhận.
+   * [Bắt buộc]
+   */
+  to_phone: string
+
+  /**
+   * Địa chỉ đầy đủ người nhận. Tối đa 1024 ký tự.
+   * [Bắt buộc]
+   */
+  to_address: string
+
+  /**
+   * Tên phường/xã người nhận — hệ mới 2 cấp tra bằng Lấy Phường/Xã (Mới), hệ cũ tra bằng Lấy Phường/Xã (theo district_id).
+   * [Bắt buộc]
+   */
+  to_ward_name: string
+
+  /**
+   * Tên quận/huyện người nhận.
+   * Bắt buộc khi is_new_to_address = false; để trống/không gửi khi true (đơn vị hành chính mới không còn cấp quận/huyện).
+   * Tra danh sách bằng Lấy Quận/Huyện.
+   * [Tùy chọn / Bắt buộc khi is_new_to_address = false]
+   */
+  to_district_name?: string
+
+  /**
+   * Tên tỉnh/thành phố người nhận — hệ mới 2 cấp tra bằng Lấy Tỉnh/Thành (Mới), hệ cũ tra bằng Lấy Tỉnh/Thành.
+   * [Bắt buộc]
+   */
+  to_province_name: string
+
+  /**
+   * Cho biết khối địa chỉ người nhận dùng hệ đơn vị hành chính nào:
+   * - false (mặc định): đơn vị cũ (phường/xã + quận/huyện + tỉnh)
+   * - true: đơn vị mới (phường/xã + tỉnh) sau 01/07/2025
+   * [Tùy chọn]
    */
   is_new_to_address?: boolean
-  to_ward_name?: string
-  to_province_name?: string
-  to_province_id?: number
-  to_district_id?: number
-  to_ward_code?: string
-  cod_amount?: number
-  content?: string
+
+  // ==========================================
+  // KHỐI THÔNG TIN NGƯỜI GỬI (FROM)
+  // Mặc định: theo hồ sơ shop của ShopId
+  // ==========================================
+
+  /**
+   * Tên người gửi. Mặc định: theo hồ sơ shop của ShopId. Tối đa 1024 ký tự.
+   * [Tùy chọn]
+   */
+  from_name?: string
+
+  /**
+   * SĐT người gửi. Mặc định: theo hồ sơ shop.
+   * [Tùy chọn]
+   */
+  from_phone?: string
+
+  /**
+   * Hotline người gửi. Mặc định: không có.
+   * [Tùy chọn]
+   */
+  from_hotline?: string
+
+  /**
+   * Địa chỉ đầy đủ người gửi. Mặc định: địa chỉ shop. Tối đa 1024 ký tự.
+   * [Tùy chọn]
+   */
+  from_address?: string
+
+  /**
+   * Tên phường/xã người gửi. Mặc định: địa chỉ shop.
+   * [Tùy chọn]
+   */
+  from_ward_name?: string
+
+  /**
+   * Tên quận/huyện người gửi. Mặc định: địa chỉ shop.
+   * [Tùy chọn]
+   */
+  from_district_name?: string
+
+  /**
+   * Tên tỉnh/thành người gửi. Mặc định: địa chỉ shop.
+   * [Tùy chọn]
+   */
+  from_province_name?: string
+
+  /**
+   * Cùng quy tắc như is_new_to_address, áp dụng cho khối địa chỉ người gửi. Mặc định: false.
+   * [Tùy chọn]
+   */
+  is_new_from_address?: boolean
+
+  // ==========================================
+  // KHỐI THÔNG TIN TRẢ HÀNG (RETURN)
+  // ==========================================
+
+  /**
+   * Tên người nhận hàng trả. Mặc định: người gửi. Tối đa 1024 ký tự.
+   * [Tùy chọn]
+   */
+  return_name?: string
+
+  /**
+   * SĐT liên hệ trả hàng. Mặc định: SĐT người gửi.
+   * [Tùy chọn]
+   */
+  return_phone?: string
+
+  /**
+   * Địa chỉ đầy đủ trả hàng. Mặc định: địa chỉ kho mặc định của shop (trên Dashboard). Tối đa 1024 ký tự.
+   * [Tùy chọn]
+   */
+  return_address?: string
+
+  /**
+   * Tên phường/xã trả hàng.
+   * [Tùy chọn]
+   */
+  return_ward_name?: string
+
+  /**
+   * Tên quận/huyện trả hàng (xem is_new_to_address).
+   * [Tùy chọn]
+   */
+  return_district_name?: string
+
+  /**
+   * Tên tỉnh/thành trả hàng.
+   * [Tùy chọn]
+   */
+  return_province_name?: string
+
+  /**
+   * Cùng quy tắc như is_new_to_address, áp dụng cho khối địa chỉ trả hàng. Mặc định: false.
+   * [Tùy chọn]
+   */
+  is_new_return_address?: boolean
+
+  // ==========================================
+  // KHỐI CẤU HÌNH GÓI HÀNG & DỊCH VỤ
+  // ==========================================
+
+  /**
+   * Mã đơn nội bộ của shop (duy nhất theo shop). Tối đa 50 ký tự. Mặc định: null.
+   * Giúp gọi lại an toàn: gửi lại request với mã đã dùng sẽ trả về order_code đã tạo trước đó thay vì tạo đơn trùng.
+   * [Tùy chọn]
+   */
+  client_order_code?: string
+
+  /**
+   * Khối lượng (gram). Tối đa: 50,000.
+   * [Bắt buộc]
+   */
   weight: number
-  length?: number
-  width?: number
-  height?: number
-  pick_station_id?: number
-  deliver_station_id?: number | null
-  insurance_value?: number
-  service_id?: number
-  service_type_id?: number
+
+  /**
+   * Chiều dài (cm). Tối đa: 200.
+   * [Bắt buộc]
+   */
+  length: number
+
+  /**
+   * Chiều rộng (cm). Tối đa: 200.
+   * [Bắt buộc]
+   */
+  width: number
+
+  /**
+   * Chiều cao (cm). Tối đa: 200.
+   * [Bắt buộc]
+   */
+  height: number
+
+  /**
+   * Mô tả hàng hóa. Tối đa 2000 ký tự.
+   * Bắt buộc khi không gửi items[] — thiếu cả content lẫn items sẽ bị từ chối.
+   * Khi có items[], GHN tự sinh nội dung từ tên/số lượng sản phẩm.
+   * [Tùy chọn]
+   */
+  content?: string
+
+  /**
+   * Loại dịch vụ, chọn theo khối lượng:
+   * - 2: tổng khối lượng dưới 20 kg
+   * - 5: tổng khối lượng từ 20 kg trở lên, hoặc đơn nhiều kiện
+   * [Bắt buộc]
+   */
+  service_type_id: 2 | 5
+
+  /**
+   * Bên trả phí vận chuyển:
+   * - 1: Shop/Người bán
+   * - 2: Người mua/Người nhận
+   * [Bắt buộc]
+   */
+  payment_type_id: 1 | 2
+
+  /**
+   * Mã khuyến mãi. Mặc định: không có.
+   * [Tùy chọn]
+   */
   coupon?: string | null
+
+  /**
+   * Số tiền thu hộ (COD) từ người nhận (VND). Tối đa: 50,000,000. Mặc định: 0.
+   * [Tùy chọn]
+   */
+  cod_amount?: number
+
+  /**
+   * Số tiền thu từ người nhận khi giao thất bại (VND). Mặc định: 0.
+   * [Tùy chọn]
+   */
+  cod_failed_amount?: number
+
+  /**
+   * Giá trị khai giá bảo hiểm (VND). Tối đa: 5,000,000. Mặc định: 0.
+   * [Tùy chọn]
+   */
+  insurance_value?: number
+
+  /**
+   * Giá trị đơn hàng (VND). Mặc định: 0.
+   * [Tùy chọn]
+   */
+  order_value?: number
+
+  /**
+   * Ghi chú giao hàng — một trong các giá trị:
+   * - KHONGCHOXEMHANG: người nhận KHÔNG được mở/xem hàng
+   * - CHOXEMHANGKHONGTHU: người nhận được xem hàng nhưng không được thử
+   * - CHOTHUHANG: người nhận được xem và thử hàng
+   * [Bắt buộc]
+   */
+  required_note: "KHONGCHOXEMHANG" | "CHOXEMHANGKHONGTHU" | "CHOTHUHANG"
+
+  /**
+   * Ghi chú cho tài xế. Tối đa 5000 ký tự. Mặc định: không có.
+   * [Tùy chọn]
+   */
+  note?: string
+
+  /**
+   * Mã bưu cục shop mang hàng đến gửi, lấy từ Lấy Bưu cục (trường locationId).
+   * Mặc định: 0 → GHN đến lấy hàng tại địa chỉ shop.
+   * [Tùy chọn]
+   */
+  pick_station_id?: number
+
+  /**
+   * Danh sách mã ca lấy hàng (dùng Ca lấy hàng). Mặc định: ca sớm nhất.
+   * [Tùy chọn]
+   */
   pick_shift?: number[]
-  items: GhnOrderItem[]
+
+  /**
+   * Danh sách sản phẩm.
+   * Bắt buộc khi service_type_id = 5 (dùng để tính phí theo từng kiện) và khi không gửi content.
+   * Với service_type_id = 2 thì không bắt buộc nhưng nên có.
+   * [Tùy chọn]
+   */
+  items?: GhnOrderItem[]
+
+  // ==========================================
+  // CÁC TRƯỜNG TƯƠNG THÍCH NGƯỢC (LEGACY)
+  // Không nằm trong bảng tham số chính thức của GHN v2 docs mới nhất
+  // ==========================================
+  /** @deprecated Không nằm trong bảng tham số docs mới */
+  to_district_id?: number
+  /** @deprecated Không nằm trong bảng tham số docs mới */
+  to_ward_code?: string
+  /** @deprecated Không nằm trong bảng tham số docs mới */
+  to_province_id?: number
+  /** @deprecated Không nằm trong bảng tham số docs mới */
+  service_id?: number
+}
+
+export interface GhnCreateOrderFeeDetail {
+  /** Phí dịch vụ giao hàng chính (VND) */
+  main_service: number
+  /** Phí bảo hiểm hàng hóa (VND) */
+  insurance?: number
+  /** Phí thu hộ COD (VND) */
+  cod_fee?: number
+  /** Phí gửi tại bưu cục (VND) */
+  station_do?: number
+  /** Phí nhận tại bưu cục (VND) */
+  station_pu?: number
+  /** Phí chuyển hoàn (VND) */
+  return?: number
+  /** Phí trả hàng về người gửi (VND) */
+  r2s?: number
+  /** Phí chuyển hoàn lần nữa (VND) */
+  return_again?: number
+  /** Giảm giá coupon (VND, số âm hoặc 0) */
+  coupon?: number
+  /** Phí chuyển phát chứng từ (VND) */
+  document_return?: number
+  /** Phí đồng kiểm (VND) */
+  double_check?: number
+  /** Phí đồng kiểm khi giao (VND) */
+  double_check_deliver?: number
+  /** Phí lấy hàng vùng xa (VND) */
+  pick_remote_areas_fee?: number
+  /** Phí giao hàng vùng xa (VND) */
+  deliver_remote_areas_fee?: number
+  /** Phí hoàn hàng vùng xa khi lấy (VND) */
+  pick_remote_areas_fee_return?: number
+  /** Phí hoàn hàng vùng xa khi giao (VND) */
+  deliver_remote_areas_fee_return?: number
+  /** Phí thu khi giao thất bại (VND) */
+  cod_failed_fee?: number
+  /** Phí đổi địa chỉ giao (VND) */
+  change_to_address_fee?: number
+  /** Phí đổi địa chỉ trả (VND) */
+  change_return_address_fee?: number
+  [key: string]: any
 }
 
 export interface GhnCreateOrderResponseData {
+  /** Mã vận đơn GHN */
   order_code: string
-  sort_code: string
-  trans_type: string
-  ward_encode: string
-  district_encode: string
-  fee: {
-    main_service: number
-    insurance: number
-    station_do: number
-    station_pu: number
-    return: number
-    r2s: number
-    coupon: number
-    cod_failed_fee: number
-  }
+  /** Chi tiết phí vận chuyển tính bởi GHN */
+  fee: GhnCreateOrderFeeDetail
+  /** Tổng phí vận chuyển (VND) */
   total_fee: number
+  /** Thời gian giao hàng dự kiến (ISO 8601) */
   expected_delivery_time: string
+  /** Mã phân loại bưu cục giao (nếu có) */
+  sort_code?: string
+  /** Phương thức vận chuyển (nếu có) */
+  trans_type?: string
+  /** Mã hóa phường/xã phân tuyến (nếu có) */
+  ward_encode?: string
+  /** Mã hóa quận/huyện phân tuyến (nếu có) */
+  district_encode?: string
 }
 
 export interface GhnCancelOrderRequest {

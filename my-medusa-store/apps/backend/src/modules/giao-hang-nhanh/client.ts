@@ -165,6 +165,7 @@ export class GhnClient {
         fee: {
           main_service: 25000,
           insurance: 0,
+          cod_fee: 0,
           station_do: 0,
           station_pu: 0,
           return: 0,
