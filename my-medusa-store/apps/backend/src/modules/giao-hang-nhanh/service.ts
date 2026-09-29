@@ -594,33 +594,74 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       .filter(Boolean)
       .join(", ")
 
-    // Map items sang cấu trúc GHN (ưu tiên variant > product > fallback)
+    // Map items sang cấu trúc GHN (lấy dữ liệu thực từ order.items dựa theo line_item_id)
+    const orderItems: any[] = (order as any)?.items || []
+
     const ghnItems: GhnOrderItem[] = (items || []).map((item: any) => {
-      const variantWeight = Number(item.line_item?.variant?.weight || 0)
-      const productWeight = Number(item.line_item?.product?.weight || item.line_item?.variant?.product?.weight || 0)
+      // 1. Tìm đúng line item trong order
+      const lineItem = orderItems.find(
+        (oi: any) => oi.id === item.line_item_id || oi.id === item.id
+      )
+      const variant = lineItem?.variant
+      const product = variant?.product || lineItem?.product
+
+      // 2. Tên sản phẩm chuẩn (ưu tiên Product title + Variant title nếu không phải "Default")
+      const prodTitle =
+        lineItem?.product_title || lineItem?.title || product?.title || "Sản phẩm"
+      const varTitle =
+        lineItem?.variant_title || variant?.title || item.title
+      const finalName =
+        varTitle && varTitle !== "Default" && varTitle !== prodTitle
+          ? `${prodTitle} (${varTitle})`
+          : prodTitle
+
+      // 3. Mã SKU
+      const finalSku =
+        item.sku ||
+        variant?.sku ||
+        lineItem?.variant_sku ||
+        item.barcode ||
+        undefined
+
+      // 4. Đơn giá thực tế
+      const finalPrice = Math.max(
+        0,
+        Number(lineItem?.unit_price ?? item.unit_price ?? 0)
+      )
+
+      // 5. Khối lượng (g): ưu tiên variant > lineItem > product > default
+      const variantWeight = Number(
+        variant?.weight || lineItem?.variant?.weight || 0
+      )
+      const productWeight = Number(product?.weight || 0)
       const fallbackWeight = this.options_.defaultWeight || 500
-      const itemWeight = variantWeight > 0 ? variantWeight : (productWeight > 0 ? productWeight : fallbackWeight)
+      const itemWeight =
+        variantWeight > 0
+          ? variantWeight
+          : productWeight > 0
+          ? productWeight
+          : fallbackWeight
 
-      const variantLength = Number(item.line_item?.variant?.length || 0)
-      const productLength = Number(item.line_item?.product?.length || item.line_item?.variant?.product?.length || 0)
+      // 6. Kích thước (cm)
       const fallbackLength = this.options_.defaultDimensions?.length || 10
-      const itemLength = variantLength > 0 ? variantLength : (productLength > 0 ? productLength : fallbackLength)
-
-      const variantWidth = Number(item.line_item?.variant?.width || 0)
-      const productWidth = Number(item.line_item?.product?.width || item.line_item?.variant?.product?.width || 0)
       const fallbackWidth = this.options_.defaultDimensions?.width || 10
-      const itemWidth = variantWidth > 0 ? variantWidth : (productWidth > 0 ? productWidth : fallbackWidth)
-
-      const variantHeight = Number(item.line_item?.variant?.height || 0)
-      const productHeight = Number(item.line_item?.product?.height || item.line_item?.variant?.product?.height || 0)
       const fallbackHeight = this.options_.defaultDimensions?.height || 10
-      const itemHeight = variantHeight > 0 ? variantHeight : (productHeight > 0 ? productHeight : fallbackHeight)
+
+      const itemLength = Number(
+        variant?.length || product?.length || fallbackLength
+      )
+      const itemWidth = Number(
+        variant?.width || product?.width || fallbackWidth
+      )
+      const itemHeight = Number(
+        variant?.height || product?.height || fallbackHeight
+      )
 
       return {
-        name: item.title || item.line_item?.title || "Sản phẩm",
-        code: item.line_item?.variant?.sku || undefined,
-        quantity: Math.max(1, Number(item.quantity || 1)),
-        price: Math.max(0, Number(item.unit_price || 0)),
+        name: finalName,
+        code: finalSku,
+        quantity: Math.max(1, Number(item.quantity || lineItem?.quantity || 1)),
+        price: Math.round(finalPrice),
         weight: Math.round(itemWeight),
         length: Math.round(itemLength),
         width: Math.round(itemWidth),
