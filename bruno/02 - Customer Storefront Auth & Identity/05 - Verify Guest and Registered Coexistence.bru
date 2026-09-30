@@ -1,0 +1,47 @@
+meta {
+  name: 05 - Verify Guest and Registered Coexistence
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/admin/customers
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "{{customerEmail}}",
+    "first_name": "Guest",
+    "last_name": "Coexist"
+  }
+}
+
+tests {
+  test("200 OK", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("verifies guest and member coexist with same email", function () {
+    const customer = res.getBody().customer;
+    expect(customer).to.be.an('object');
+    expect(customer.email).to.equal(bru.getVar('customerEmail'));
+    expect(customer.has_account).to.equal(false);
+  });
+}
+
+docs {
+  # 05 - Verify Guest and Registered Coexistence
+
+  Kiem chung quyet dinh kien truc cua team (Option B - Explicit Reconciliation):
+  - Tao mot ban ghi Guest Customer co cung dia chi email voi thanh vien Registered Member vua tao o tren, nhung co `has_account: false`.
+  - Nho chi muc PostgreSQL Partial Unique Index `UNIQUE (email, has_account) WHERE deleted_at IS NULL`, ca hai ban ghi duoc phep song song ton tai ma khong bi loi Duplicate Key Violation.
+}

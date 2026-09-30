@@ -1,0 +1,49 @@
+meta {
+  name: 03 - Login Storefront Customer
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/auth/customer/emailpass
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "{{customerEmail}}",
+    "password": "{{customerPassword}}"
+  }
+}
+
+script:post-response {
+  const body = res.getBody();
+  const token = typeof body === 'string' ? body : (body && body.token ? body.token : null);
+  if (token) {
+    bru.setVar('customerToken', token);
+    bru.setEnvVar('customerToken', token);
+  }
+}
+
+tests {
+  test("200 OK", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("returns customer JWT token", function () {
+    const body = res.getBody();
+    const token = typeof body === 'string' ? body : (body && body.token ? body.token : null);
+    expect(token).to.be.a('string');
+  });
+}
+
+docs {
+  # 03 - Login Storefront Customer
+
+  Dang nhap tai khoan Khach hang thanh vien qua endpoint `POST /auth/customer/emailpass`.
+  Cap phat JWT Bearer Token da duoc gan chat voi actor customer_id trong Medusa. Token nay duoc luu vao bien `{{customerToken}}` de su dung cho toan bo cac request Store API ve sau.
+}

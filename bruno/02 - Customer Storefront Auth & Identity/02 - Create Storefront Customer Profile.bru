@@ -1,0 +1,49 @@
+meta {
+  name: 02 - Create Storefront Customer Profile
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/store/customers
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{registrationToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "{{customerEmail}}",
+    "first_name": "Test",
+    "last_name": "Member"
+  }
+}
+
+tests {
+  test("200 OK", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("creates registered member profile", function () {
+    const customer = res.getBody().customer;
+    expect(customer).to.be.an('object');
+    expect(customer.email).to.equal(bru.getVar('customerEmail'));
+    expect(customer.has_account).to.equal(true);
+  });
+}
+
+docs {
+  # 02 - Create Storefront Customer Profile
+
+  Khoi tao thong tin ho so Customer trong Customer Module va lien ket truc tiep voi Auth Identity vua tao.
+  Yeu cau:
+  - Header: Authorization: Bearer {{registrationToken}}
+  - Header: x-publishable-api-key: {{publishableApiKey}} (ke thua tu folder.bru)
+  - Endpoint: `POST /store/customers`
+}

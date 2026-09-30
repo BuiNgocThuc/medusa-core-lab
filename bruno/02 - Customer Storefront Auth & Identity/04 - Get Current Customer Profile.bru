@@ -1,0 +1,34 @@
+meta {
+  name: 04 - Get Current Customer Profile
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/store/customers/me
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{customerToken}}
+}
+
+tests {
+  test("200 OK", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("returns customer profile with has_account true", function () {
+    const customer = res.getBody().customer;
+    expect(customer).to.be.an('object');
+    expect(customer.email).to.equal(bru.getVar('customerEmail'));
+    expect(customer.has_account).to.equal(true);
+  });
+}
+
+docs {
+  # 04 - Get Current Customer Profile
+
+  Kiem tra thong tin ca nhan cua khach hang dang dang nhap bang Bearer `{{customerToken}}`.
+  Xac minh rang tai khoan thanh vien duoc tao co truong `has_account: true` va dia chi email khop dung voi email da dang ky.
+}

@@ -1,0 +1,53 @@
+meta {
+  name: 01 - Register Storefront Auth Identity
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/auth/customer/emailpass/register
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "{{customerEmail}}",
+    "password": "{{customerPassword}}"
+  }
+}
+
+script:pre-request {
+  const timestamp = Date.now();
+  const email = `reconcile_member_${timestamp}@test.com`;
+  bru.setVar('customerEmail', email);
+  bru.setEnvVar('customerEmail', email);
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.token) {
+    bru.setVar('registrationToken', body.token);
+    bru.setEnvVar('registrationToken', body.token);
+  }
+}
+
+tests {
+  test("200 OK", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("returns registration token string", function () {
+    expect(res.getBody().token).to.be.a('string');
+  });
+}
+
+docs {
+  # 01 - Register Storefront Auth Identity
+
+  Khoi tao Auth Identity cho Khach hang Storefront qua endpoint `POST /auth/customer/emailpass/register`.
+  Endpoint nay tao ban ghi dinh danh trong module Auth va tra ve mot actorless token dung de lien ket voi ban ghi Customer o buoc tiep theo.
+}
