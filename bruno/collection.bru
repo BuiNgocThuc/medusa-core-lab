@@ -7,18 +7,23 @@ auth:bearer {
 }
 
 docs {
-  # Medusa Core Lab — Customer Module (Bruno Collection)
+  # Medusa Core Lab - API Test Collection
 
-  Bộ sưu tập kiểm thử API cho Medusa v2 Customer Module (Task 1, 2, 3) trên dự án `medusa-core-lab`.
+  Bo suu tap kiem thu API toan dien cho du an Medusa v2 tren repository `medusa-core-lab`.
 
-  ## Cấu trúc Collection:
-  - **01 - Customers Test Suite (Admin API):** Chuỗi 10 bài kiểm thử liên hoàn từ Login đến Bắt lỗi nghiệp vụ.
-  - **02 - Cleanup (Run Manually):** 3 request xóa khách hàng kiểm thử, được bảo vệ tự động bằng `skipRequest()` trong chế độ Runner và chỉ chạy khi bấm Send thủ công từng request.
+  ## Cac Test Suites Chinh:
+  - **01 - Customers Test Suite (Admin API):** 10 bai kiem thu Admin quan ly Customer Module (Task 1, 2, 3), hop nhat metadata va validation.
+  - **02 - Customer Storefront Auth & Identity:** 5 bai kiem thu quy trinh dang ky, dang nhap Storefront, cap nhat ho so va xac minh Partial Unique Index cho phep Guest va Member cung email dong thoi ton tai.
+  - **03 - Order Transfer & Reconciliation:** 20 bai kiem thu nghiep vu Chuyen don hang (Task 7) chia lam 3 chu trinh:
+    - Chu trinh A: Quan tri vien Chu dong Huy yeu cau chuyen don (Cancellation Flow).
+    - Chu trinh B: Quy trinh Chuyen giao Hoan chinh va Phong thu Bao mat (Tampered Token, Duplicate Request, Replay Attack, Self-Ownership Guard, Customer Order List Verification).
+    - Chu trinh C: Tu choi Tiep nhan Chuyen don (Decline Flow).
+  - **04 - Customer Loyalty & Tier Profile:** 3 bai kiem thu Module Loyalty (Task 5), tra cuu diem thuong va thong tin thap/hang tiep theo (Next Tier).
+  - **05 - Cleanup (Run Manually):** Cac request DELETE don dep du lieu doc lap, duoc tu dong bo qua khi chay Runner de tranh xoa nham du lieu.
 
-  ## Hướng dẫn sử dụng:
-  1. **Thiết lập mật khẩu:** Copy `.env.sample` thành `.env` trong thư mục `bruno/` và điền mật khẩu admin thực tế của bạn.
-  2. **Tắt Cookie tự động:** Trong cài đặt của Bruno (Preferences / Settings), tắt tùy chọn tự động gửi cookie phiên (Clear / Disable Cookie Jar) để bảo đảm tính khách quan cho test 401.
-  3. **Chọn Environment:** Chọn môi trường **local** ở góc trên bên phải giao diện Bruno.
-  4. **Chạy Test Suite:** Nhấp chuột phải vào thư mục `01 - Customers Test Suite (Admin API)` chọn **Run Folder** (hoặc chọn **Run Collection** ở root). Tất cả 10 bài kiểm thử sẽ chạy tuần tự và hiển thị màu xanh (PASS). Cả 3 request DELETE ở thư mục Cleanup sẽ hiển thị trạng thái SKIPPED.
-  5. **Dọn dẹp (Tùy chọn):** Khi muốn xóa các bản ghi test trong database, mở thư mục `02 - Cleanup (Run Manually)` và bấm nút Send thủ công cho từng request xóa.
+  ## Huong dan su dung:
+  1. **Thiet lap mat khau:** Sao chep `.env.sample` thanh `.env` trong thu muc `bruno/` va dien mat khau Admin thuc te.
+  2. **Tat Luu Cookie:** Trong phan Cai dat (Preferences / Settings) cua Bruno, tat tinh nang Cookie Jar de dam bao tinh khach quan khi kiem thu Unauthorized (401).
+  3. **Chon Moi truong:** Chon moi truong **local** o goc tren ben phai giao dien Bruno.
+  4. **Chay Toan bo Collection:** Nhan chuot phai vao Collection chon **Run Collection** hoac chay tung Folder theo thu tu tu 01 den 04.
 }
