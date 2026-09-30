@@ -1,14 +1,24 @@
 'use client'
+
 import { createTransferRequest } from '@lib/data/orders'
 import { CheckCircleMiniSolid, XCircleSolid } from '@medusajs/icons'
 import { Heading, IconButton, Input, Text } from '@modules/common/components/ui'
-import { useActionState } from 'react'
-// TODO: Re-add Toaster component when needed
 import { SubmitButton } from '@modules/checkout/components/submit-button'
-import { useEffect, useState } from 'react'
+import { useActionState, useEffect, useState } from 'react'
+
+const RESEND_TIMEOUT_SECONDS = 120
+
+function formatCountdown(seconds: number): string {
+    const minutes = Math.floor(seconds / 60)
+    const remainingSeconds = seconds % 60
+    const formattedMinutes = minutes.toString().padStart(2, '0')
+    const formattedSeconds = remainingSeconds.toString().padStart(2, '0')
+    return `${formattedMinutes}:${formattedSeconds}`
+}
 
 export default function TransferRequestForm() {
     const [showSuccess, setShowSuccess] = useState(false)
+    const [countdown, setCountdown] = useState(0)
 
     const [state, formAction] = useActionState(createTransferRequest, {
         success: false,
@@ -19,8 +29,33 @@ export default function TransferRequestForm() {
     useEffect(() => {
         if (state.success && state.order) {
             setShowSuccess(true)
+            setCountdown(RESEND_TIMEOUT_SECONDS)
         }
     }, [state.success, state.order])
+
+    useEffect(() => {
+        if (countdown <= 0) {
+            return
+        }
+
+        const interval = setInterval(() => {
+            setCountdown((previous) => {
+                if (previous <= 1) {
+                    clearInterval(interval)
+                    return 0
+                }
+                return previous - 1
+            })
+        }, 1000)
+
+        return () => clearInterval(interval)
+    }, [countdown])
+
+    const handleDismiss = () => {
+        setShowSuccess(false)
+    }
+
+    const isCooldownActive = countdown > 0
 
     return (
         <div className="flex flex-col gap-y-4 w-full">
@@ -46,41 +81,53 @@ export default function TransferRequestForm() {
                             className="w-full"
                             name="order_id"
                             placeholder="Order ID"
+                            disabled={isCooldownActive}
+                            required
                         />
-                        <SubmitButton
-                            variant="secondary"
-                            size="small"
-                            className="w-fit whitespace-nowrap self-end"
-                        >
-                            Request transfer
-                        </SubmitButton>
+                        <div className="flex items-center justify-end gap-x-3">
+                            {isCooldownActive && (
+                                <Text className="text-xs text-neutral-500">
+                                    Resend available in {formatCountdown(countdown)}
+                                </Text>
+                            )}
+                            <SubmitButton
+                                variant="secondary"
+                                size="small"
+                                className="w-fit whitespace-nowrap self-end"
+                                disabled={isCooldownActive}
+                            >
+                                Request transfer
+                            </SubmitButton>
+                        </div>
                     </div>
                 </form>
             </div>
+
             {!state.success && state.error && (
                 <Text className="text-base-regular text-rose-500 text-right">
                     {state.error}
                 </Text>
             )}
+
             {showSuccess && (
-                <div className="flex justify-between p-4 bg-neutral-50 shadow-borders-base w-full self-stretch items-center">
-                    <div className="flex gap-x-2 items-center">
-                        <CheckCircleMiniSolid className="w-4 h-4 text-emerald-500" />
+                <div className="flex justify-between p-4 bg-emerald-50 border border-emerald-200 rounded-md w-full self-stretch items-center">
+                    <div className="flex gap-x-3 items-center">
+                        <CheckCircleMiniSolid className="w-5 h-5 text-emerald-600 flex-shrink-0" />
                         <div className="flex flex-col gap-y-1">
-                            <Text className="text-medim-pl text-neutral-950">
-                                Transfer for order {state.order?.id} requested
+                            <Text className="text-sm font-medium text-emerald-950">
+                                Transfer requested for order {state.order?.id}
                             </Text>
-                            <Text className="text-base-regular text-neutral-600">
+                            <Text className="text-xs text-emerald-800">
                                 Transfer request email sent to{' '}
-                                {state.order?.email}
+                                <span className="font-semibold">{state.order?.email}</span>. Please check your inbox to confirm.
                             </Text>
                         </div>
                     </div>
                     <IconButton
-                        className="h-fit"
-                        onClick={() => setShowSuccess(false)}
+                        className="h-fit text-emerald-700 hover:text-emerald-950"
+                        onClick={handleDismiss}
                     >
-                        <XCircleSolid className="w-4 h-4 text-neutral-500" />
+                        <XCircleSolid className="w-4 h-4" />
                     </IconButton>
                 </div>
             )}
