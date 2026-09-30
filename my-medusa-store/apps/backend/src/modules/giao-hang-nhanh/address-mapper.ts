@@ -80,6 +80,95 @@ export function removeVietnameseTones(str: string): string {
     .trim()
 }
 
+/**
+ * Phân loại 34 Tỉnh/Thành phố mới (GHN v3) theo 3 miền địa lý
+ */
+export const NORTH_PROVINCE_V3_IDS = new Set<number>([
+  1000000, // Hà Nội
+  1000004, // Hải Phòng
+  1000014, // Tuyên Quang
+  1000015, // Phú Thọ
+  1000016, // Ninh Bình
+  1000020, // Thái Nguyên
+  1000021, // Bắc Ninh
+  1000023, // Hưng Yên
+  1000024, // Lào Cai
+  1000025, // Lai Châu
+  1000026, // Điện Biên
+  1000027, // Sơn La
+  1000028, // Quảng Ninh
+  1000032, // Cao Bằng
+  1000033, // Lạng Sơn
+])
+
+export const SOUTH_PROVINCE_V3_IDS = new Set<number>([
+  1000001, // Hồ Chí Minh
+  1000005, // Cần Thơ
+  1000006, // Đồng Nai
+  1000011, // Vĩnh Long
+  1000012, // Đồng Tháp
+  1000013, // An Giang
+  1000018, // Tây Ninh
+  1000022, // Cà Mau
+])
+
+export const CENTRAL_PROVINCE_V3_IDS = new Set<number>([
+  1000002, // Huế
+  1000003, // Đà Nẵng
+  1000007, // Gia Lai
+  1000008, // Khánh Hòa
+  1000009, // Lâm Đồng
+  1000010, // Đắk Lắk
+  1000017, // Quảng Trị
+  1000019, // Quảng Ngãi
+  1000029, // Hà Tĩnh
+  1000030, // Thanh Hóa
+  1000031, // Nghệ An
+])
+
+export const NORTH_PROVINCE_V3_NAMES = [
+  "hà nội", "ha noi", "hải phòng", "hai phong", "tuyên quang", "tuyen quang",
+  "phú thọ", "phu tho", "ninh bình", "ninh binh", "thái nguyên", "thai nguyen",
+  "bắc ninh", "bac ninh", "hưng yên", "hung yen", "lào cai", "lao cai",
+  "lai châu", "lai chau", "điện biên", "dien bien", "sơn la", "son la",
+  "quảng ninh", "quang ninh", "cao bằng", "cao bang", "lạng sơn", "lang son"
+]
+
+export const SOUTH_PROVINCE_V3_NAMES = [
+  "hồ chí minh", "ho chi minh", "tp.hcm", "tphcm", "sài gòn", "sai gon",
+  "cần thơ", "can tho", "đồng nai", "dong nai", "vĩnh long", "vinh long",
+  "đồng tháp", "dong thap", "an giang", "tây ninh", "tay ninh", "cà mau", "ca mau"
+]
+
+export function detectRegion(input?: { provinceId?: number | string; provinceName?: string } | string): "NORTH" | "SOUTH" | "CENTRAL" {
+  let pId: number | undefined
+  let pName = ""
+
+  if (typeof input === "object" && input !== null) {
+    if (input.provinceId) pId = Number(input.provinceId)
+    if (input.provinceName) pName = input.provinceName
+  } else if (typeof input === "string") {
+    pName = input
+  }
+
+  // 1. Nhận diện chuẩn xác theo ID 34 Tỉnh v3
+  if (pId) {
+    if (NORTH_PROVINCE_V3_IDS.has(pId)) return "NORTH"
+    if (SOUTH_PROVINCE_V3_IDS.has(pId)) return "SOUTH"
+    if (CENTRAL_PROVINCE_V3_IDS.has(pId)) return "CENTRAL"
+  }
+
+  // 2. Nhận diện theo tên 34 Tỉnh v3
+  const p = (pName || "").toLowerCase().trim()
+  if (p) {
+    if (NORTH_PROVINCE_V3_NAMES.some((n) => p.includes(n))) return "NORTH"
+    if (SOUTH_PROVINCE_V3_NAMES.some((s) => p.includes(s))) return "SOUTH"
+  }
+
+  return "CENTRAL"
+}
+
+
 // Bảng ánh xạ 34 Tỉnh / Thành phố mới (GHN v3) với Tỉnh và Quận/Huyện trung tâm (Legacy v2)
 export const GHN_PROVINCE_V3_MAP: GhnProvinceMapping[] = [
   {

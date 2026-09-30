@@ -22,7 +22,7 @@ import type {
 } from "@medusajs/framework/types"
 
 import { GhnClient } from "./client"
-import { resolveLegacyAddress } from "./address-mapper"
+import { detectRegion, resolveLegacyAddress } from "./address-mapper"
 import type {
   GhnAvailableService,
   GhnCreateOrderRequest,
@@ -89,7 +89,9 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
     wardName: string
     districtName: string
     provinceName: string
+    provinceId?: number
     isNewAddress: boolean
+    region?: "NORTH" | "SOUTH" | "CENTRAL"
   } | null> {
     const cacheKey = locationId || "default_stock_location"
     if (this.stockLocationCache_.has(cacheKey)) {
@@ -124,6 +126,8 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       const row = rows[0]
       const meta = (row.sla_metadata || row.sl_metadata || {}) as Record<string, any>
       const ghn = (meta.ghn || {}) as Record<string, any>
+      const provinceId = Number(ghn.province_id || meta.province_id || meta.v3_province_id || 0)
+      const provinceName = String(ghn.province_name || meta.province_name || row.province || "Hồ Chí Minh")
 
       const result = {
         id: row.id,
@@ -137,8 +141,10 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
         wardCode: String(ghn.ward_code || meta.ward_code || meta.ghn_ward_code || "90741"),
         wardName: String(ghn.ward_name || meta.ward_name || "Phường Hiệp Bình"),
         districtName: String(ghn.district_name || meta.district_name || "Thành Phố Thủ Đức"),
-        provinceName: String(ghn.province_name || meta.province_name || row.province || "Hồ Chí Minh"),
+        provinceName,
+        provinceId: provinceId > 0 ? provinceId : undefined,
         isNewAddress: Boolean(ghn.is_new_address ?? meta.is_new_address ?? true),
+        region: detectRegion({ provinceId, provinceName: provinceName || row.name }),
       }
 
       this.stockLocationCache_.set(cacheKey, result)
@@ -151,6 +157,271 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       this.logger_.warn?.(`[GHN Fulfillment] Failed to resolve stock location: ${err?.message}`)
       return null
     }
+  }
+
+  /**
+   * Lấy danh sách tất cả các Stock Location đang hoạt động từ DB (có cache)
+   */
+  async resolveAllStockLocations(): Promise<Array<{
+    id: string
+    name: string
+    company?: string
+    address_1?: string
+    city?: string
+    province?: string
+    phone?: string
+    districtId: number
+    wardCode: string
+    wardName: string
+    districtName: string
+    provinceName: string
+    provinceId?: number
+    isNewAddress: boolean
+    region?: "NORTH" | "SOUTH" | "CENTRAL"
+  }>> {
+    try {
+      const knex = this.getPgConnection()
+      const rows = await knex("stock_location as sl")
+        .leftJoin("stock_location_address as sla", "sl.address_id", "sla.id")
+        .whereNull("sl.deleted_at")
+        .select(
+          "sl.id",
+          "sl.name",
+          "sl.metadata as sl_metadata",
+          "sla.address_1",
+          "sla.address_2",
+          "sla.city",
+          "sla.province",
+          "sla.phone",
+          "sla.metadata as sla_metadata"
+        )
+        .orderBy("sl.created_at", "asc")
+
+      return rows.map((row: any) => {
+        const meta = (row.sla_metadata || row.sl_metadata || {}) as Record<string, any>
+        const ghn = (meta.ghn || {}) as Record<string, any>
+        const provinceId = Number(ghn.province_id || meta.province_id || meta.v3_province_id || 0)
+        const provinceName = String(ghn.province_name || meta.province_name || row.province || "")
+        return {
+          id: row.id,
+          name: row.name,
+          company: meta.company,
+          address_1: row.address_1,
+          city: row.city,
+          province: row.province,
+          phone: row.phone || "0901234567",
+          districtId: Number(ghn.district_id || meta.district_id || meta.ghn_district_id || 3695),
+          wardCode: String(ghn.ward_code || meta.ward_code || meta.ghn_ward_code || "90741"),
+          wardName: String(ghn.ward_name || meta.ward_name || "Phường Hiệp Bình"),
+          districtName: String(ghn.district_name || meta.district_name || "Thành Phố Thủ Đức"),
+          provinceName,
+          provinceId: provinceId > 0 ? provinceId : undefined,
+          isNewAddress: Boolean(ghn.is_new_address ?? meta.is_new_address ?? true),
+          region: detectRegion({ provinceId, provinceName: provinceName || row.name }),
+        }
+      })
+    } catch (err: any) {
+      this.logger_.warn?.(`[GHN Fulfillment] Failed to resolve all stock locations: ${err?.message}`)
+      return []
+    }
+  }
+
+  /**
+   * Lọc danh sách kho theo khả năng đáp ứng tồn kho (Inventory Level)
+   */
+  async filterWarehousesByInventory(
+    warehouses: any[],
+    items: any[]
+  ): Promise<any[]> {
+    if (!warehouses || warehouses.length <= 1 || !items || items.length === 0) {
+      return warehouses
+    }
+
+    const variantIds = items
+      .map((i) => i.variant_id || i.variant?.id)
+      .filter(Boolean)
+
+    if (variantIds.length === 0) {
+      return warehouses
+    }
+
+    try {
+      const knex = this.getPgConnection()
+      const levels = await knex("product_variant_inventory_item as pvi")
+        .join("inventory_level as il", "pvi.inventory_item_id", "il.inventory_item_id")
+        .whereIn("pvi.variant_id", variantIds)
+        .whereNull("il.deleted_at")
+        .select(
+          "il.location_id",
+          "pvi.variant_id",
+          knex.raw("(il.stocked_quantity - il.reserved_quantity) as available_quantity")
+        )
+
+      const capable = warehouses.filter((wh) => {
+        return items.every((item) => {
+          const vId = item.variant_id || item.variant?.id
+          if (!vId) return true
+          const lvl = levels.find(
+            (l: any) => l.location_id === wh.id && l.variant_id === vId
+          )
+          if (!lvl) return false
+          return Number(lvl.available_quantity) >= Number(item.quantity || 1)
+        })
+      })
+
+      if (capable.length > 0) {
+        if (capable.length < warehouses.length) {
+          this.logger_.info?.(
+            `[GHN Smart Routing] Filtered warehouses by inventory availability: ${capable.map((w: any) => w.name).join(", ")}`
+          )
+        }
+        return capable
+      }
+    } catch (err: any) {
+      this.logger_.warn?.(
+        `[GHN Smart Routing] Inventory check error (continuing without filter): ${err?.message}`
+      )
+    }
+
+    return warehouses
+  }
+
+  /**
+   * Định tuyến kho thông minh (Smart Warehouse Routing):
+   * Tự động chọn kho gửi hàng tối ưu dựa trên:
+   * 1. Tồn kho thực tế (Inventory Level - chỉ chọn kho còn hàng)
+   * 2. Vùng miền địa lý theo 34 Tỉnh v3 (Khách miền Bắc chọn Kho Bắc, khách miền Nam chọn Kho Nam)
+   * 3. So sánh cước thực tế GHN (Miền Trung chọn kho có cước rẻ nhất)
+   */
+  async selectOptimalStockLocation({
+    toProvinceId,
+    toProvinceName,
+    toDistrictId,
+    toWardCode,
+    items,
+    fallbackLocationId,
+  }: {
+    toProvinceId?: number
+    toProvinceName: string
+    toDistrictId?: number
+    toWardCode?: string
+    items?: any[]
+    fallbackLocationId?: string
+  }): Promise<{
+    id: string
+    name: string
+    company?: string
+    address_1?: string
+    city?: string
+    province?: string
+    phone?: string
+    districtId: number
+    wardCode: string
+    wardName: string
+    districtName: string
+    provinceName: string
+    provinceId?: number
+    isNewAddress: boolean
+    region?: "NORTH" | "SOUTH" | "CENTRAL"
+  } | null> {
+    const allWarehouses = await this.resolveAllStockLocations()
+    if (!allWarehouses || allWarehouses.length === 0) {
+      return this.resolveStockLocation(fallbackLocationId)
+    }
+
+    if (allWarehouses.length === 1) {
+      return allWarehouses[0]
+    }
+
+    // 1. Lọc kho còn hàng trong tồn kho
+    const eligibleWarehouses = await this.filterWarehousesByInventory(
+      allWarehouses,
+      items || []
+    )
+    if (eligibleWarehouses.length === 1) {
+      this.logger_.info?.(
+        `[GHN Smart Routing] Only 1 warehouse has sufficient inventory: "${eligibleWarehouses[0].name}"`
+      )
+      return eligibleWarehouses[0]
+    }
+
+    // 2. Khớp vùng miền địa lý đích theo 34 Tỉnh v3 (Fast Geo Matching)
+    const targetRegion = detectRegion({
+      provinceId: toProvinceId,
+      provinceName: toProvinceName,
+    })
+    this.logger_.info?.(
+      `[GHN Smart Routing] Destination "${toProvinceName}" (ID: ${toProvinceId}) detected as Region: ${targetRegion}`
+    )
+
+    if (targetRegion === "NORTH") {
+      const northWh = eligibleWarehouses.find(
+        (w) =>
+          w.region === "NORTH" ||
+          w.name.toLowerCase().includes("north") ||
+          w.name.toLowerCase().includes("bắc")
+      )
+      if (northWh) {
+        this.logger_.info?.(
+          `[GHN Smart Routing] Matched Northern warehouse: "${northWh.name}" for destination: "${toProvinceName}"`
+        )
+        return northWh
+      }
+    }
+
+    if (targetRegion === "SOUTH") {
+      const southWh = eligibleWarehouses.find(
+        (w) =>
+          w.region === "SOUTH" ||
+          w.name.toLowerCase().includes("south") ||
+          w.name.toLowerCase().includes("nam")
+      )
+      if (southWh) {
+        this.logger_.info?.(
+          `[GHN Smart Routing] Matched Southern warehouse: "${southWh.name}" for destination: "${toProvinceName}"`
+        )
+        return southWh
+      }
+    }
+
+    // 3. Miền Trung (CENTRAL) hoặc trường hợp giáp ranh / không rõ vùng:
+    // So sánh cước GHN thực tế giữa các kho ứng viên để chọn kho có cước rẻ nhất
+    if (toDistrictId) {
+      try {
+        const feePromises = eligibleWarehouses.map(async (wh) => {
+          try {
+            const fee = await this.client_.calculateFee({
+              from_district_id: wh.districtId,
+              from_ward_code: wh.wardCode,
+              service_type_id: 2,
+              to_district_id: toDistrictId,
+              to_ward_code: toWardCode,
+              weight: 500,
+            })
+            return { warehouse: wh, fee: fee.total }
+          } catch {
+            return { warehouse: wh, fee: Infinity }
+          }
+        })
+
+        const feeResults = await Promise.all(feePromises)
+        const validResults = feeResults.filter((r) => r.fee < Infinity)
+        if (validResults.length > 0) {
+          validResults.sort((a, b) => a.fee - b.fee)
+          const best = validResults[0]
+          this.logger_.info?.(
+            `[GHN Smart Routing] Selected warehouse with lowest fee (${best.fee}₫): "${best.warehouse.name}" for "${toProvinceName}"`
+          )
+          return best.warehouse
+        }
+      } catch (err: any) {
+        this.logger_.warn?.(
+          `[GHN Smart Routing] Fee comparison failed, falling back to first warehouse: ${err?.message}`
+        )
+      }
+    }
+
+    return eligibleWarehouses[0]
   }
 
   constructor(container: InjectedDependencies, options: GhnModuleOptions) {
@@ -483,37 +754,6 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
         })
       }
 
-      // Lấy thông tin kho gửi hàng (Ship From):
-      // 1. Ưu tiên lấy từ Stock Location trong context (địa chỉ kho thực tế)
-      // 2. Tự động truy vấn từ Stock Location DB nếu context chưa có
-      const fromLocation = (context as any)?.from_location
-      const fromMeta = (
-        fromLocation?.address?.metadata ||
-        fromLocation?.metadata ||
-        {}
-      ) as Record<string, any>
-      const fromGhn = (fromMeta?.ghn || {}) as Record<string, any>
-
-      let fromDistrictId = Number(
-        fromGhn?.district_id ||
-        fromMeta?.ghn_district_id ||
-        fromMeta?.district_id
-      )
-      let fromWardCode = String(
-        fromGhn?.ward_code ||
-        fromMeta?.ghn_ward_code ||
-        fromMeta?.ward_code ||
-        ""
-      )
-
-      if (!fromDistrictId || !fromWardCode) {
-        const resolvedStockLocation = await this.resolveStockLocation(fromLocation?.id)
-        if (resolvedStockLocation) {
-          fromDistrictId = resolvedStockLocation.districtId
-          fromWardCode = resolvedStockLocation.wardCode
-        }
-      }
-
       // Fallback giá tạm tính khi không có địa chỉ người nhận nào
       if (!toDistrictId && !toProvinceName) {
         this.logger_.warn?.(
@@ -525,15 +765,36 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
         }
       }
 
-      // Resolve service_type_id động dựa vào tuyến đường và cân nặng
-      let serviceTypeId: number
       const effectiveToDistrict = toDistrictId || 1442 // Fallback Quận 1 nếu dùng form mặc định
 
+      // Định tuyến kho thông minh (Smart Warehouse Routing):
+      // Tự động phân tích địa chỉ nhận hàng theo 34 Tỉnh v3 và kiểm tra tồn kho (Inventory Level)
+      // để chọn kho gần nhất, cước phí thấp nhất và giao hàng nhanh nhất.
+      const fromLocation = (context as any)?.from_location
+      const optimalWarehouse = await this.selectOptimalStockLocation({
+        toProvinceId: metadata?.ghn_province_id ? Number(metadata.ghn_province_id) : undefined,
+        toProvinceName: String(toProvinceName || ""),
+        toDistrictId: effectiveToDistrict,
+        toWardCode: toWardCode ? String(toWardCode) : undefined,
+        items,
+        fallbackLocationId: fromLocation?.id,
+      })
+
+      const fromDistrictId = optimalWarehouse?.districtId || 3695
+      const fromWardCode = optimalWarehouse?.wardCode || "90741"
+
+      this.logger_.info?.(
+        `[GHN Smart Routing] Routed checkout to warehouse: "${optimalWarehouse?.name || "Default"}" (${optimalWarehouse?.provinceName}) [districtId=${fromDistrictId}, wardCode=${fromWardCode}] for destination "${toProvinceName}"`
+      )
+
+      // Resolve service_type_id động dựa vào tuyến đường và cân nặng
+      let serviceTypeId: number
       serviceTypeId = await this.resolveServiceTypeId(
         fromDistrictId,
         effectiveToDistrict,
         totalWeight
       )
+
 
       const feePayload: GhnFeeRequest = {
         from_district_id: fromDistrictId,
@@ -986,10 +1247,17 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       customFrom?.ward_code
     )
 
-    // Tầng 2: Nếu additional_data không có địa chỉ kho, tự động resolve từ DB (kết hợp in-memory cache)
+    // Tầng 2: Nếu additional_data không có địa chỉ kho, tự động áp dụng Smart Routing theo địa chỉ nhận
     const resolvedStockLocation = hasCustomSender
       ? null
-      : await this.resolveStockLocation((fulfillment as any)?.location_id)
+      : await this.selectOptimalStockLocation({
+          toProvinceId: metadata?.ghn_province_id ? Number(metadata.ghn_province_id) : undefined,
+          toProvinceName,
+          toDistrictId,
+          toWardCode: mappedOrderAddress?.wardCode || metadata?.ghn_ward_code,
+          items: orderItems,
+          fallbackLocationId: (fulfillment as any)?.location_id,
+        })
 
     const fromName = String(
       customFrom?.from_name ||
@@ -1003,6 +1271,7 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
 
     const fromPhone = String(
       customFrom?.from_phone ||
+      customFrom?.phone ||
       customFrom?.phone ||
       resolvedStockLocation?.phone ||
       this.options_.fromPhone ||
@@ -1023,7 +1292,7 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       customFrom?.wardName ||
       resolvedStockLocation?.wardName ||
       this.options_.fromWardName ||
-      "Phường Hiệp Bình Chánh"
+      "Phường Hiệp Bình"
     )
 
     const fromDistrictName = String(
