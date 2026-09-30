@@ -1,0 +1,24 @@
+meta {
+  name: 07 - Reject Transfer Without Auth
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/store/orders/{{transferOrderId}}/transfer/request
+  body: none
+  auth: none
+}
+
+tests {
+  test("401 Unauthorized", function () {
+    expect(res.getStatus()).to.equal(401);
+  });
+}
+
+docs {
+  # 07 - Reject Transfer Without Auth
+
+  Kiem thu rao chan bao mat: Nguoi dung an danh (khong co Bearer token) co tinh gui yeu cau chuyen giao don hang qua Store API.
+  He thong phai lap tuc tu choi voi HTTP 401 Unauthorized vi yeu cau chuyen don bat buoc phai xac dinh duoc Customer Actor ID.
+}

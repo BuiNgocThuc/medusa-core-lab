@@ -1,0 +1,29 @@
+meta {
+  name: 14 - Reject Transfer On Owned Order
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/store/orders/{{transferOrderId}}/transfer/request
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{customerToken}}
+}
+
+tests {
+  test("400 Bad Request (Order already belongs to customer)", function () {
+    expect(res.getStatus()).to.equal(400);
+  });
+}
+
+docs {
+  # 14 - Reject Transfer On Owned Order
+
+  Kiem thu ranh gioi nghiep vu (Self-Ownership Guard):
+  Khach hang co tinh gui yeu cau chuyen giao mot don hang von da thuoc ve chinh tai khoan cua minh.
+  Medusa Core validate tai `requestOrderTransferValidationStep` va chan dung voi loi HTTP 400 Bad Request ("Order already belongs to customer").
+}

@@ -1,0 +1,50 @@
+meta {
+  name: 19 - Admin Extract Decline Token
+  type: http
+  seq: 19
+}
+
+get {
+  url: {{baseUrl}}/admin/orders/{{declineOrderId}}/changes
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.order_changes) {
+    for (const change of body.order_changes) {
+      if (change.status === 'requested' && change.actions) {
+        const action = change.actions.find(a => 
+          (a.action && a.action.toUpperCase() === 'TRANSFER_CUSTOMER')
+        );
+        if (action && action.details && action.details.token) {
+          bru.setVar('declineToken', action.details.token);
+          bru.setEnvVar('declineToken', action.details.token);
+          break;
+        }
+      }
+    }
+  }
+}
+
+tests {
+  test("200 OK", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("extracted valid decline token", function () {
+    const token = bru.getVar('declineToken');
+    expect(token).to.be.a('string');
+    expect(token.length).to.be.greaterThan(10);
+  });
+}
+
+docs {
+  # 19 - Admin Extract Decline Token
+
+  Trich xuat Token xac nhan cho don hang `{{declineOrderId}}` qua quyen Admin va luu vao bien `{{declineToken}}`.
+}

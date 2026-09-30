@@ -1,0 +1,50 @@
+meta {
+  name: 09 - Admin Extract Transfer Token
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/admin/orders/{{transferOrderId}}/changes
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.order_changes) {
+    for (const change of body.order_changes) {
+      if (change.status === 'requested' && change.actions) {
+        const action = change.actions.find(a => 
+          (a.action && a.action.toUpperCase() === 'TRANSFER_CUSTOMER')
+        );
+        if (action && action.details && action.details.token) {
+          bru.setVar('transferToken', action.details.token);
+          bru.setEnvVar('transferToken', action.details.token);
+          break;
+        }
+      }
+    }
+  }
+}
+
+tests {
+  test("200 OK", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("extracted valid transfer token", function () {
+    const token = bru.getVar('transferToken');
+    expect(token).to.be.a('string');
+    expect(token.length).to.be.greaterThan(10);
+  });
+}
+
+docs {
+  # 09 - Admin Extract Transfer Token
+
+  Do Medusa Core bao mat Store API bang cach khong bao gio tra token xac nhan ve phia Storefront (token chi duoc gui qua email goc), quy trinh test tu dong su dung quyen Admin de truy van `order_change.actions` va trich xuat Token UUID v4 an toan vao bien `{{transferToken}}`.
+}

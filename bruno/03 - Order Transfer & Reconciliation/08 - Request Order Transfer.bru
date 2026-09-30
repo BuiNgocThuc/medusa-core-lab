@@ -1,0 +1,33 @@
+meta {
+  name: 08 - Request Order Transfer
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/store/orders/{{transferOrderId}}/transfer/request
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{customerToken}}
+}
+
+tests {
+  test("200 OK", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("creates pending transfer request", function () {
+    const order = res.getBody().order;
+    expect(order).to.be.an('object');
+    expect(order.id).to.equal(bru.getVar('transferOrderId'));
+  });
+}
+
+docs {
+  # 08 - Request Order Transfer
+
+  Khach hang thanh vien hop le gui yeu cau chuyen giao don hang bang Bearer `{{customerToken}}`.
+  Medusa v2 tao `order_change` o trang thai `requested` va phat su kien `order.transfer_requested`.
+}

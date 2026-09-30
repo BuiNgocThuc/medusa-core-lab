@@ -1,0 +1,43 @@
+meta {
+  name: 02 - Admin Convert Order To Guest For Cancel
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/admin/orders/{{cancelOrderId}}/transfer/guest
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "{{cancelOrderEmail}}"
+  }
+}
+
+tests {
+  test("200 OK", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("converted order to guest customer", function () {
+    const order = res.getBody().order;
+    expect(order).to.be.an('object');
+    expect(order.id).to.equal(bru.getVar('cancelOrderId'));
+  });
+}
+
+docs {
+  # 02 - Admin Convert Order To Guest For Cancel
+
+  Su dung Medusa v2 native workflow `POST /admin/orders/:id/transfer/guest` de chu dong chuyen doi don hang ve quyen so huu cua Guest customer voi email `{{cancelOrderEmail}}`.
+  Dieu nay dam bao bo test suite hoan toan doc lap, tu cung tu cap du lieu va khong bao gio bi fail do thieu don hang Guest.
+}

@@ -1,0 +1,35 @@
+meta {
+  name: 15 - Verify Transferred Order in Customer Orders
+  type: http
+  seq: 15
+}
+
+get {
+  url: {{baseUrl}}/store/orders
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{customerToken}}
+}
+
+tests {
+  test("200 OK", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("transferred order appears in member order list", function () {
+    const orders = res.getBody().orders;
+    expect(orders).to.be.an('array');
+    const targetId = bru.getVar('transferOrderId');
+    const found = orders.some(o => o.id === targetId);
+    expect(found).to.equal(true);
+  });
+}
+
+docs {
+  # 15 - Verify Transferred Order in Customer Orders
+
+  Khach hang thanh vien kiem tra danh sach don hang ca nhan qua Store API `GET /store/orders`.
+  Xac minh don hang `{{transferOrderId}}` da thuc su xuat hien trong danh sach don hang cua tai khoan thanh vien.
+}

@@ -1,0 +1,33 @@
+meta {
+  name: 04 - Admin Cancel Transfer Request
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/admin/orders/{{cancelOrderId}}/transfer/cancel
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+tests {
+  test("200 OK", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("admin successfully cancels transfer request", function () {
+    const order = res.getBody().order;
+    expect(order).to.be.an('object');
+    expect(order.id).to.equal(bru.getVar('cancelOrderId'));
+  });
+}
+
+docs {
+  # 04 - Admin Cancel Transfer Request
+
+  Quan tri vien can thiep va chu dong huy bo yeu cau chuyen don hang qua endpoint `POST /admin/orders/:id/transfer/cancel`.
+  Trang thai cua `order_change` se duoc chuyen sang `canceled`.
+}

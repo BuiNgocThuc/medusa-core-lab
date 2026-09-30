@@ -1,0 +1,45 @@
+meta {
+  name: 20 - Decline Order Transfer
+  type: http
+  seq: 20
+}
+
+post {
+  url: {{baseUrl}}/store/orders/{{declineOrderId}}/transfer/decline
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{customerToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "token": "{{declineToken}}"
+  }
+}
+
+tests {
+  test("200 OK", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("successfully declines order transfer", function () {
+    const order = res.getBody().order;
+    expect(order).to.be.an('object');
+    expect(order.id).to.equal(bru.getVar('declineOrderId'));
+  });
+}
+
+docs {
+  # 20 - Decline Order Transfer
+
+  Nguoi dung chu dong tu choi yeu cau tiep nhan chuyen giao don hang qua endpoint `POST /store/orders/:id/transfer/decline`.
+  Medusa Core kich hoat `declineOrderTransferRequestWorkflow`:
+  - Yeu cau chuyen don bi huy bo.
+  - Don hang giu nguyen quyen so huu cua khach cu, khong bi chuyen giao.
+}

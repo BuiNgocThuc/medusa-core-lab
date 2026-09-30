@@ -1,0 +1,33 @@
+meta {
+  name: 03 - Request Transfer For Cancel
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/store/orders/{{cancelOrderId}}/transfer/request
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{customerToken}}
+}
+
+tests {
+  test("200 OK", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("creates pending order transfer request", function () {
+    const order = res.getBody().order;
+    expect(order).to.be.an('object');
+    expect(order.id).to.equal(bru.getVar('cancelOrderId'));
+  });
+}
+
+docs {
+  # 03 - Request Transfer For Cancel
+
+  Khach hang thanh vien (Storefront Member) gui yeu cau tiep nhan don hang qua endpoint `POST /store/orders/:id/transfer/request`.
+  He thong tao mot `order_change` o trang thai `requested`.
+}

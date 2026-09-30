@@ -1,0 +1,32 @@
+meta {
+  name: 18 - Request Transfer For Decline
+  type: http
+  seq: 18
+}
+
+post {
+  url: {{baseUrl}}/store/orders/{{declineOrderId}}/transfer/request
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{customerToken}}
+}
+
+tests {
+  test("200 OK", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("creates pending transfer request", function () {
+    const order = res.getBody().order;
+    expect(order).to.be.an('object');
+    expect(order.id).to.equal(bru.getVar('declineOrderId'));
+  });
+}
+
+docs {
+  # 18 - Request Transfer For Decline
+
+  Khach hang gui yeu cau chuyen giao don hang de chuan bi kiem thu hanh vi Tu choi (Decline Flow).
+}

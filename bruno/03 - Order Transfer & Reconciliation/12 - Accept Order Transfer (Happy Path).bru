@@ -1,0 +1,45 @@
+meta {
+  name: 12 - Accept Order Transfer (Happy Path)
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/store/orders/{{transferOrderId}}/transfer/accept
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{customerToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "token": "{{transferToken}}"
+  }
+}
+
+tests {
+  test("200 OK", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("transfers order to authenticated member", function () {
+    const order = res.getBody().order;
+    expect(order).to.be.an('object');
+    expect(order.id).to.equal(bru.getVar('transferOrderId'));
+  });
+}
+
+docs {
+  # 12 - Accept Order Transfer (Happy Path)
+
+  Thuc hien xac nhan tiep nhan don hang thanh cong bang token hop le `{{transferToken}}`.
+  Workflow `acceptOrderTransferWorkflow` cua Medusa Core hoan tat:
+  - Cap nhat `customer_id` cua don hang sang thanh vien hien tai.
+  - Chuyen trang thai `order_change` sang `confirmed`.
+}

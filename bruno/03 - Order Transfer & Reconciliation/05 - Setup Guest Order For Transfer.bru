@@ -1,0 +1,44 @@
+meta {
+  name: 05 - Setup Guest Order For Transfer
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/admin/orders?limit=5
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.orders && body.orders.length > 0) {
+    const order = body.orders[4] || body.orders[1] || body.orders[0];
+    const email = `guest_transfer_${Date.now()}@example.test`;
+    bru.setVar('transferOrderId', order.id);
+    bru.setEnvVar('transferOrderId', order.id);
+    bru.setVar('transferOrderEmail', email);
+    bru.setEnvVar('transferOrderEmail', email);
+  }
+}
+
+tests {
+  test("200 OK", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("found orders in system", function () {
+    expect(res.getBody().orders).to.be.an('array');
+    expect(res.getBody().orders.length).to.be.greaterThan(0);
+  });
+}
+
+docs {
+  # 05 - Setup Guest Order For Transfer
+
+  Chon mot don hang trong he thong cho Chu trinh Chuyen giao chinh thuc (Full Transfer & Security Flow).
+  Script se luu ID don vao bien `{{transferOrderId}}` va tao email guest `{{transferOrderEmail}}`.
+}

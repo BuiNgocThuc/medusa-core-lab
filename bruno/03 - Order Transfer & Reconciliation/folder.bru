@@ -1,0 +1,19 @@
+meta {
+  name: 03 - Order Transfer & Reconciliation
+  seq: 3
+}
+
+headers {
+  x-publishable-api-key: {{publishableApiKey}}
+}
+
+docs {
+  # 03 - Order Transfer & Reconciliation
+
+  Thu muc nay chua chuoi kiem thu toan dien cho tinh nang Chuyen don hang (Order Transfer - Task 7) va tai hoa giai tai khoan (Reconciliation).
+  
+  Bao gom 3 chu trinh doc lap:
+  - **Chu trinh A (Cancellation Flow - Requests 01-04):** Chu dong chuyen 1 don hang ve Guest, gui yeu cau transfer tu phia khach va Admin chu dong huy yeu cau.
+  - **Chu trinh B (Full Transfer & Security Flow - Requests 05-15):** Chu dong chuyen 1 don hang ve Guest, kiem thu cac rao chan bao mat (401 khong auth, 400 yeu cau trung lap, 400 token gia mao), chap thuan chuyen don thanh cong (Happy Path), chan tan cong phat lai (Anti-Replay 400), chan yeu cau chuyen don tren don da so huu (400 Self-Ownership), va xac minh don hang xuat hien trong danh sach cua thanh vien.
+  - **Chu trinh C (Decline Flow - Requests 16-20):** Chu dong chuyen 1 don hang ve Guest, gui yeu cau chuyen don va nguoi dung Storefront chu dong tu choi tiep nhan qua token (/store/orders/:id/transfer/decline).
+}

@@ -1,0 +1,28 @@
+meta {
+  name: 10 - Reject Duplicate Transfer Request
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/store/orders/{{transferOrderId}}/transfer/request
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{customerToken}}
+}
+
+tests {
+  test("400 Bad Request (duplicate pending change)", function () {
+    expect(res.getStatus()).to.equal(400);
+  });
+}
+
+docs {
+  # 10 - Reject Duplicate Transfer Request
+
+  Kiem thu ranh gioi nghiep vu: Khach hang co tinh spam hoac gui lai yeu cau chuyen giao tren cung mot don hang khi yeu cau cu van dang o trang thai `requested` (chua duoc duyet/chua bi huy).
+  Medusa v2 phai chan dung voi HTTP 400 Bad Request vi don hang dang co mot `order_change` ton tai chua hoan tat.
+}

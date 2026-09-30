@@ -1,0 +1,43 @@
+meta {
+  name: 06 - Admin Convert Order To Guest For Transfer
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/admin/orders/{{transferOrderId}}/transfer/guest
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "{{transferOrderEmail}}"
+  }
+}
+
+tests {
+  test("200 OK", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("converted order to guest customer", function () {
+    const order = res.getBody().order;
+    expect(order).to.be.an('object');
+    expect(order.id).to.equal(bru.getVar('transferOrderId'));
+  });
+}
+
+docs {
+  # 06 - Admin Convert Order To Guest For Transfer
+
+  Chuyen doi don hang `{{transferOrderId}}` ve quyen so huu cua Guest voi email `{{transferOrderEmail}}`.
+  Dam bao san sang cho cac buoc kiem thu bao mat va chuyen giao.
+}

@@ -1,0 +1,44 @@
+meta {
+  name: 16 - Setup Guest Order For Decline
+  type: http
+  seq: 16
+}
+
+get {
+  url: {{baseUrl}}/admin/orders?limit=5
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+script:post-response {
+  const body = res.getBody();
+  if (body && body.orders && body.orders.length > 0) {
+    const order = body.orders[5] || body.orders[2] || body.orders[0];
+    const email = `guest_decline_${Date.now()}@example.test`;
+    bru.setVar('declineOrderId', order.id);
+    bru.setEnvVar('declineOrderId', order.id);
+    bru.setVar('declineOrderEmail', email);
+    bru.setEnvVar('declineOrderEmail', email);
+  }
+}
+
+tests {
+  test("200 OK", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("found orders in system", function () {
+    expect(res.getBody().orders).to.be.an('array');
+    expect(res.getBody().orders.length).to.be.greaterThan(0);
+  });
+}
+
+docs {
+  # 16 - Setup Guest Order For Decline
+
+  Chon mot don hang trong he thong cho Chu trinh Tu choi chuyen don (Decline Flow).
+  Script se luu ID don vao bien `{{declineOrderId}}` va email guest `{{declineOrderEmail}}`.
+}
