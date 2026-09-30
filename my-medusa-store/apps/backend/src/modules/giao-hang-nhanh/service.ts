@@ -133,10 +133,10 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
         city: row.city,
         province: row.province,
         phone: row.phone || "0901234567",
-        districtId: Number(ghn.district_id || meta.district_id || meta.ghn_district_id || 1460),
-        wardCode: String(ghn.ward_code || meta.ward_code || meta.ghn_ward_code || "22114"),
-        wardName: String(ghn.ward_name || meta.ward_name || "Xã Củ Chi"),
-        districtName: String(ghn.district_name || meta.district_name || "Huyện Củ Chi"),
+        districtId: Number(ghn.district_id || meta.district_id || meta.ghn_district_id || 3695),
+        wardCode: String(ghn.ward_code || meta.ward_code || meta.ghn_ward_code || "90741"),
+        wardName: String(ghn.ward_name || meta.ward_name || "Phường Hiệp Bình"),
+        districtName: String(ghn.district_name || meta.district_name || "Thành Phố Thủ Đức"),
         provinceName: String(ghn.province_name || meta.province_name || row.province || "Hồ Chí Minh"),
         isNewAddress: Boolean(ghn.is_new_address ?? meta.is_new_address ?? true),
       }
@@ -998,7 +998,7 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       resolvedStockLocation?.company ||
       resolvedStockLocation?.name ||
       this.options_.fromName ||
-      "Kho Củ Chi SOC (HCM Mega SOC)"
+      "South Warehouse"
     ).slice(0, 1024)
 
     const fromPhone = String(
@@ -1014,7 +1014,7 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       customFrom?.address_1 ||
       resolvedStockLocation?.address_1 ||
       this.options_.fromAddress ||
-      "WHC3+PH7, Đường N13, Củ Chi, Hồ Chí Minh"
+      "123 Đường Hiệp Bình, Phường Hiệp Bình, TP. Hồ Chí Minh"
     ).slice(0, 1024)
 
     const fromWardName = String(
@@ -1023,7 +1023,7 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       customFrom?.wardName ||
       resolvedStockLocation?.wardName ||
       this.options_.fromWardName ||
-      "Xã Củ Chi"
+      "Phường Hiệp Bình Chánh"
     )
 
     const fromDistrictName = String(
@@ -1032,7 +1032,7 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       customFrom?.districtName ||
       resolvedStockLocation?.districtName ||
       this.options_.fromDistrictName ||
-      "Huyện Củ Chi"
+      "Thành Phố Thủ Đức"
     )
 
     const fromProvinceName = String(

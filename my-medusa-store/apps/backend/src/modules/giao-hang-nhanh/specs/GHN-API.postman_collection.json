@@ -1,8 +1,8 @@
 {
   "info": {
     "_postman_id": "ghn-v2-api-collection",
-    "name": "GHN Open API - Shipping & Fulfillment (34 Tỉnh Thành Mới)",
-    "description": "Bộ Postman Collection chuẩn tích hợp Giao Hàng Nhanh (GHN) cho Medusa v2 Fulfillment Provider. Đã cập nhật 100% sang API Địa giới hành chính mới (34 Tỉnh/Thành phố & Phường/Xã theo mô hình 2 cấp của GHN áp dụng từ 01/07/2025, thay cho mô hình 63/64 tỉnh thành cũ). Bao gồm: Lấy danh sách Shop, Master Data Mới (34 Tỉnh/Thành & Phường/Xã theo ID), Dịch vụ khả dụng, Tính cước phí (Gói Chuẩn Type 2 & Hàng Nặng Type 5), Vòng đời đơn hàng GHN (is_new_to_address), và API Medusa Storefront Proxy (Redis Cache 24h).",
+    "name": "GHN Open API & Medusa Fulfillment - Complete Suite",
+    "description": "Bộ Postman Collection hoàn chỉnh tích hợp Giao Hàng Nhanh (GHN) cho Medusa v2. Bao gồm: \n1. Quản lý Shop & Ca lấy hàng\n2. Master Data Tỉnh Mới (34 Tỉnh/Thành & Phường/Xã v3 2 cấp)\n3. Master Data Tỉnh Cũ (63 Tỉnh/Thành, Quận/Huyện, Phường/Xã Legacy 3 cấp)\n4. Bảng tính cước dự kiến (Hàng nhẹ Type 2 & Hàng nặng Type 5) và Tra cứu cước thực tế đơn hàng (SOC API)\n5. Vòng đời đơn hàng GHN (Xem trước đơn, Tạo đơn 2 cấp mới & 3 cấp cũ, Tra cứu chi tiết, In vận đơn A5/80x80/52x70, Hủy đơn, Cập nhật đơn)\n6. Simulator Webhook Chuyển Trạng Thái Đơn Hàng vào Medusa Backend với đầy đủ payload chuẩn (ready_to_pick, picking, picked, transporting, delivering, delivered kèm ảnh POD, delivery_fail, cancel, returning, returned, và Ticket callback)\n7. Medusa Storefront Proxy API (Cache Redis 24h, Cart Shipping Address, Shipping Option Calculation).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -27,8 +27,38 @@
       "type": "string"
     },
     {
+      "key": "provinceIdLegacy",
+      "value": "202",
+      "type": "string"
+    },
+    {
+      "key": "districtIdLegacy",
+      "value": "1442",
+      "type": "string"
+    },
+    {
+      "key": "wardCodeLegacy",
+      "value": "20110",
+      "type": "string"
+    },
+    {
+      "key": "orderCode",
+      "value": "L8ALLU",
+      "type": "string"
+    },
+    {
+      "key": "clientOrderCode",
+      "value": "ORD-10-N4VPYQM1",
+      "type": "string"
+    },
+    {
       "key": "medusaUrl",
       "value": "http://localhost:9099",
+      "type": "string"
+    },
+    {
+      "key": "webhookSecret",
+      "value": "ghn_secret_hailinh_deptrai",
       "type": "string"
     },
     {
@@ -49,7 +79,7 @@
   ],
   "item": [
     {
-      "name": "01. Shop Management",
+      "name": "01. Shop Management & Operations",
       "item": [
         {
           "name": "Lấy danh sách Cửa hàng (Get All Shops)",
@@ -71,20 +101,59 @@
             },
             "url": {
               "raw": "{{baseUrl}}/v2/shop/all",
-              "host": ["{{baseUrl}}"],
-              "path": ["v2", "shop", "all"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v2",
+                "shop",
+                "all"
+              ]
             },
-            "description": "API lấy danh sách các Shop thuộc về Token này. Trường `_id` trong kết quả chính là `ShopId`."
+            "description": "API lấy danh sách các Shop thuộc về Token này. Trường `_id` trong kết quả chính là `ShopId` (ví dụ 225452)."
+          },
+          "response": []
+        },
+        {
+          "name": "Lấy danh sách Ca lấy hàng (Get Pick Shift Date)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Token",
+                "value": "{{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v2/shift/date",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v2",
+                "shift",
+                "date"
+              ]
+            },
+            "description": "API tra cứu các ca tài xế GHN có thể đến địa chỉ kho của shop để lấy hàng (ví dụ: Ca trưa 12h-18h, Ca sáng 7h-12h ngày mai...)."
           },
           "response": []
         }
       ]
     },
     {
-      "name": "02. Master Data (Địa giới hành chính 2 cấp - Mới)",
+      "name": "02. Master Data - Tỉnh/Thành & Phường/Xã Mới (v3 2 cấp)",
       "item": [
         {
-          "name": "Lấy danh sách Tỉnh / Thành phố mới - 34 Tỉnh/Thành (Get Provinces - New)",
+          "name": "Lấy danh sách Tỉnh / Thành phố mới - 34 Tỉnh/Thành (Get Provinces - New v3)",
           "request": {
             "method": "GET",
             "header": [
@@ -103,27 +172,34 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/v3/master-data/province/all?offset=0&limit=200",
-              "host": ["{{baseUrl}}"],
-              "path": ["v3", "master-data", "province", "all"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v3",
+                "master-data",
+                "province",
+                "all"
+              ],
               "query": [
                 {
                   "key": "offset",
                   "value": "0",
-                  "description": "Vị trí bắt đầu khi phân trang. Mặc định: 0"
+                  "description": "Vị trí bắt đầu khi phân trang"
                 },
                 {
                   "key": "limit",
                   "value": "200",
-                  "description": "Số phần tử tối đa, không quá 200. Bỏ trống hoặc 0 để lấy tất cả (hiện có 34 tỉnh/thành nên một lần gọi là đủ)"
+                  "description": "Số phần tử tối đa (hiện có 34 tỉnh/thành mới)"
                 }
               ]
             },
-            "description": "API lấy danh sách 34 Tỉnh/Thành phố mới nhất theo mô hình hành chính 2 cấp (mới sau 01/07/2025 theo GHN Developer Docs: https://developer.ghn.dev/vi/docs/master-data/get-province-new). `name` trả về được dùng trực tiếp cho `to_province_name` khi Tạo đơn với `is_new_to_address: true`. `_id` dùng truyền vào `province_id` khi gọi API Lấy Phường/Xã mới."
+            "description": "API lấy danh sách 34 Tỉnh/Thành phố mới nhất theo mô hình hành chính 2 cấp của GHN (áp dụng từ 01/07/2025). `name` trả về được dùng trực tiếp cho `to_province_name` khi Tạo đơn với `is_new_to_address: true`. `_id` dùng truyền vào `province_id` khi gọi API Lấy Phường/Xã mới."
           },
           "response": []
         },
         {
-          "name": "Lấy danh sách Phường / Xã mới theo Tỉnh/Thành (Get Wards - New)",
+          "name": "Lấy danh sách Phường / Xã mới theo Tỉnh/Thành (Get Wards - New v3)",
           "request": {
             "method": "GET",
             "header": [
@@ -142,34 +218,134 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/v3/master-data/ward/all-by-province-id?province_id={{provinceIdV3}}&offset=0&limit=200",
-              "host": ["{{baseUrl}}"],
-              "path": ["v3", "master-data", "ward", "all-by-province-id"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v3",
+                "master-data",
+                "ward",
+                "all-by-province-id"
+              ],
               "query": [
                 {
                   "key": "province_id",
                   "value": "{{provinceIdV3}}",
-                  "description": "Mã tỉnh/thành hệ 2 cấp (_id từ API get-province-new, ví dụ 1000001: TP. Hồ Chí Minh, 1000000: Hà Nội, 1000003: Đà Nẵng...)"
+                  "description": "Mã tỉnh/thành hệ 2 cấp (_id từ API get-province-new, ví dụ 1000001: TP. Hồ Chí Minh)"
                 },
                 {
                   "key": "offset",
                   "value": "0",
-                  "description": "Vị trí bắt đầu khi phân trang. Mặc định: 0"
+                  "description": "Vị trí bắt đầu"
                 },
                 {
                   "key": "limit",
                   "value": "200",
-                  "description": "Số phần tử tối đa, không quá 200 (TP.HCM có 168 phường/xã nên limit 200 là đủ)"
+                  "description": "Số phần tử tối đa"
                 }
               ]
             },
-            "description": "API lấy danh sách Phường/Xã trực thuộc thẳng Tỉnh/Thành phố theo mô hình hành chính 2 cấp (không còn cấp quận/huyện theo GHN Developer Docs: https://developer.ghn.dev/vi/docs/master-data/get-ward-new). `name` trả về được dùng trực tiếp cho `to_ward_name` khi Tạo đơn với `is_new_to_address: true`."
+            "description": "API lấy danh sách Phường/Xã trực thuộc thẳng Tỉnh/Thành phố theo mô hình hành chính 2 cấp (không còn cấp quận/huyện). `name` trả về được dùng trực tiếp cho `to_ward_name` khi Tạo đơn với `is_new_to_address: true`."
           },
           "response": []
         }
       ]
     },
     {
-      "name": "03. Fees & Services (Tính cước & Gói dịch vụ)",
+      "name": "03. Master Data - Tỉnh/Huyện/Xã Cũ (Legacy 3 cấp)",
+      "item": [
+        {
+          "name": "Lấy danh sách Tỉnh / Thành phố cũ - 63 Tỉnh/Thành (Get Provinces - Legacy 3 cấp)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Token",
+                "value": "{{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/master-data/province",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "master-data",
+                "province"
+              ]
+            },
+            "description": "API lấy danh sách 63 Tỉnh/Thành phố theo mô hình hành chính 3 cấp truyền thống (Province -> District -> Ward). Mỗi tỉnh trả về `ProvinceID` (ví dụ: 202: TP. Hồ Chí Minh, 201: Hà Nội, 203: Đà Nẵng...)."
+          },
+          "response": []
+        },
+        {
+          "name": "Lấy danh sách Quận / Huyện cũ theo Tỉnh (Get Districts - Legacy 3 cấp)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Token",
+                "value": "{{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"province_id\": 202\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/master-data/district",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "master-data",
+                "district"
+              ]
+            },
+            "description": "API lấy danh sách Quận/Huyện thuộc Tỉnh/Thành phố theo mô hình cũ 3 cấp. Trả về `DistrictID` (ví dụ 1442: Quận 1, 3695: TP. Thủ Đức, 1444: Quận 3...). Dùng truyền vào `to_district_id` khi tạo đơn hoặc tính phí hệ cũ."
+          },
+          "response": []
+        },
+        {
+          "name": "Lấy danh sách Phường / Xã cũ theo Quận/Huyện (Get Wards - Legacy 3 cấp)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Token",
+                "value": "{{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"district_id\": 1442\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/master-data/ward",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "master-data",
+                "ward"
+              ]
+            },
+            "description": "API lấy danh sách Phường/Xã thuộc Quận/Huyện theo mô hình cũ 3 cấp. Trả về `WardCode` dạng chuỗi (ví dụ: \"20110\": Phường Tân Định, \"20101\": Phường Bến Nghé...). Dùng truyền vào `to_ward_code` khi tạo đơn hoặc tính phí hệ cũ."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "04. Fees & Services (Tính cước & Gói dịch vụ)",
       "item": [
         {
           "name": "Lấy gói dịch vụ khả dụng (Available Services)",
@@ -187,19 +363,25 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"shop_id\": {{shopId}},\n  \"from_district\": 1442,\n  \"to_district\": 1442\n}"
+              "raw": "{\n  \"shop_id\": 225452,\n  \"from_district\": 1442,\n  \"to_district\": 1442\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/v2/shipping-order/available-services",
-              "host": ["{{baseUrl}}"],
-              "path": ["v2", "shipping-order", "available-services"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v2",
+                "shipping-order",
+                "available-services"
+              ]
             },
-            "description": "Kiểm tra các gói vận chuyển GHN hỗ trợ giữa tuyến gửi và tuyến nhận. Trả về danh sách gói dịch vụ kèm `service_type_id`."
+            "description": "Kiểm tra các gói vận chuyển GHN hỗ trợ giữa tuyến gửi và tuyến nhận. Trả về danh sách gói dịch vụ kèm `service_id` và `service_type_id` (2: Hàng nhẹ, 5: Hàng nặng)."
           },
           "response": []
         },
         {
-          "name": "Tính cước - Gói Chuẩn < 20kg (service_type_id = 2)",
+          "name": "Tính cước dự kiến - Gói Chuẩn < 20kg (service_type_id = 2)",
           "request": {
             "method": "POST",
             "header": [
@@ -222,15 +404,21 @@
             },
             "url": {
               "raw": "{{baseUrl}}/v2/shipping-order/fee",
-              "host": ["{{baseUrl}}"],
-              "path": ["v2", "shipping-order", "fee"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v2",
+                "shipping-order",
+                "fee"
+              ]
             },
-            "description": "Tính phí vận chuyển cho hàng nhẹ (< 20kg). GHN chỉ yêu cầu kích thước ở cấp đơn hàng (root: weight, length, width, height). Miễn phí COD."
+            "description": "Tính phí vận chuyển ước tính cho hàng nhẹ (< 20kg). GHN chỉ yêu cầu kích thước ở cấp đơn hàng (root: weight, length, width, height)."
           },
           "response": []
         },
         {
-          "name": "Tính cước - Gói Hàng nặng >= 20kg (service_type_id = 5, kèm items[])",
+          "name": "Tính cước dự kiến - Gói Hàng nặng >= 20kg (service_type_id = 5, kèm items[])",
           "request": {
             "method": "POST",
             "header": [
@@ -253,20 +441,62 @@
             },
             "url": {
               "raw": "{{baseUrl}}/v2/shipping-order/fee",
-              "host": ["{{baseUrl}}"],
-              "path": ["v2", "shipping-order", "fee"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v2",
+                "shipping-order",
+                "fee"
+              ]
             },
             "description": "Tính phí vận chuyển cho hàng nặng (>= 20kg hoặc đơn nhiều kiện). GHN BẮT BUỘC có mảng `items[]` với đầy đủ length, width, height, weight của từng kiện."
+          },
+          "response": []
+        },
+        {
+          "name": "Tra cứu cước phí thực tế của đơn hàng (Actual Order Fee - SOC)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Token",
+                "value": "{{token}}"
+              },
+              {
+                "key": "ShopId",
+                "value": "{{shopId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v2/shipping-order/soc?order_code={{orderCode}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v2",
+                "shipping-order",
+                "soc"
+              ],
+              "query": [
+                {
+                  "key": "order_code",
+                  "value": "{{orderCode}}",
+                  "description": "Mã đơn hàng GHN đã tạo (ví dụ L8ALLU)"
+                }
+              ]
+            },
+            "description": "API tra cứu toàn bộ chi phí thực tế đã chốt của đơn hàng sau khi tạo (SOC - Shipping Order Cost). Trả về bóc tách chi tiết: main_service (cước chính), insurance (phí bảo hiểm), cod_fee, station_do, station_pu, return, r2s, document_return, double_check, pick/deliver_remote_areas_fee... Dùng để đối soát tài chính với hóa đơn GHN."
           },
           "response": []
         }
       ]
     },
     {
-      "name": "04. Orders & Fulfillment (Tạo & Quản lý đơn)",
+      "name": "05. Orders & Fulfillment (Vòng đời đơn hàng GHN)",
       "item": [
         {
-          "name": "Tạo đơn - Gói Chuẩn < 20kg (service_type_id = 2, Địa chỉ mới 34 Tỉnh)",
+          "name": "Xem trước đơn hàng (Preview Order - Không tạo đơn thật)",
           "request": {
             "method": "POST",
             "header": [
@@ -285,19 +515,25 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"payment_type_id\": 1,\n  \"note\": \"Medusa Order Standard (Địa chỉ mới 34 Tỉnh thành)\",\n  \"required_note\": \"CHOXEMHANGKHONGTHU\",\n  \"from_name\": \"Medusa Store\",\n  \"from_phone\": \"0901234567\",\n  \"from_address\": \"123 Kho Hang\",\n  \"from_ward_name\": \"Phường Bến Nghé\",\n  \"from_district_name\": \"Quận 1\",\n  \"from_province_name\": \"Hồ Chí Minh\",\n  \"to_name\": \"Nguyen Linh\",\n  \"to_phone\": \"0901234567\",\n  \"to_address\": \"123 Đường 30/4\",\n  \"to_province_name\": \"Hồ Chí Minh\",\n  \"to_ward_name\": \"Phường Tam Thắng\",\n  \"is_new_to_address\": true,\n  \"weight\": 500,\n  \"length\": 10,\n  \"width\": 10,\n  \"height\": 10,\n  \"service_type_id\": 2,\n  \"items\": [\n    {\n      \"name\": \"Vợt Yonex Nanoflare 800 (Light)\",\n      \"code\": \"YONEX-NF800\",\n      \"quantity\": 1,\n      \"price\": 4100000,\n      \"weight\": 500,\n      \"length\": 10,\n      \"width\": 10,\n      \"height\": 10\n    }\n  ]\n}"
+              "raw": "{\n  \"payment_type_id\": 1,\n  \"required_note\": \"CHOXEMHANGKHONGTHU\",\n  \"from_name\": \"South Warehouse\",\n  \"from_phone\": \"0901234567\",\n  \"from_address\": \"123 Đường Hiệp Bình, Phường Hiệp Bình, TP. Thủ Đức, TP. Hồ Chí Minh\",\n  \"from_ward_name\": \"Phường Hiệp Bình Chánh\",\n  \"from_district_name\": \"Thành Phố Thủ Đức\",\n  \"from_province_name\": \"Hồ Chí Minh\",\n  \"to_name\": \"Nguyen Linh\",\n  \"to_phone\": \"0901234567\",\n  \"to_address\": \"123 Đường 30/4\",\n  \"to_province_name\": \"Hồ Chí Minh\",\n  \"to_ward_name\": \"Phường Tam Thắng\",\n  \"is_new_to_address\": true,\n  \"weight\": 500,\n  \"length\": 10,\n  \"width\": 10,\n  \"height\": 10,\n  \"service_type_id\": 2,\n  \"items\": [\n    {\n      \"name\": \"Vợt Cầu Lông Yonex Nanoflare 800\",\n      \"quantity\": 1,\n      \"weight\": 500\n    }\n  ]\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/v2/shipping-order/create",
-              "host": ["{{baseUrl}}"],
-              "path": ["v2", "shipping-order", "create"]
+              "raw": "{{baseUrl}}/v2/shipping-order/preview",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v2",
+                "shipping-order",
+                "preview"
+              ]
             },
-            "description": "Tạo đơn hàng GHN với gói dịch vụ chuẩn service_type_id = 2 theo định dạng địa chỉ 2 cấp mới (`is_new_to_address: true`, không cần `to_district_id` và `to_ward_code`)."
+            "description": "Xem trước đơn hàng và các khoản phí dự kiến mà không thực sự ghi nhận hay tạo mã đơn trên hệ thống GHN."
           },
           "response": []
         },
         {
-          "name": "Tạo đơn - Gói Hàng nặng >= 20kg (service_type_id = 5, Địa chỉ mới 34 Tỉnh)",
+          "name": "Tạo đơn - Gói Chuẩn < 20kg (Kho Miền Nam - South Warehouse, 34 Tỉnh mới)",
           "request": {
             "method": "POST",
             "header": [
@@ -316,19 +552,99 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"payment_type_id\": 1,\n  \"note\": \"Medusa Order Heavy Goods (Địa chỉ mới 34 Tỉnh thành)\",\n  \"required_note\": \"CHOXEMHANGKHONGTHU\",\n  \"from_name\": \"Medusa Store\",\n  \"from_phone\": \"0901234567\",\n  \"from_address\": \"123 Kho Hang\",\n  \"from_ward_name\": \"Phường Bến Nghé\",\n  \"from_district_name\": \"Quận 1\",\n  \"from_province_name\": \"Hồ Chí Minh\",\n  \"to_name\": \"Nguyen Linh\",\n  \"to_phone\": \"0901234567\",\n  \"to_address\": \"123 Đường 30/4\",\n  \"to_province_name\": \"Hồ Chí Minh\",\n  \"to_ward_name\": \"Phường Tam Thắng\",\n  \"is_new_to_address\": true,\n  \"weight\": 22000,\n  \"length\": 10,\n  \"width\": 10,\n  \"height\": 10,\n  \"service_type_id\": 5,\n  \"items\": [\n    {\n      \"name\": \"Yonex Nanoflare 800 (22kg)\",\n      \"code\": \"YONEX-NF800-HEAVY\",\n      \"quantity\": 1,\n      \"price\": 4100000,\n      \"weight\": 22000,\n      \"length\": 10,\n      \"width\": 10,\n      \"height\": 10\n    }\n  ]\n}"
+              "raw": "{\n  \"payment_type_id\": 1,\n  \"note\": \"Medusa Order Standard (South Warehouse - TP.HCM)\",\n  \"required_note\": \"CHOXEMHANGKHONGTHU\",\n  \"from_name\": \"South Warehouse\",\n  \"from_phone\": \"0901234567\",\n  \"from_address\": \"123 Đường Hiệp Bình, Phường Hiệp Bình, TP. Thủ Đức, TP. Hồ Chí Minh\",\n  \"from_ward_name\": \"Phường Hiệp Bình Chánh\",\n  \"from_district_name\": \"Thành Phố Thủ Đức\",\n  \"from_province_name\": \"Hồ Chí Minh\",\n  \"to_name\": \"Nguyen Linh\",\n  \"to_phone\": \"0901234567\",\n  \"to_address\": \"123 Đường 30/4\",\n  \"to_province_name\": \"Hồ Chí Minh\",\n  \"to_ward_name\": \"Phường Tam Thắng\",\n  \"is_new_to_address\": true,\n  \"weight\": 500,\n  \"length\": 10,\n  \"width\": 10,\n  \"height\": 10,\n  \"service_type_id\": 2,\n  \"items\": [\n    {\n      \"name\": \"Vợt Yonex Nanoflare 800 (Light)\",\n      \"code\": \"YONEX-NF800\",\n      \"quantity\": 1,\n      \"price\": 4100000,\n      \"weight\": 500,\n      \"length\": 10,\n      \"width\": 10,\n      \"height\": 10\n    }\n  ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/v2/shipping-order/create",
-              "host": ["{{baseUrl}}"],
-              "path": ["v2", "shipping-order", "create"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v2",
+                "shipping-order",
+                "create"
+              ]
+            },
+            "description": "Tạo đơn hàng GHN gửi từ South Warehouse (Hiệp Bình, Thủ Đức, TP.HCM) với gói dịch vụ chuẩn service_type_id = 2 theo định dạng địa chỉ 2 cấp mới (`is_new_to_address: true`)."
+          },
+          "response": []
+        },
+        {
+          "name": "Tạo đơn - Gói Chuẩn < 20kg (Kho Miền Bắc - North Warehouse Hà Nội)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Token",
+                "value": "{{token}}"
+              },
+              {
+                "key": "ShopId",
+                "value": "{{shopId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"payment_type_id\": 1,\n  \"note\": \"Medusa Order Standard (North Warehouse - Hà Nội)\",\n  \"required_note\": \"CHOXEMHANGKHONGTHU\",\n  \"from_name\": \"North Warehouse\",\n  \"from_phone\": \"0901234568\",\n  \"from_address\": \"456 Đường Nguyễn Văn Linh, Phường Long Biên, Quận Long Biên, Hà Nội\",\n  \"from_ward_name\": \"Phường Long Biên\",\n  \"from_district_name\": \"Quận Long Biên\",\n  \"from_province_name\": \"Hà Nội\",\n  \"to_name\": \"Nguyen Linh\",\n  \"to_phone\": \"0901234567\",\n  \"to_address\": \"123 Đường 30/4\",\n  \"to_province_name\": \"Hồ Chí Minh\",\n  \"to_ward_name\": \"Phường Tam Thắng\",\n  \"is_new_to_address\": true,\n  \"weight\": 500,\n  \"length\": 10,\n  \"width\": 10,\n  \"height\": 10,\n  \"service_type_id\": 2,\n  \"items\": [\n    {\n      \"name\": \"Vợt Yonex Nanoflare 800 (Light)\",\n      \"code\": \"YONEX-NF800\",\n      \"quantity\": 1,\n      \"price\": 4100000,\n      \"weight\": 500,\n      \"length\": 10,\n      \"width\": 10,\n      \"height\": 10\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v2/shipping-order/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v2",
+                "shipping-order",
+                "create"
+              ]
+            },
+            "description": "Tạo đơn hàng GHN gửi từ North Warehouse (Phường Long Biên, Hà Nội) chuyển phát liên miền Bắc - Nam."
+          },
+          "response": []
+        },
+        {
+          "name": "Tạo đơn - Gói Hàng nặng >= 20kg (Địa chỉ MỚI 34 Tỉnh - is_new_to_address: true)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Token",
+                "value": "{{token}}"
+              },
+              {
+                "key": "ShopId",
+                "value": "{{shopId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"payment_type_id\": 1,\n  \"note\": \"Medusa Order Heavy Goods (South Warehouse - TP.HCM)\",\n  \"required_note\": \"CHOXEMHANGKHONGTHU\",\n  \"from_name\": \"South Warehouse\",\n  \"from_phone\": \"0901234567\",\n  \"from_address\": \"123 Đường Hiệp Bình, Phường Hiệp Bình, TP. Thủ Đức, TP. Hồ Chí Minh\",\n  \"from_ward_name\": \"Phường Hiệp Bình Chánh\",\n  \"from_district_name\": \"Thành Phố Thủ Đức\",\n  \"from_province_name\": \"Hồ Chí Minh\",\n  \"to_name\": \"Nguyen Linh\",\n  \"to_phone\": \"0901234567\",\n  \"to_address\": \"123 Đường 30/4\",\n  \"to_province_name\": \"Hồ Chí Minh\",\n  \"to_ward_name\": \"Phường Tam Thắng\",\n  \"is_new_to_address\": true,\n  \"weight\": 22000,\n  \"length\": 10,\n  \"width\": 10,\n  \"height\": 10,\n  \"service_type_id\": 5,\n  \"items\": [\n    {\n      \"name\": \"Yonex Nanoflare 800 (22kg)\",\n      \"code\": \"YONEX-NF800-HEAVY\",\n      \"quantity\": 1,\n      \"price\": 4100000,\n      \"weight\": 22000,\n      \"length\": 10,\n      \"width\": 10,\n      \"height\": 10\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v2/shipping-order/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v2",
+                "shipping-order",
+                "create"
+              ]
             },
             "description": "Tạo đơn hàng GHN với gói dịch vụ hàng nặng service_type_id = 5 theo định dạng địa chỉ 2 cấp mới (`is_new_to_address: true`)."
           },
           "response": []
         },
         {
-          "name": "Tạo Token In phiếu gửi hàng A5 (Gen Print Token)",
+          "name": "Tạo đơn - Gói Chuẩn địa chỉ CŨ (3 cấp: to_district_id + to_ward_code)",
           "request": {
             "method": "POST",
             "header": [
@@ -339,23 +655,33 @@
               {
                 "key": "Token",
                 "value": "{{token}}"
+              },
+              {
+                "key": "ShopId",
+                "value": "{{shopId}}"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"order_codes\": [\"LBNH4567\"]\n}"
+              "raw": "{\n  \"payment_type_id\": 1,\n  \"note\": \"Medusa Order (Địa chỉ truyền thống 3 cấp)\",\n  \"required_note\": \"CHOXEMHANGKHONGTHU\",\n  \"from_name\": \"South Warehouse\",\n  \"from_phone\": \"0901234567\",\n  \"from_address\": \"123 Đường Hiệp Bình, Phường Hiệp Bình, TP. Thủ Đức, TP. Hồ Chí Minh\",\n  \"from_ward_name\": \"Phường Hiệp Bình Chánh\",\n  \"from_district_name\": \"Thành Phố Thủ Đức\",\n  \"from_province_name\": \"Hồ Chí Minh\",\n  \"to_name\": \"Nguyen Linh\",\n  \"to_phone\": \"0901234567\",\n  \"to_address\": \"123 Đường Hai Bà Trưng\",\n  \"to_district_id\": 1442,\n  \"to_ward_code\": \"20110\",\n  \"weight\": 500,\n  \"length\": 10,\n  \"width\": 10,\n  \"height\": 10,\n  \"service_type_id\": 2,\n  \"items\": [\n    {\n      \"name\": \"Vợt Yonex Nanoflare 800\",\n      \"code\": \"YONEX-NF800\",\n      \"quantity\": 1,\n      \"price\": 4100000,\n      \"weight\": 500\n    }\n  ]\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/v2/a5/gen-token",
-              "host": ["{{baseUrl}}"],
-              "path": ["v2", "a5", "gen-token"]
+              "raw": "{{baseUrl}}/v2/shipping-order/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v2",
+                "shipping-order",
+                "create"
+              ]
             },
-            "description": "Sinh token để mở link in phiếu A5: `https://dev-online-gateway.ghn.vn/a5/public-api/printA5?token_code={token}`."
+            "description": "Tạo đơn hàng GHN với gói dịch vụ chuẩn theo định dạng địa chỉ 3 cấp truyền thống (sử dụng `to_district_id` và `to_ward_code`)."
           },
           "response": []
         },
         {
-          "name": "Chi tiết đơn hàng / Tracking (Order Detail)",
+          "name": "Chi tiết đơn hàng & Tracking (Order Detail)",
           "request": {
             "method": "POST",
             "header": [
@@ -370,14 +696,90 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"order_code\": \"LBNH4567\"\n}"
+              "raw": "{\n  \"order_code\": \"{{orderCode}}\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/v2/shipping-order/detail",
-              "host": ["{{baseUrl}}"],
-              "path": ["v2", "shipping-order", "detail"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v2",
+                "shipping-order",
+                "detail"
+              ]
             },
-            "description": "Tra cứu thông tin trạng thái vận đơn GHN."
+            "description": "Tra cứu toàn bộ thông tin chi tiết, lịch sử xử lý và trạng thái tracking hiện tại của vận đơn GHN."
+          },
+          "response": []
+        },
+        {
+          "name": "Cập nhật thông tin đơn hàng (Update Order)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Token",
+                "value": "{{token}}"
+              },
+              {
+                "key": "ShopId",
+                "value": "{{shopId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_code\": \"{{orderCode}}\",\n  \"note\": \"Giao hàng giờ hành chính, gọi điện trước khi đến\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v2/shipping-order/update",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v2",
+                "shipping-order",
+                "update"
+              ]
+            },
+            "description": "Cập nhật ghi chú hoặc thông tin giao nhận của đơn hàng trước khi shipper đến lấy hàng."
+          },
+          "response": []
+        },
+        {
+          "name": "Tạo Token In phiếu gửi hàng A5 / 80x80 / 52x70 (Gen Print Token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Token",
+                "value": "{{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_codes\": [\n    \"{{orderCode}}\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v2/a5/gen-token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v2",
+                "a5",
+                "gen-token"
+              ]
+            },
+            "description": "Sinh token in vận đơn. Dùng token trả về mở link in trình duyệt:\n- In A5: `https://dev-online-gateway.ghn.vn/a5/public-api/printA5?token_code={token}`\n- In 80x80: `https://dev-online-gateway.ghn.vn/a5/public-api/print80x80?token_code={token}`\n- In 52x70: `https://dev-online-gateway.ghn.vn/a5/public-api/print52x70?token_code={token}`"
           },
           "response": []
         },
@@ -401,21 +803,395 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"order_codes\": [\"LBNH4567\"]\n}"
+              "raw": "{\n  \"order_codes\": [\n    \"{{orderCode}}\"\n  ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/v2/switch-status/cancel",
-              "host": ["{{baseUrl}}"],
-              "path": ["v2", "switch-status", "cancel"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v2",
+                "switch-status",
+                "cancel"
+              ]
             },
-            "description": "Hủy đơn hàng khi khách hoặc Admin hủy fulfillment."
+            "description": "Hủy đơn hàng trên hệ thống GHN khi khách hủy hoặc Admin Medusa hủy fulfillment."
           },
           "response": []
         }
       ]
     },
     {
-      "name": "05. Medusa Store API (Shipping & Address)",
+      "name": "06. Medusa Webhook Simulator (Trigger chuyển trạng thái đơn hàng)",
+      "item": [
+        {
+          "name": "01. Webhook - Trạng thái: ready_to_pick (Tạo đơn / Chờ lấy hàng)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-ghn-secret",
+                "value": "{{webhookSecret}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ShopID\": 225452,\n  \"Time\": \"2026-09-30T08:00:00.000Z\",\n  \"OrderCode\": \"{{orderCode}}\",\n  \"ClientOrderCode\": \"{{clientOrderCode}}\",\n  \"Type\": \"ready_to_pick\",\n  \"Status\": \"ready_to_pick\",\n  \"Description\": \"Đơn hàng đã được tiếp nhận và đang chờ phân bổ shipper đến lấy hàng\",\n  \"TotalFee\": 83113,\n  \"CODAmount\": 0,\n  \"Weight\": 500,\n  \"Length\": 10,\n  \"Width\": 10,\n  \"Height\": 10,\n  \"Warehouse\": \"Kho Bến Nghé Quận 1\"\n}"
+            },
+            "url": {
+              "raw": "{{medusaUrl}}/webhooks/ghn/order",
+              "host": [
+                "{{medusaUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "ghn",
+                "order"
+              ]
+            },
+            "description": "Giả lập GHN bắn Webhook sự kiện đơn hàng vừa tạo thành công (`ready_to_pick`). Medusa ghi nhận OrderCode và cập nhật fulfillment sang trạng thái sẵn sàng lấy hàng."
+          },
+          "response": []
+        },
+        {
+          "name": "02. Webhook - Trạng thái: picking (Shipper đang đi lấy hàng tại Shop)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-ghn-secret",
+                "value": "{{webhookSecret}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ShopID\": 225452,\n  \"Time\": \"2026-09-30T08:30:00.000Z\",\n  \"OrderCode\": \"{{orderCode}}\",\n  \"ClientOrderCode\": \"{{clientOrderCode}}\",\n  \"Type\": \"picking\",\n  \"Status\": \"picking\",\n  \"Description\": \"Tài xế đang trên đường đến địa chỉ shop để nhận kiện hàng\",\n  \"ShipperName\": \"Lê Văn Lấy\",\n  \"ShipperPhone\": \"0912345678\",\n  \"Warehouse\": \"Kho Bến Nghé Quận 1\",\n  \"TotalFee\": 83113,\n  \"CODAmount\": 0,\n  \"Weight\": 500\n}"
+            },
+            "url": {
+              "raw": "{{medusaUrl}}/webhooks/ghn/order",
+              "host": [
+                "{{medusaUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "ghn",
+                "order"
+              ]
+            },
+            "description": "Giả lập GHN bắn Webhook sự kiện Shipper đã tiếp nhận ca lấy và đang tới kho shop lấy kiện hàng (`picking`)."
+          },
+          "response": []
+        },
+        {
+          "name": "03. Webhook - Trạng thái: picked (Đã lấy hàng thành công)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-ghn-secret",
+                "value": "{{webhookSecret}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ShopID\": 225452,\n  \"Time\": \"2026-09-30T09:00:00.000Z\",\n  \"OrderCode\": \"{{orderCode}}\",\n  \"ClientOrderCode\": \"{{clientOrderCode}}\",\n  \"Type\": \"picked\",\n  \"Status\": \"picked\",\n  \"Description\": \"Tài xế đã nhận kiện hàng thành công và đang chuyển về bưu cục trung chuyển\",\n  \"ShipperName\": \"Lê Văn Lấy\",\n  \"ShipperPhone\": \"0912345678\",\n  \"Warehouse\": \"Kho Bến Nghé Quận 1\",\n  \"TotalFee\": 83113,\n  \"CODAmount\": 0,\n  \"Weight\": 500\n}"
+            },
+            "url": {
+              "raw": "{{medusaUrl}}/webhooks/ghn/order",
+              "host": [
+                "{{medusaUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "ghn",
+                "order"
+              ]
+            },
+            "description": "Giả lập sự kiện hàng đã được lấy rời khỏi shop (`picked`). Medusa tự động cập nhật mốc `shipped_at` cho fulfillment."
+          },
+          "response": []
+        },
+        {
+          "name": "04. Webhook - Trạng thái: transporting (Nhập kho trung chuyển / Đang luân chuyển)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-ghn-secret",
+                "value": "{{webhookSecret}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ShopID\": 225452,\n  \"Time\": \"2026-09-30T10:15:00.000Z\",\n  \"OrderCode\": \"{{orderCode}}\",\n  \"ClientOrderCode\": \"{{clientOrderCode}}\",\n  \"Type\": \"transporting\",\n  \"Status\": \"transporting\",\n  \"Description\": \"Kiện hàng đã nhập kho Tân Bình HUB và đang được luân chuyển đến bưu cục giao phát\",\n  \"Warehouse\": \"Kho Trung Chuyển GHN Tân Bình HUB\",\n  \"TotalFee\": 83113,\n  \"CODAmount\": 0,\n  \"Weight\": 500\n}"
+            },
+            "url": {
+              "raw": "{{medusaUrl}}/webhooks/ghn/order",
+              "host": [
+                "{{medusaUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "ghn",
+                "order"
+              ]
+            },
+            "description": "Giả lập kiện hàng qua các trạm trung chuyển HUB (`storing` hoặc `transporting`). Log hành trình được nối thêm vào `ghn_events_log`."
+          },
+          "response": []
+        },
+        {
+          "name": "05. Webhook - Trạng thái: delivering (Shipper đang đi giao cho người nhận)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-ghn-secret",
+                "value": "{{webhookSecret}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ShopID\": 225452,\n  \"Time\": \"2026-09-30T11:00:00.000Z\",\n  \"OrderCode\": \"{{orderCode}}\",\n  \"ClientOrderCode\": \"{{clientOrderCode}}\",\n  \"Type\": \"delivering\",\n  \"Status\": \"delivering\",\n  \"Description\": \"Shipper Nguyễn Văn Giao (0987654321) đang trên đường giao kiện hàng tới người nhận\",\n  \"ShipperName\": \"Nguyễn Văn Giao\",\n  \"ShipperPhone\": \"0987654321\",\n  \"Warehouse\": \"Kho GHN Hiệp Bình (Thủ Đức)\",\n  \"TotalFee\": 83113,\n  \"CODAmount\": 0,\n  \"Weight\": 500\n}"
+            },
+            "url": {
+              "raw": "{{medusaUrl}}/webhooks/ghn/order",
+              "host": [
+                "{{medusaUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "ghn",
+                "order"
+              ]
+            },
+            "description": "Giả lập shipper xuất kho đi giao (`delivering`). Medusa lưu `ghn_shipper_name` và `ghn_shipper_phone` để khách hàng/admin có thể liên hệ trực tiếp tài xế."
+          },
+          "response": []
+        },
+        {
+          "name": "06. Webhook - Trạng thái: delivered (Giao hàng thành công - Có ảnh POD)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-ghn-secret",
+                "value": "{{webhookSecret}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ShopID\": 225452,\n  \"Time\": \"2026-09-30T11:45:00.000Z\",\n  \"OrderCode\": \"{{orderCode}}\",\n  \"ClientOrderCode\": \"{{clientOrderCode}}\",\n  \"Type\": \"delivered\",\n  \"Status\": \"delivered\",\n  \"Description\": \"Kiện hàng đã được giao thành công cho người nhận kèm ảnh chứng từ ký nhận POD\",\n  \"ShipperName\": \"Nguyễn Văn Giao\",\n  \"ShipperPhone\": \"0987654321\",\n  \"PodURL\": \"https://image-pod.ghn.vn/pod/2026/09/30/L8ALLU_signature_proof.jpg\",\n  \"Warehouse\": \"Kho GHN Hiệp Bình (Thủ Đức)\",\n  \"TotalFee\": 83113,\n  \"CODAmount\": 0,\n  \"Weight\": 500\n}"
+            },
+            "url": {
+              "raw": "{{medusaUrl}}/webhooks/ghn/order",
+              "host": [
+                "{{medusaUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "ghn",
+                "order"
+              ]
+            },
+            "description": "Giả lập giao hàng thành công (`delivered`). Medusa kích hoạt workflow `markOrderFulfillmentAsDeliveredWorkflow`, cập nhật `delivered_at`, lưu `ghn_pod_url` và chốt trạng thái đơn hàng."
+          },
+          "response": []
+        },
+        {
+          "name": "07. Webhook - Trạng thái: delivery_fail (Giao không thành công - Hẹn lại)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-ghn-secret",
+                "value": "{{webhookSecret}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ShopID\": 225452,\n  \"Time\": \"2026-09-30T14:00:00.000Z\",\n  \"OrderCode\": \"{{orderCode}}\",\n  \"ClientOrderCode\": \"{{clientOrderCode}}\",\n  \"Type\": \"delivery_fail\",\n  \"Status\": \"delivery_fail\",\n  \"Reason\": \"Người nhận bận việc đột xuất, hẹn giao lại vào sáng mai\",\n  \"ReasonCode\": \"CUSTOMER_RESCHEDULE\",\n  \"Description\": \"Giao hàng không thành công: Người nhận hẹn giao lại vào ngày mai\",\n  \"ShipperName\": \"Nguyễn Văn Giao\",\n  \"ShipperPhone\": \"0987654321\",\n  \"Warehouse\": \"Kho GHN Hiệp Bình (Thủ Đức)\",\n  \"TotalFee\": 83113,\n  \"CODAmount\": 0\n}"
+            },
+            "url": {
+              "raw": "{{medusaUrl}}/webhooks/ghn/order",
+              "host": [
+                "{{medusaUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "ghn",
+                "order"
+              ]
+            },
+            "description": "Giả lập sự kiện giao hàng thất bại tạm thời kèm lý do (`Reason`, `ReasonCode`). Medusa lưu log để CSKH tiện theo dõi hỗ trợ."
+          },
+          "response": []
+        },
+        {
+          "name": "08. Webhook - Trạng thái: cancel (Đơn hàng bị hủy)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-ghn-secret",
+                "value": "{{webhookSecret}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ShopID\": 225452,\n  \"Time\": \"2026-09-30T14:30:00.000Z\",\n  \"OrderCode\": \"{{orderCode}}\",\n  \"ClientOrderCode\": \"{{clientOrderCode}}\",\n  \"Type\": \"cancel\",\n  \"Status\": \"cancel\",\n  \"Reason\": \"Người gửi yêu cầu hủy đơn hàng\",\n  \"ReasonCode\": \"SENDER_CANCEL\",\n  \"Description\": \"Đơn hàng đã được hủy thành công theo yêu cầu của đối tác shop\",\n  \"TotalFee\": 0,\n  \"CODAmount\": 0\n}"
+            },
+            "url": {
+              "raw": "{{medusaUrl}}/webhooks/ghn/order",
+              "host": [
+                "{{medusaUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "ghn",
+                "order"
+              ]
+            },
+            "description": "Giả lập GHN phản hồi đơn đã hủy (`cancel`). Medusa cập nhật `canceled_at`, đóng fulfillment và lưu lịch sử hủy."
+          },
+          "response": []
+        },
+        {
+          "name": "09. Webhook - Trạng thái: returning (Đơn hàng chuyển hoàn về Shop)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-ghn-secret",
+                "value": "{{webhookSecret}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ShopID\": 225452,\n  \"Time\": \"2026-09-30T15:00:00.000Z\",\n  \"OrderCode\": \"{{orderCode}}\",\n  \"ClientOrderCode\": \"{{clientOrderCode}}\",\n  \"Type\": \"returning\",\n  \"Status\": \"returning\",\n  \"Reason\": \"Giao không thành công quá số lần quy định (3 lần)\",\n  \"ReasonCode\": \"FAILED_OVER_LIMIT\",\n  \"Description\": \"Kiện hàng đang trên hành trình chuyển hoàn về lại kho gửi của shop\",\n  \"Warehouse\": \"Kho Trung Chuyển GHN Tân Bình HUB\",\n  \"TotalFee\": 83113,\n  \"CODAmount\": 0\n}"
+            },
+            "url": {
+              "raw": "{{medusaUrl}}/webhooks/ghn/order",
+              "host": [
+                "{{medusaUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "ghn",
+                "order"
+              ]
+            },
+            "description": "Giả lập kiện hàng bắt đầu quy trình quay đầu chuyển hoàn về shop (`returning`)."
+          },
+          "response": []
+        },
+        {
+          "name": "10. Webhook - Trạng thái: returned (Đã trả hàng về Shop thành công)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-ghn-secret",
+                "value": "{{webhookSecret}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ShopID\": 225452,\n  \"Time\": \"2026-09-30T16:00:00.000Z\",\n  \"OrderCode\": \"{{orderCode}}\",\n  \"ClientOrderCode\": \"{{clientOrderCode}}\",\n  \"Type\": \"returned\",\n  \"Status\": \"returned\",\n  \"Description\": \"Kiện hàng hoàn đã được trao trả tận tay cho đại diện shop tại địa chỉ kho gửi\",\n  \"Warehouse\": \"Kho Bến Nghé Quận 1\",\n  \"ShipperName\": \"Trần Văn Hoàn\",\n  \"ShipperPhone\": \"0933445566\",\n  \"TotalFee\": 83113,\n  \"CODAmount\": 0\n}"
+            },
+            "url": {
+              "raw": "{{medusaUrl}}/webhooks/ghn/order",
+              "host": [
+                "{{medusaUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "ghn",
+                "order"
+              ]
+            },
+            "description": "Giả lập hàng hoàn đã về tận tay shop (`returned`). Đây là Terminal State (trạng thái kết thúc của quy trình trả hàng)."
+          },
+          "response": []
+        },
+        {
+          "name": "11. Webhook - Ticket hỗ trợ / Khiếu nại (Ticket Callback)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-ghn-secret",
+                "value": "{{webhookSecret}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"TicketId\": 987654,\n  \"ClientID\": \"{{shopId}}\",\n  \"OrderCode\": \"{{orderCode}}\",\n  \"Type\": \"khieu_nai_giao_hang\",\n  \"Status\": \"processing\",\n  \"StatusID\": 2,\n  \"Description\": \"Khách hàng khiếu nại chưa nhận được kiện hàng dù tracking báo giao thành công\",\n  \"CreatedBy\": 1718600,\n  \"CreatedAt\": \"2026-09-30T16:15:00.000Z\",\n  \"UpdatedAt\": \"2026-09-30T16:15:00.000Z\",\n  \"Conversations\": [\n    {\n      \"Body\": \"Shop yêu cầu GHN kiểm tra lại hình ảnh chữ ký POD và định vị GPS của shipper tại thời điểm giao hàng.\",\n      \"FromEmail\": \"cskh@medusastore.vn\",\n      \"UserId\": 1718600,\n      \"Private\": false,\n      \"CreatedAt\": \"2026-09-30T16:15:00.000Z\",\n      \"UpdatedAt\": \"2026-09-30T16:15:00.000Z\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{medusaUrl}}/webhooks/ghn/ticket",
+              "host": [
+                "{{medusaUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "ghn",
+                "ticket"
+              ]
+            },
+            "description": "Giả lập GHN gửi thông báo cập nhật tiến độ xử lý ticket khiếu nại / hỗ trợ CSKH tới endpoint `/webhooks/ghn/ticket`."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "07. Medusa Store API (Shipping & Address - Redis Cache)",
       "item": [
         {
           "name": "Medusa Store - Lấy danh sách 34 Tỉnh/Thành (Cache Redis 24h)",
@@ -429,8 +1205,14 @@
             ],
             "url": {
               "raw": "{{medusaUrl}}/store/ghn/provinces",
-              "host": ["{{medusaUrl}}"],
-              "path": ["store", "ghn", "provinces"]
+              "host": [
+                "{{medusaUrl}}"
+              ],
+              "path": [
+                "store",
+                "ghn",
+                "provinces"
+              ]
             },
             "description": "Endpoint proxy của Medusa Backend, gọi GHN v3 API `/v3/master-data/province/all` và lưu cache Redis với TTL 24 giờ. Phục vụ Storefront hiển thị danh mục 34 tỉnh/thành."
           },
@@ -448,8 +1230,14 @@
             ],
             "url": {
               "raw": "{{medusaUrl}}/store/ghn/wards?province_id={{provinceIdV3}}",
-              "host": ["{{medusaUrl}}"],
-              "path": ["store", "ghn", "wards"],
+              "host": [
+                "{{medusaUrl}}"
+              ],
+              "path": [
+                "store",
+                "ghn",
+                "wards"
+              ],
               "query": [
                 {
                   "key": "province_id",
@@ -482,8 +1270,14 @@
             },
             "url": {
               "raw": "{{medusaUrl}}/store/carts/{{cartId}}",
-              "host": ["{{medusaUrl}}"],
-              "path": ["store", "carts", "{{cartId}}"]
+              "host": [
+                "{{medusaUrl}}"
+              ],
+              "path": [
+                "store",
+                "carts",
+                "{{cartId}}"
+              ]
             },
             "description": "Lưu địa chỉ nhận hàng Việt Nam kèm metadata chuẩn GHN v3 (`ghn_province_id`, `ghn_province_name`, `ghn_ward_id`, `ghn_ward_name`) vào cart để GHN Provider tính cước thời gian thực."
           },
@@ -509,8 +1303,15 @@
             },
             "url": {
               "raw": "{{medusaUrl}}/store/shipping-options/{{shippingOptionId}}/calculate",
-              "host": ["{{medusaUrl}}"],
-              "path": ["store", "shipping-options", "{{shippingOptionId}}", "calculate"]
+              "host": [
+                "{{medusaUrl}}"
+              ],
+              "path": [
+                "store",
+                "shipping-options",
+                "{{shippingOptionId}}",
+                "calculate"
+              ]
             },
             "description": "Gọi endpoint Storefront Medusa để hệ thống tự động invoke GHN Provider tính cước thời gian thực theo trọng lượng cart."
           },

@@ -44,7 +44,7 @@ export default async function initial_data_seed({ container }: { container: Medu
     const { defaultSalesChannel, region } = await seedStoreAndRegion(container);
 
     logger.info("[seed] stock location + shipping...");
-    const { stockLocation, shippingProfile } = await seedStockAndShipping(container, {
+    const { stockLocation, stockLocations, shippingProfile } = await seedStockAndShipping(container, {
         regionId: region.id,
         salesChannelId: defaultSalesChannel.id,
     });
@@ -60,7 +60,8 @@ export default async function initial_data_seed({ container }: { container: Medu
     });
 
     logger.info("[seed] inventory levels...");
-    await seedInventory(container, stockLocation.id);
+    const locationIds = (stockLocations || [stockLocation]).map((l: any) => l.id);
+    await seedInventory(container, locationIds);
 
     logger.info("[seed] demo customers...");
     const execArgs = { container, args: [] as string[] };
