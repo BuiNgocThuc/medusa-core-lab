@@ -9,10 +9,32 @@ import { createFindParams, createSelectParams } from "@medusajs/medusa/api/utils
 import { NextTierSchema } from "@/src/api/store/customers";
 import { CreateTierSchema, UpdateTierSchema } from "@/src/api/admin/tiers";
 import { RedeemLoyaltyPointsSchema } from "@/src/api/store/carts/[id]/loyalty-points/validators.ts";
+import { authAuditMiddleware } from "./middlewares/auth-audit";
 
 export default defineMiddlewares({
 
     routes: [
+        // Ghi log toàn bộ sự kiện xác thực / đăng nhập vào hệ thống (Admin & Customer)
+        {
+            matcher: "/auth/:actor_type/:auth_provider",
+            methods: ["POST", "GET"],
+            middlewares: [authAuditMiddleware],
+        },
+        {
+            matcher: "/auth/:actor_type/:auth_provider/callback",
+            methods: ["POST", "GET"],
+            middlewares: [authAuditMiddleware],
+        },
+        {
+            matcher: "/auth/:actor_type/:auth_provider/register",
+            methods: ["POST"],
+            middlewares: [authAuditMiddleware],
+        },
+        {
+            matcher: "/auth/session",
+            methods: ["POST", "DELETE"],
+            middlewares: [authAuditMiddleware],
+        },
         // create tier
         {
             matcher: "/admin/tiers",
