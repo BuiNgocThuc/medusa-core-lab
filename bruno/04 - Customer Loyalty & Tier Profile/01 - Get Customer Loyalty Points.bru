@@ -1,0 +1,33 @@
+meta {
+  name: 01 - Get Customer Loyalty Points
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/store/customers/me/loyalty-points
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{customerToken}}
+}
+
+tests {
+  test("200 OK", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("returns valid loyalty points number", function () {
+    const body = res.getBody();
+    expect(body).to.be.an('object');
+    expect(body.points).to.be.a('number');
+    expect(body.points).to.be.at.least(0);
+  });
+}
+
+docs {
+  # 01 - Get Customer Loyalty Points
+
+  Tra cuu so diem thuong loyalty tich luy cua tai khoan thanh vien dang dang nhap qua endpoint `GET /store/customers/me/loyalty-points`.
+}

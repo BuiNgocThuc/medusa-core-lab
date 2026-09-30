@@ -1,0 +1,33 @@
+meta {
+  name: 02 - Get Customer Next Tier Information
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/store/customers/me/next-tier?region_id={{regionId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{customerToken}}
+}
+
+tests {
+  test("200 OK", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("returns valid tier calculation", function () {
+    const body = res.getBody();
+    expect(body).to.be.an('object');
+    expect(body).to.have.property('current_purchase_value');
+    expect(body.current_purchase_value).to.be.a('number');
+  });
+}
+
+docs {
+  # 02 - Get Customer Next Tier Information
+
+  Kiem tra thong tin tinh toan hang thanh vien tiep theo dua tren tong gia tri chi tieu cua khach hang trong vung tien te `{{regionId}}`.
+}

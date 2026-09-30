@@ -1,0 +1,23 @@
+meta {
+  name: 03 - Reject Loyalty Points Without Auth
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/store/customers/me/loyalty-points
+  body: none
+  auth: none
+}
+
+tests {
+  test("401 Unauthorized", function () {
+    expect(res.getStatus()).to.equal(401);
+  });
+}
+
+docs {
+  # 03 - Reject Loyalty Points Without Auth
+
+  Kiem thu an ninh: Yeu cau tra cuu diem thuong khong mang theo Authorization Bearer token se bi chan ngay lap tuc voi HTTP 401 Unauthorized.
+}
