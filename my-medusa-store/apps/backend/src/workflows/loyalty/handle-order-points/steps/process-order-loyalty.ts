@@ -12,6 +12,7 @@ export const processOrderLoyaltyStep = createStep(
         const orderModule = container.resolve(Modules.ORDER) as any;
         const promotionModule = container.resolve(Modules.PROMOTION) as any;
         const loyaltyModule = container.resolve(LOYALTY_MODULE) as LoyaltyModuleService;
+
         const {
             data: [order],
         } = await query.graph(
@@ -22,6 +23,8 @@ export const processOrderLoyaltyStep = createStep(
                     "metadata",
                     "customer.id",
                     "items.subtotal",
+                    "items.unit_price",
+                    "items.quantity",
                     "items.discount_total",
                     "cart.id",
                     "cart.metadata",
@@ -35,14 +38,18 @@ export const processOrderLoyaltyStep = createStep(
             { throwIfKeyNotFound: true },
         );
 
-        if (order.metadata?.loyalty_redemption_processed === true) {
-            return new StepResponse({ skipped: true });
+        if (!order || !order.customer?.id) {
+            return new StepResponse({ skipped: true, reason: "No customer linked to order" });
         }
 
-        const loyaltyPromotion = getCartLoyaltyPromotion(order.cart as CartData);
+        if (order.metadata?.loyalty_redemption_processed === true || order.metadata?.loyalty_processed === true) {
+            return new StepResponse({ skipped: true, reason: "Already processed" });
+        }
+
+        const loyaltyPromotion = order.cart ? getCartLoyaltyPromotion(order.cart as CartData) : undefined;
         let redeemedPoints = 0;
 
-        if (loyaltyPromotion) {
+        if (loyaltyPromotion && order.cart?.id) {
             const [reservation] = await loyaltyModule.listLoyaltyReservations({
                 cart_id: order.cart.id,
             });
@@ -66,18 +73,41 @@ export const processOrderLoyaltyStep = createStep(
                 await promotionModule.updatePromotions(loyaltyPromotion.id, { status: "inactive" });
             }
         }
-        if (!loyaltyPromotion) {
-            return new StepResponse({ skipped: true, redeemed_points: 0 });
+
+        const eligibleAmount = (order.items ?? []).reduce(
+            (total: number, item: { subtotal?: number; unit_price?: number; quantity?: number; discount_total?: number }) => {
+                const subtotal = item.subtotal ?? (Number(item.unit_price ?? 0) * Number(item.quantity ?? 0));
+                const discount = item.discount_total ?? 0;
+                return total + Math.max(0, subtotal - discount);
+            },
+            0,
+        );
+
+        const earnedPoints = await loyaltyModule.calculatePointsFromAmount(eligibleAmount);
+        if (earnedPoints > 0) {
+            await loyaltyModule.recordTransaction({
+                customer_id: order.customer.id,
+                type: "add",
+                reference_id: order.id,
+                points: earnedPoints,
+                order_id: order.id,
+            });
         }
 
         await orderModule.updateOrders({
             id: order.id,
-            metadata: { ...(order.metadata ?? {}), loyalty_redemption_processed: true },
+            metadata: {
+                ...(order.metadata ?? {}),
+                loyalty_redemption_processed: true,
+                loyalty_processed: true,
+            },
         });
 
         return new StepResponse({
             skipped: false,
             redeemed_points: redeemedPoints,
+            earned_points: earnedPoints ?? 0,
         });
     },
 );
+

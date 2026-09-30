@@ -8,12 +8,11 @@ loadEnv(process.env.NODE_ENV || "development", process.cwd());
 
 const REDIS_URL = process.env.REDIS_URL;
 const MOMO_CONFIGURED = Boolean(
-    process.env.MOMO_MOCK_ENABLED === "true" ||
-        (process.env.MOMO_PARTNER_CODE &&
-            process.env.MOMO_ACCESS_KEY &&
-            process.env.MOMO_SECRET_KEY &&
-            process.env.MOMO_REDIRECT_URL &&
-            process.env.MOMO_IPN_URL)
+    process.env.MOMO_PARTNER_CODE &&
+        process.env.MOMO_ACCESS_KEY &&
+        process.env.MOMO_SECRET_KEY &&
+        process.env.MOMO_REDIRECT_URL &&
+        process.env.MOMO_IPN_URL
 );
 const VNPAY_CONFIGURED = Boolean(
     process.env.VNPAY_TMN_CODE &&

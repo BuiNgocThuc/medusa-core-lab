@@ -22,7 +22,9 @@ export const handleOrderRedemptionWorkflow = createWorkflow(
             options: { throwIfKeyNotFound: true },
         });
         const customerLockKey = transform({ orders }, ({ orders }) =>
-            `loyalty-customer-${orders[0].customer!.id}`,
+            orders[0]?.customer?.id
+                ? `loyalty-customer-${orders[0].customer.id}`
+                : `loyalty-order-${orders[0].id}`,
         );
 
         acquireLockStep({

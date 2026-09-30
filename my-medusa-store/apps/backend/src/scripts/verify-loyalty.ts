@@ -1,5 +1,6 @@
 import { ExecArgs } from "@medusajs/framework/types";
 import { ContainerRegistrationKeys, MedusaError } from "@medusajs/framework/utils";
+import { LOYALTY_MODULE } from "@/src/modules/loyalty";
 
 export default async function verifyLoyalty({ container, args }: ExecArgs) {
   const logger = container.resolve(ContainerRegistrationKeys.LOGGER);
@@ -27,21 +28,14 @@ export default async function verifyLoyalty({ container, args }: ExecArgs) {
     );
   }
 
-  const loyaltyAccount = (customer as any).loyalty_account;
-  if (!loyaltyAccount) {
-    throw new MedusaError(
-      MedusaError.Types.NOT_FOUND,
-      `Customer ${customerId} khong co LoyaltyAccount duoc lien ket.`
-    );
-  }
-
-  if (loyaltyAccount.customer_id !== customer.id) {
-    throw new MedusaError(
-      MedusaError.Types.INVALID_DATA,
-      `Phat hien lech du lieu: LoyaltyAccount.customer_id (${loyaltyAccount.customer_id}) khong khop voi Customer.id (${customer.id})`
-    );
-  }
+  const loyaltyService = container.resolve(LOYALTY_MODULE);
+  const points = await loyaltyService.getPoints(customerId);
+  const loyaltyPointsRecords = await loyaltyService.listLoyaltyPoints({ customer_id: customerId });
 
   logger.info(`Customer: ${customer.id} (${customer.email})`);
-  logger.info(`Loyalty Data: ${JSON.stringify(loyaltyAccount, null, 2)}`);
+  logger.info(`Loyalty Points Balance: ${points}`);
+  logger.info(`Loyalty Points Record: ${JSON.stringify(loyaltyPointsRecords, null, 2)}`);
+  if ((customer as any).loyalty_account) {
+    logger.info(`Loyalty Account Link Data: ${JSON.stringify((customer as any).loyalty_account, null, 2)}`);
+  }
 }
