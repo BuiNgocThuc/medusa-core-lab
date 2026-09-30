@@ -6,6 +6,8 @@ import { listOrders } from '@lib/data/orders'
 import Divider from '@modules/common/components/divider'
 import TransferRequestForm from '@modules/account/components/transfer-request-form'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
     title: 'Orders',
     description: 'Overview of your previous orders.',
