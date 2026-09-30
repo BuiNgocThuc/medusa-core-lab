@@ -3,6 +3,7 @@
  */
 import {
   AbstractFulfillmentProviderService,
+  ContainerRegistrationKeys,
   createPgConnection,
   MedusaError,
   Modules,
@@ -36,6 +37,7 @@ const GHN_ROUTE_CACHE_TTL_SECONDS = 60 * 60
 type InjectedDependencies = {
   logger: Logger
   [Modules.CACHING]: ICachingModuleService
+  [ContainerRegistrationKeys.PG_CONNECTION]?: any
 }
 
 export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderService {
@@ -48,13 +50,24 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
   protected stockLocationCache_: Map<string, any> = new Map()
   protected pgConnection_: any = null
 
+  /**
+   * Lấy kết nối PostgreSQL:
+   * 1. Ưu tiên tuyệt đối Knex connection pool được Medusa inject sẵn qua Container (`ContainerRegistrationKeys.PG_CONNECTION`).
+   * 2. Chỉ fallback tạo connection mới từ process.env.DATABASE_URL nếu chạy trong môi trường standalone/test không có container.
+   * 3. Tuyệt đối không hardcode credentials/host/port local.
+   */
   protected getPgConnection() {
     if (!this.pgConnection_) {
-      this.pgConnection_ = createPgConnection({
-        clientUrl:
-          process.env.DATABASE_URL ||
-          "postgres://admin:123456@localhost:5434/medusa_core_lab_db",
-      })
+      if (process.env.DATABASE_URL) {
+        this.pgConnection_ = createPgConnection({
+          clientUrl: process.env.DATABASE_URL,
+        })
+      } else {
+        throw new MedusaError(
+          MedusaError.Types.UNEXPECTED_STATE,
+          "[GHN Fulfillment] Database connection is not available in container and DATABASE_URL is not set."
+        )
+      }
     }
     return this.pgConnection_
   }
@@ -145,6 +158,10 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
 
     this.logger_ = container.logger
     this.cache_ = container[Modules.CACHING]
+    this.pgConnection_ =
+      container[ContainerRegistrationKeys.PG_CONNECTION] ||
+      (container as any)?.pgConnection ||
+      null
     this.options_ = {
       endpoint: "https://dev-online-gateway.ghn.vn/shiip/public-api",
       paymentTypeId: 1,
@@ -924,15 +941,24 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       width: orderWidth,
       height: orderHeight,
 
-      // 3. Khối dịch vụ & thanh toán (Bắt buộc)
+      // 3. Khối dịch vụ & thanh toán (Bắt buộc) - Ưu tiên additional_data nếu caller truyền vào
       service_type_id: serviceTypeId,
-      payment_type_id: this.options_.paymentTypeId || 1,
-      required_note: this.options_.requiredNote || "CHOXEMHANGKHONGTHU",
+      payment_type_id: (Number(
+        additionalData?.payment_type_id ??
+        this.options_.paymentTypeId ??
+        1
+      ) === 2 ? 2 : 1) as 1 | 2,
+      required_note: (String(
+        additionalData?.required_note ||
+        additionalData?.carrier_instruction ||
+        this.options_.requiredNote ||
+        "CHOXEMHANGKHONGTHU"
+      ) as "KHONGCHOXEMHANG" | "CHOXEMHANGKHONGTHU" | "CHOTHUHANG"),
 
       // 4. Khối thông tin đơn hàng & thu hộ
       client_order_code: clientOrderCode || undefined,
       content: contentDescription,
-      note: driverNote || undefined,
+      note: String(additionalData?.note || driverNote || "").trim() || undefined,
       cod_amount: codAmount,
       cod_failed_amount: 0,
       insurance_value: insuranceValue,
@@ -942,12 +968,33 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       items: ghnItems,
     }
 
-    // Khối thông tin người gửi (from) - lấy động từ Stock Location thực tế đang xuất hàng
-    const resolvedStockLocation = await this.resolveStockLocation(
-      (fulfillment as any)?.location_id
+    // Khối thông tin người gửi (from):
+    // Tầng 1: Ưu tiên additional_data (nếu caller, custom API hoặc workflow truyền vào -> không tốn query DB)
+    const customFrom = (
+      additionalData?.stock_location ||
+      additionalData?.from_location ||
+      additionalData?.sender ||
+      additionalData
+    ) as Record<string, any> | undefined
+
+    const hasCustomSender = Boolean(
+      customFrom?.from_address ||
+      customFrom?.address_1 ||
+      customFrom?.from_district_id ||
+      customFrom?.district_id ||
+      customFrom?.from_ward_code ||
+      customFrom?.ward_code
     )
 
+    // Tầng 2: Nếu additional_data không có địa chỉ kho, tự động resolve từ DB (kết hợp in-memory cache)
+    const resolvedStockLocation = hasCustomSender
+      ? null
+      : await this.resolveStockLocation((fulfillment as any)?.location_id)
+
     const fromName = String(
+      customFrom?.from_name ||
+      customFrom?.name ||
+      customFrom?.company ||
       resolvedStockLocation?.company ||
       resolvedStockLocation?.name ||
       this.options_.fromName ||
@@ -955,30 +1002,43 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
     ).slice(0, 1024)
 
     const fromPhone = String(
+      customFrom?.from_phone ||
+      customFrom?.phone ||
       resolvedStockLocation?.phone ||
       this.options_.fromPhone ||
       "0901234567"
     )
 
     const fromAddress = String(
+      customFrom?.from_address ||
+      customFrom?.address_1 ||
       resolvedStockLocation?.address_1 ||
       this.options_.fromAddress ||
       "WHC3+PH7, Đường N13, Củ Chi, Hồ Chí Minh"
     ).slice(0, 1024)
 
     const fromWardName = String(
+      customFrom?.from_ward_name ||
+      customFrom?.ward_name ||
+      customFrom?.wardName ||
       resolvedStockLocation?.wardName ||
       this.options_.fromWardName ||
       "Xã Củ Chi"
     )
 
     const fromDistrictName = String(
+      customFrom?.from_district_name ||
+      customFrom?.district_name ||
+      customFrom?.districtName ||
       resolvedStockLocation?.districtName ||
       this.options_.fromDistrictName ||
       "Huyện Củ Chi"
     )
 
     const fromProvinceName = String(
+      customFrom?.from_province_name ||
+      customFrom?.province_name ||
+      customFrom?.provinceName ||
       resolvedStockLocation?.provinceName ||
       this.options_.fromProvinceName ||
       "Hồ Chí Minh"
@@ -992,7 +1052,10 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
     createOrderPayload.from_district_name = fromDistrictName
     createOrderPayload.from_province_name = fromProvinceName
     createOrderPayload.is_new_from_address = Boolean(
-      this.options_.isNewFromAddress ?? resolvedStockLocation?.isNewAddress ?? true
+      customFrom?.is_new_from_address ??
+      this.options_.isNewFromAddress ??
+      resolvedStockLocation?.isNewAddress ??
+      true
     )
 
     // Khối thông tin trả hàng (return) - nếu shop có cấu hình
