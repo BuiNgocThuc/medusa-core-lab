@@ -1,5 +1,5 @@
 import { MedusaContainer } from "@medusajs/framework/types"
-import { LOYALTY_MODULE, LoyaltyModuleService } from "@/src/modules/loyalty"
+import { LOYALTY_MODULE, LoyaltyModuleService } from "@/modules/loyalty"
 import { Modules } from "@medusajs/framework/utils"
 
 export default async function expireLoyaltyReservations(container: MedusaContainer) {
@@ -21,7 +21,7 @@ export default async function expireLoyaltyReservations(container: MedusaContain
             const [cart] = await cartModule.listCarts({ id: current.cart_id })
             if (cart) {
                 const { loyalty_promo_id, ...metadata } = cart.metadata || {}
-                await cartModule.updateCarts({ id: cart.id, metadata })
+                await cartModule.updateCarts(cart.id, { metadata })
             }
         } finally {
             await locking.release(key)

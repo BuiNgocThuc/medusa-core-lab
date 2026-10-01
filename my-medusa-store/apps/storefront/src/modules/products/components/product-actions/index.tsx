@@ -127,14 +127,16 @@ export default function ProductActions({
         if (!selectedVariant?.id) return null
 
         setIsAdding(true)
-
-        await addToCart({
-            variantId: selectedVariant.id,
-            quantity: 1,
-            countryCode,
-        })
-
-        setIsAdding(false)
+        try {
+            await addToCart({
+                variantId: selectedVariant.id,
+                quantity: 1,
+                countryCode,
+            })
+            router.refresh()
+        } finally {
+            setIsAdding(false)
+        }
     }
 
     return (
@@ -178,7 +180,9 @@ export default function ProductActions({
                     isLoading={isAdding}
                     data-testid="add-product-button"
                 >
-                    {!selectedVariant
+                    {isAdding
+                        ? 'Checking promotion eligibility...'
+                        : !selectedVariant
                         ? 'Select variant'
                         : !inStock || !isValidVariant
                         ? 'Out of stock'

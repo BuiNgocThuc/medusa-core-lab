@@ -1,6 +1,6 @@
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 import { createStep, StepResponse } from "@medusajs/framework/workflows-sdk"
-import { LOYALTY_REDEEM_VND_PER_POINT } from "@/src/constant"
+import { LOYALTY_REDEEM_VND_PER_POINT } from "@/constant"
 
 const LOYALTY_ADJUSTMENT_CODE_PREFIX = "LOYALTY-ADJUSTMENT-"
 

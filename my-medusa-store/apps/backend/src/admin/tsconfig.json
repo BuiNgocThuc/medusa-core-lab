@@ -18,7 +18,13 @@
         "strict": true,
         "noUnusedLocals": true,
         "noUnusedParameters": true,
-        "noFallthroughCasesInSwitch": true
+        "noFallthroughCasesInSwitch": true,
+
+        //      Alias
+        "baseUrl": ".",
+        "paths": {
+            "@/*": ["./*"]
+        }
     },
     "include": [".", "../../.medusa/types/plugin-augmentations.d.ts"]
 }

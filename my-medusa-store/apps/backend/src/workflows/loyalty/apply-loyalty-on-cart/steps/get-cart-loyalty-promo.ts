@@ -1,5 +1,5 @@
 import { createStep, StepResponse } from "@medusajs/framework/workflows-sdk";
-import { CartData, getCartLoyaltyPromotion } from "@/src/utils/promo";
+import { CartData, getCartLoyaltyPromotion } from "@/utils/promo";
 import { MedusaError } from "@medusajs/framework/utils";
 
 type GetCartLoyaltyPromoStepInput = {

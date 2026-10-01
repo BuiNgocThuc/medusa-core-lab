@@ -1,4 +1,4 @@
-import { TIER_MODULE, TierModuleService } from "@/src/modules/tier";
+import { TIER_MODULE, TierModuleService } from "../../../../modules/tier";
 import { createStep, StepResponse } from "@medusajs/framework/workflows-sdk";
 
 const DELETE_TIER_RULES_ID = "delete-tier-rules";

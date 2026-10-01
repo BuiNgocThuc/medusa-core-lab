@@ -23,6 +23,7 @@ export const validateTierPromotionStep = createStep(
 
         if (!customer?.has_account) {
             return new StepResponse({
+                promotion_id: null,
                 promotion_code: null,
             });
         }
@@ -32,11 +33,13 @@ export const validateTierPromotionStep = createStep(
 
         if (!tier?.promo_id || !promotion || promotion.status !== "active") {
             return new StepResponse({
+                promotion_id: null,
                 promotion_code: null,
             });
         }
 
         return new StepResponse({
+            promotion_id: promotion.id ?? null,
             promotion_code: promotion.code ?? null,
         });
     },

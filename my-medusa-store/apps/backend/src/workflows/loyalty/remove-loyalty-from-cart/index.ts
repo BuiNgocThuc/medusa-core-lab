@@ -10,7 +10,7 @@ import {
 import { getCartLoyaltyPromoStep } from "../apply-loyalty-on-cart/steps";
 import { releaseLoyaltyReservationStep } from "./steps";
 import { PromotionActions } from "@medusajs/framework/utils";
-import { CartData } from "@/src/utils";
+import { CartData } from "@/utils";
 
 type WorkflowInput = {
     cart_id: string;

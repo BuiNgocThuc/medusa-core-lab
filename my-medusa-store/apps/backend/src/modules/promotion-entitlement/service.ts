@@ -1,6 +1,6 @@
 import { MedusaError, MedusaService } from "@medusajs/framework/utils"
 import { FlashRedemption } from "./models"
-import { FLASH_CUSTOMER_USAGE_LIMIT } from "@/src/constant"
+import { FLASH_CUSTOMER_USAGE_LIMIT } from "../../constant"
 
 class PromotionEntitlementModuleService extends MedusaService({ FlashRedemption }) {
     async reserveFlashRedemption(customerId: string, cartId: string, amount: number) {

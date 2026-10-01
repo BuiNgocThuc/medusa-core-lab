@@ -1,7 +1,7 @@
 import { createStep, StepResponse } from "@medusajs/framework/workflows-sdk";
 import { ContainerRegistrationKeys, MedusaError, Modules } from "@medusajs/framework/utils";
-import { LOYALTY_MODULE, LoyaltyModuleService } from "@/src/modules/loyalty";
-import { CartData, getCartLoyaltyPromotion } from "@/src/utils";
+import { LOYALTY_MODULE, LoyaltyModuleService } from "@/modules/loyalty";
+import { CartData, getCartLoyaltyPromotion } from "@/utils";
 
 type ProcessOrderLoyaltyInput = { order_id: string };
 

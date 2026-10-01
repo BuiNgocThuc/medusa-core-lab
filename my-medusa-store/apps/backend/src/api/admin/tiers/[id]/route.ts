@@ -1,6 +1,6 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http";
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils";
-import { updateTierWorkflow } from "@/src/workflows";
+import { updateTierWorkflow } from "@/workflows";
 import { UpdateTierInput } from "./validators";
 
 // retrieve by id

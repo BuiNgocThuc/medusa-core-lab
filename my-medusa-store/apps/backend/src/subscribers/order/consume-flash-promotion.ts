@@ -1,10 +1,10 @@
 import { SubscriberArgs, SubscriberConfig } from "@medusajs/framework"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
-import { FLASH_PROMOTION_CODE_PREFIX } from "@/src/constant"
+import { FLASH_PROMOTION_CODE_PREFIX } from "@/constant"
 import {
     PROMOTION_ENTITLEMENT_MODULE,
     PromotionEntitlementModuleService,
-} from "@/src/modules/promotion-entitlement"
+} from "@/modules/promotion-entitlement"
 
 export default async function consumeFlashPromotionHandler({
     event: { data },

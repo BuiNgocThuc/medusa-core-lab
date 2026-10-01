@@ -90,7 +90,7 @@ const CustomerExtraDetails = ({
     <Container className="divide-y p-0">
       {/* Header Widget */}
       <div className="flex items-center justify-between px-6 py-4">
-        <Heading level="h2">Extra Information | Thông tin Bổ sung</Heading>
+        <Heading level="h2">Extra information</Heading>
       </div>
 
       {/* Hàng thông tin Avatar Profile */}
@@ -128,7 +128,7 @@ const CustomerExtraDetails = ({
             </div>
           ) : (
             <Text size="small" leading="compact" className="text-ui-fg-muted">
-              Chưa có ảnh đại diện
+              No profile image available
             </Text>
           )}
         </div>
@@ -158,7 +158,7 @@ const CustomerExtraDetails = ({
             </>
           ) : (
             <Text size="small" leading="compact" className="text-ui-fg-muted">
-              Chưa có Zalo ID
+              No Zalo ID available
             </Text>
           )}
         </div>

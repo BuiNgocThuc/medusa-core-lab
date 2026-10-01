@@ -38,8 +38,8 @@ const LoyaltyPointsBalance = ({ points }: LoyaltyPointsBalanceProps) => {
             {balance === null ? (
                 <p className="mt-2 text-small-regular text-ui-fg-subtle">
                     {loadFailed
-                        ? 'Không thể tải số dư loyalty points. Vui lòng đăng nhập lại.'
-                        : 'Đang tải số dư loyalty points...'}
+                        ? 'Could not load your loyalty points balance. Please sign in again.'
+                        : 'Loading loyalty points balance...'}
                 </p>
             ) : (
                 <>

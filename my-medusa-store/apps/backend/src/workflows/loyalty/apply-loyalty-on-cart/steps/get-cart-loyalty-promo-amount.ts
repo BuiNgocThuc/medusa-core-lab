@@ -1,7 +1,7 @@
 import { PromotionDTO, CustomerDTO } from "@medusajs/framework/types";
 import { MedusaError } from "@medusajs/framework/utils";
 import { createStep, StepResponse } from "@medusajs/framework/workflows-sdk";
-import { LOYALTY_MODULE, LoyaltyModuleService } from "@/src/modules/loyalty";
+import { LOYALTY_MODULE, LoyaltyModuleService } from "@/modules/loyalty";
 
 const GET_CART_LOYALTY_PROMO_AMOUNT_STEP_ID = "get-cart-loyalty-promo-amount";
 export type GetCartLoyaltyPromoAmountStepInput = {

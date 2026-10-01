@@ -20,13 +20,50 @@ type DiscountCodeProps = {
     cart: HttpTypes.StoreCart
 }
 
+const AUTOMATIC_WORKFLOW_PROMOTION_CODES = new Set([
+    'FIRST_PURCHASE',
+    'VIP_BUNDLE_15',
+])
+const CONDITIONAL_PROMOTION_CODES = new Set([
+    'RACKET_SUMMER_GET_SOCK',
+])
+const PROMOTION_CODE_ERROR_MESSAGE = 'This promotion code is invalid or cannot be applied.'
+
 const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
     const [isOpen, setIsOpen] = React.useState(false)
     const { showToast } = useToast()
 
     const { promotions = [] } = cart
+    const tierPromotionIds = new Set(
+        Array.isArray(cart.metadata?.tier_promotion_ids)
+            ? cart.metadata.tier_promotion_ids.filter(
+                  (id): id is string => typeof id === 'string'
+              )
+            : []
+    )
+    const conditionalPromotionIds = new Set(
+        Array.isArray(cart.metadata?.conditional_promotion_ids)
+            ? cart.metadata.conditional_promotion_ids.filter(
+                  (id): id is string => typeof id === 'string'
+              )
+            : []
+    )
     const isLoyaltyPromotion = (promotion: (typeof promotions)[number]) =>
         promotion.id === cart.metadata?.loyalty_promo_id
+    const isTierPromotion = (promotion: (typeof promotions)[number]) =>
+        tierPromotionIds.has(promotion.id)
+    const isConditionalPromotion = (promotion: (typeof promotions)[number]) =>
+        conditionalPromotionIds.has(promotion.id) ||
+        (promotion.code !== undefined &&
+            CONDITIONAL_PROMOTION_CODES.has(promotion.code))
+    const isWorkflowAutomaticPromotion = (
+        promotion: (typeof promotions)[number]
+    ) =>
+        Boolean(
+            promotion.code &&
+                (AUTOMATIC_WORKFLOW_PROMOTION_CODES.has(promotion.code) ||
+                    promotion.code.startsWith('FLASH20-'))
+        )
     const orderedPromotions = [...promotions].sort((left, right) => {
         if (isLoyaltyPromotion(left)) return 1
         if (isLoyaltyPromotion(right)) return -1
@@ -57,7 +94,11 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
         )
 
         if (alreadyApplied) {
-            showToast({ content: 'Mã ưu đãi đã được áp dụng', type: 'warning' })
+            showToast({ content: 'This promotion code is already applied.', type: 'warning' })
+            return
+        }
+        if (CONDITIONAL_PROMOTION_CODES.has(normalizedCode)) {
+            showToast({ content: 'This promotion is applied automatically.', type: 'warning' })
             return
         }
         const input = document.getElementById(
@@ -69,9 +110,17 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
         codes.push(normalizedCode)
 
         try {
-            await applyPromotions(codes)
-        } catch (e) {
-            showToast({ content: e instanceof Error ? e.message : String(e), type: 'error' })
+            const updatedCart = await applyPromotions(codes)
+            const wasApplied = updatedCart.promotions?.some(
+                (promotion) =>
+                    promotion.code?.toUpperCase() === normalizedCode
+            )
+            if (!wasApplied) {
+                showToast({ content: PROMOTION_CODE_ERROR_MESSAGE, type: 'error' })
+                return
+            }
+        } catch {
+            showToast({ content: PROMOTION_CODE_ERROR_MESSAGE, type: 'error' })
         }
 
         if (input) {
@@ -133,6 +182,10 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
 
                             {orderedPromotions.map((promotion) => {
                                 const isLoyalty = isLoyaltyPromotion(promotion)
+                                const isTier = isTierPromotion(promotion)
+                                const isConditional = isConditionalPromotion(promotion)
+                                const isWorkflowAutomatic =
+                                    isWorkflowAutomaticPromotion(promotion)
                                 const applicationMethod = promotion.application_method
                                 const promotionValue = applicationMethod?.value
                                 const promotionValueLabel =
@@ -161,6 +214,9 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
                                                 <Badge
                                                     color={
                                                         isLoyalty ||
+                                                        isTier ||
+                                                        isConditional ||
+                                                        isWorkflowAutomatic ||
                                                         promotion.is_automatic
                                                             ? 'green'
                                                             : 'grey'
@@ -176,6 +232,16 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
                                                         Loyalty points
                                                     </span>
                                                 )}
+                                                {isTier && (
+                                                    <span className="ml-1 text-ui-fg-subtle">
+                                                        Tier benefit
+                                                    </span>
+                                                )}
+                                                {isConditional && (
+                                                    <span className="ml-1 text-ui-fg-subtle">
+                                                        Automatic promotion
+                                                    </span>
+                                                )}
                                                 {/* {promotion.is_automatic && (
                           <Tooltip content="This promotion is automatically applied">
                             <InformationCircleSolid className="inline text-zinc-400" />
@@ -184,7 +250,10 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
                                             </span>
                                         </Text>
                                         {!promotion.is_automatic &&
-                                            !isLoyalty && (
+                                            !isLoyalty &&
+                                            !isTier &&
+                                            !isConditional &&
+                                            !isWorkflowAutomatic && (
                                             <button
                                                 className="flex items-center"
                                                 onClick={() => {

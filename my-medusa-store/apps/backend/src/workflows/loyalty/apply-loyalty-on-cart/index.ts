@@ -16,8 +16,8 @@ import {
     reserveLoyaltyReservationStep,
     GetCartLoyaltyPromoAmountStepInput,
 } from "./steps";
-import { CartData, orderPromotionCodes } from "@/src/utils";
-import { CUSTOMER_ID_PROMOTION_RULE_ATTRIBUTE } from "@/src/constant";
+import { CartData, orderPromotionCodes } from "@/utils";
+import { CUSTOMER_ID_PROMOTION_RULE_ATTRIBUTE } from "@/constant";
 import { PromotionActions } from "@medusajs/framework/utils";
 import { CreatePromotionDTO } from "@medusajs/framework/types";
 

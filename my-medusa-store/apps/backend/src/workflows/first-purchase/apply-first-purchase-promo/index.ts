@@ -5,7 +5,7 @@ import {
     WorkflowResponse,
 } from "@medusajs/framework/workflows-sdk";
 import { updateCartPromotionsWorkflow, useQueryGraphStep } from "@medusajs/medusa/core-flows";
-import { FIRST_PURCHASE_PROMOTION_CODE } from "@/src/constant";
+import { FIRST_PURCHASE_PROMOTION_CODE } from "@/constant";
 import { PromotionActions } from "@medusajs/framework/utils";
 import { isEligibleForFirstPurchasePromotion } from "../eligibility";
 

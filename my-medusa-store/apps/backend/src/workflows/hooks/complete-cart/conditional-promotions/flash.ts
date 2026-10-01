@@ -1,4 +1,4 @@
-import { PromotionEntitlementModuleService } from "@/src/modules/promotion-entitlement"
+import { PromotionEntitlementModuleService } from "@/modules/promotion-entitlement"
 import { throwInvalidPromotion } from "../../shared/errors"
 import { isFlashWindow } from "../../shared/cart-promotion-utils"
 

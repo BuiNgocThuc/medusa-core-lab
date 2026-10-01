@@ -1,5 +1,5 @@
 import { createStep, StepResponse } from "@medusajs/framework/workflows-sdk";
-import { LOYALTY_MODULE, LoyaltyModuleService } from "@/src/modules/loyalty";
+import { LOYALTY_MODULE, LoyaltyModuleService } from "@/modules/loyalty";
 
 const ADD_PURCHASE_AS_POINT_STEP_ID = "add-purchase-as-points";
 

@@ -18,7 +18,7 @@ export default function LoyaltyPointsEarnedToast({
         }
 
         showToast({
-            content: `Bạn đã nhận ${points.toLocaleString('vi-VN')} điểm loyalty.`,
+            content: `You earned ${points.toLocaleString('en-US')} loyalty points.`,
             type: 'success',
             duration: 5000,
         })

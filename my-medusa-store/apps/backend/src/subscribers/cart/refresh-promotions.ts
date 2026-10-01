@@ -3,8 +3,8 @@ import {
     addTierPromotionToCartWorkflow,
     refreshConditionalPromotionsWorkflow,
     syncLoyaltyAdjustmentWorkflow,
-} from "@/src/workflows"
-import { LOYALTY_MODULE, LoyaltyModuleService } from "@/src/modules/loyalty"
+} from "@/workflows"
+import { LOYALTY_MODULE, LoyaltyModuleService } from "@/modules/loyalty"
 
 export default async function refreshPromotionsHandler({
     event: { data },

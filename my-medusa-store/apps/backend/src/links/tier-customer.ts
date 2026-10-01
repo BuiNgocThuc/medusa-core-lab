@@ -1,5 +1,5 @@
 import { defineLink } from "@medusajs/framework/utils";
-import TierModule from "@/src/modules/tier";
+import TierModule from "../modules/tier";
 import CustomerModule from "@medusajs/medusa/customer";
 
 export default defineLink(

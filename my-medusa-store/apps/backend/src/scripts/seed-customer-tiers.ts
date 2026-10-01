@@ -1,7 +1,7 @@
 import type { ExecArgs, Logger, RemoteQueryFunction } from "@medusajs/framework/types";
 import { ContainerRegistrationKeys, MedusaError, Modules } from "@medusajs/framework/utils";
 import { createCustomerAccountWorkflow } from "@medusajs/medusa/core-flows";
-import { TIER_MODULE, TierModuleService } from "@/src/modules/tier";
+import { TIER_MODULE, TierModuleService } from "@/modules/tier";
 import { seedLoyaltyBalance } from "./seed-loyalty";
 import { Link } from "@medusajs/framework/modules-sdk";
 
@@ -98,6 +98,14 @@ const customers = [
         tier: "Gold",
         spend: 25_000_000,
         loyalty_points: 0,
+    },
+    {
+        email: "tier-vip-1@example.test",
+        first_name: "VIP",
+        last_name: "One",
+        tier: "VIP",
+        spend: 25_000_000,
+        loyalty_points: 1_000,
     },
 ];
 

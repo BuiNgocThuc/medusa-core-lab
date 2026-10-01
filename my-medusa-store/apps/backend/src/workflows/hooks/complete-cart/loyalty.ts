@@ -1,6 +1,6 @@
 import { MedusaError } from "@medusajs/framework/utils"
-import { CartData, getCartLoyaltyPromotion } from "@/src/utils"
-import { LoyaltyModuleService } from "@/src/modules/loyalty"
+import { CartData, getCartLoyaltyPromotion } from "@/utils"
+import { LoyaltyModuleService } from "@/modules/loyalty"
 import { Query } from "../shared/types"
 
 export async function validateLoyaltyPoints(

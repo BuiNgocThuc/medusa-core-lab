@@ -1,6 +1,6 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http";
 import { CreateTierInput } from "./validators";
-import { createTierWorkflow } from "@/src/workflows";
+import { createTierWorkflow } from "@/workflows";
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils";
 
 export async function POST(req: MedusaRequest<CreateTierInput>, res: MedusaResponse) {

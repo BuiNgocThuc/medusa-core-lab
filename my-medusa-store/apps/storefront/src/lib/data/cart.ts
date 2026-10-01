@@ -34,10 +34,6 @@ export async function retrieveCart(cartId?: string, fields?: string) {
         ...(await getAuthHeaders()),
     }
 
-    const next = {
-        ...(await getCacheOptions('carts')),
-    }
-
     return await sdk.client
         .fetch<HttpTypes.StoreCartResponse>(`/store/carts/${id}`, {
             method: 'GET',
@@ -45,11 +41,25 @@ export async function retrieveCart(cartId?: string, fields?: string) {
                 fields,
             },
             headers,
-            next,
-            cache: 'force-cache',
+            // Cart promotions are refreshed asynchronously by the backend's
+            // cart.updated subscriber. A cached cart can otherwise hide a
+            // promotion that was already attached to the cart in Medusa.
+            cache: 'no-store',
         })
-        .then(({ cart }: { cart: HttpTypes.StoreCart }) => cart)
-        .catch(() => null)
+        .then(({ cart }: { cart: HttpTypes.StoreCart }) => {
+            console.log('[storefront][cart promotions]', JSON.stringify({
+                cart_id: cart.id,
+                promotion_codes: cart.promotions?.map((promotion) => promotion.code),
+                conditional_promotion_ids: cart.metadata?.conditional_promotion_ids,
+                conditional_promotion_config_ids:
+                    cart.metadata?.conditional_promotion_config_ids,
+            }))
+            return cart
+        })
+        .catch((error) => {
+            console.error('[storefront][cart promotions] fetch failed', { cart_id: id, error })
+            return null
+        })
 }
 
 export async function getOrSetCart(countryCode: string) {
@@ -155,6 +165,7 @@ export async function addToCart({
             headers
         )
         .then(async () => {
+            await refreshConditionalPromotions(cart.id)
             const cartCacheTag = await getCacheTag('carts')
             revalidateTag(cartCacheTag)
 
@@ -162,6 +173,22 @@ export async function addToCart({
             revalidateTag(fulfillmentCacheTag)
         })
         .catch(medusaError)
+}
+
+async function refreshConditionalPromotions(
+    cartId: string
+) {
+    const headers = {
+        ...(await getAuthHeaders()),
+    }
+    await sdk.client.fetch(
+        `/store/carts/${cartId}/conditional-promotions/refresh`,
+        {
+            method: 'POST',
+            headers,
+            cache: 'no-store',
+        }
+    )
 }
 
 export async function updateLineItem({
@@ -188,6 +215,7 @@ export async function updateLineItem({
     await sdk.store.cart
         .updateLineItem(cartId, lineId, { quantity }, {}, headers)
         .then(async () => {
+            await refreshConditionalPromotions(cartId)
             const cartCacheTag = await getCacheTag('carts')
             revalidateTag(cartCacheTag)
 
@@ -215,6 +243,7 @@ export async function deleteLineItem(lineId: string) {
     await sdk.store.cart
         .deleteLineItem(cartId, lineId, {}, headers)
         .then(async () => {
+            await refreshConditionalPromotions(cartId)
             const cartCacheTag = await getCacheTag('carts')
             revalidateTag(cartCacheTag)
 
@@ -275,12 +304,14 @@ export async function applyPromotions(codes: string[]) {
 
     return sdk.store.cart
         .update(cartId, { promo_codes: codes }, {}, headers)
-        .then(async () => {
+        .then(async ({ cart }) => {
             const cartCacheTag = await getCacheTag('carts')
             revalidateTag(cartCacheTag)
 
             const fulfillmentCacheTag = await getCacheTag('fulfillment')
             revalidateTag(fulfillmentCacheTag)
+
+            return cart
         })
         .catch(medusaError)
 }

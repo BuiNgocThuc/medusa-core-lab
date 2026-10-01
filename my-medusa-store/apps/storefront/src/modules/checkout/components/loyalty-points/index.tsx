@@ -158,7 +158,7 @@ const LoyaltyPoints = ({ cart }: LoyaltyPointsProps) => {
 
                 setAvailablePoints(null)
                 setPointsLoadError(
-                    'Không thể tải điểm loyalty. Vui lòng đăng nhập lại.'
+                    'Could not load loyalty points. Please sign in again.'
                 )
             })
 
@@ -183,7 +183,7 @@ const LoyaltyPoints = ({ cart }: LoyaltyPointsProps) => {
             setError(
                 error instanceof Error
                     ? error.message
-                    : 'Không thể áp dụng ưu đãi đổi điểm'
+                    : 'Could not apply the loyalty redemption offer'
             )
         } finally {
             setIsSubmitting(false)
@@ -202,7 +202,7 @@ const LoyaltyPoints = ({ cart }: LoyaltyPointsProps) => {
             setError(
                 error instanceof Error
                     ? error.message
-                    : 'Không thể gỡ ưu đãi đổi điểm'
+                    : 'Could not remove the loyalty redemption offer'
             )
         } finally {
             setIsSubmitting(false)

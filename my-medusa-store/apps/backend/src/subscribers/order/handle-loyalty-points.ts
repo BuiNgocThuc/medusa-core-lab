@@ -1,6 +1,6 @@
 import { SubscriberArgs, SubscriberConfig } from "@medusajs/framework"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
-import { earnLoyaltyOnOrderWorkflow, handleOrderRedemptionWorkflow } from "@/src/workflows"
+import { earnLoyaltyOnOrderWorkflow, handleOrderRedemptionWorkflow } from "@/workflows"
 
 export default async function handleOrderPointsHandler({
     event: { data },

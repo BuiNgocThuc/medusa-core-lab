@@ -8,10 +8,15 @@ import {
     acquireLockStep,
     releaseLockStep,
     updateCartPromotionsWorkflow,
+    updateCartsStep,
     useQueryGraphStep,
 } from "@medusajs/medusa/core-flows";
 import { PromotionActions } from "@medusajs/framework/utils";
-import { validateTierPromotionStep } from "./steps";
+import {
+    buildTierPromotionSyncPlan,
+    createTierPromotionSyncMarkerStep,
+    validateTierPromotionStep,
+} from "./steps";
 
 const ADD_TIER_PROMOTION_TO_CART_WORKFLOW_ID = "add-tier-promotion-to-cart";
 export type AddTierPromotionToCartWorkflowInput = {
@@ -21,7 +26,7 @@ export type AddTierPromotionToCartWorkflowInput = {
 export const addTierPromotionToCartWorkflow = createWorkflow(
     ADD_TIER_PROMOTION_TO_CART_WORKFLOW_ID,
     (input: AddTierPromotionToCartWorkflowInput) => {
-        // Get cart with customer, tier, and promotions
+        // Get cart with customer, tier, and promotions.
         const { data: carts } = useQueryGraphStep({
             entity: "cart",
             fields: [
@@ -34,6 +39,7 @@ export const addTierPromotionToCartWorkflow = createWorkflow(
                 "customer.tier.promotion.status",
                 "promotions.*",
                 "promotions.code",
+                "metadata",
             ],
             filters: {
                 id: input.cart_id,
@@ -49,6 +55,11 @@ export const addTierPromotionToCartWorkflow = createWorkflow(
             ttl: 10,
         });
 
+        const { data: tiers } = useQueryGraphStep({
+            entity: "tier",
+            fields: ["id", "promo_id"],
+        }).config({ name: "list-tier-promotions" });
+
         const customer = transform({ carts }, ({ carts }) => {
             return carts[0]?.customer ?? null;
         });
@@ -57,31 +68,52 @@ export const addTierPromotionToCartWorkflow = createWorkflow(
             customer,
         });
 
-        // Add promotion to cart if valid and not already applied
-        when({ validationResult, carts }, ({ validationResult, carts }) => {
-            const promotionCode = validationResult.promotion_code;
+        const syncPlan = transform(
+            { carts, tiers, validationResult },
+            ({ carts, tiers, validationResult }) => buildTierPromotionSyncPlan({
+                promotions: (carts[0].promotions ?? []).filter(
+                    (promotion): promotion is NonNullable<typeof promotion> => promotion != null,
+                ),
+                metadata: carts[0].metadata,
+                loyaltyPromotionId: carts[0].metadata?.loyalty_promo_id as string | undefined,
+                desiredPromotion:
+                    validationResult.promotion_id && validationResult.promotion_code
+                        ? {
+                            id: validationResult.promotion_id,
+                            code: validationResult.promotion_code,
+                        }
+                        : null,
+                tierPromotions: tiers,
+            }),
+        );
 
-            if (!promotionCode) {
-                return false;
-            }
-
-            const isAlreadyApplied =
-                carts[0].promotions?.some((promotion) => promotion?.code === promotionCode) ??
-                false;
-
-            return !isAlreadyApplied;
-        }).then(() => {
-            const promoCodes = transform({ validationResult }, ({ validationResult }) => [
-                validationResult?.promotion_code!,
-            ]);
+        when({ syncPlan }, ({ syncPlan }) => syncPlan.promotions_changed).then(() => {
+            const markerInput = transform({ syncPlan, input }, ({ syncPlan, input }) => ({
+                cart_id: input.cart_id,
+                promo_codes: syncPlan.promo_codes,
+            }));
+            const marker = createTierPromotionSyncMarkerStep(markerInput);
+            const promotionInput = transform({ syncPlan, input, marker }, ({ syncPlan, input, marker }) => ({
+                cart_id: input.cart_id,
+                promo_codes: syncPlan.promo_codes,
+                action: PromotionActions.REPLACE,
+                tier_promotion_sync_marker: marker,
+            }));
 
             return updateCartPromotionsWorkflow.runAsStep({
-                input: {
-                    cart_id: input.cart_id,
-                    promo_codes: promoCodes,
-                    action: PromotionActions.ADD,
-                },
+                input: promotionInput as any,
             });
+        });
+
+        when({ syncPlan }, ({ syncPlan }) => syncPlan.metadata_changed).then(() => {
+            const updateInput = transform({ carts, syncPlan, input }, ({ carts, syncPlan, input }) => [{
+                id: input.cart_id,
+                metadata: {
+                    ...(carts[0].metadata ?? {}),
+                    tier_promotion_ids: syncPlan.tier_promotion_ids,
+                },
+            }]);
+            return updateCartsStep(updateInput);
         });
 
         releaseLockStep({

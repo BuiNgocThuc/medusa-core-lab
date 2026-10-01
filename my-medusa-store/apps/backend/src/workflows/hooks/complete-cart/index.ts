@@ -1,10 +1,11 @@
 import { completeCartWorkflow } from "@medusajs/medusa/core-flows"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
-import { LOYALTY_MODULE, LoyaltyModuleService } from "@/src/modules/loyalty"
+import { LOYALTY_MODULE, LoyaltyModuleService } from "@/modules/loyalty"
 import {
     PROMOTION_ENTITLEMENT_MODULE,
     PromotionEntitlementModuleService,
-} from "@/src/modules/promotion-entitlement"
+} from "@/modules/promotion-entitlement"
+import { CONDITIONAL_PROMOTION_MODULE, ConditionalPromotionModuleService } from "@/modules/conditional-promotion"
 import { validateConditionalPromotions } from "./conditional-promotions"
 import { validateCompleteCartFirstPurchasePromotion } from "./first-purchase"
 import { validateLoyaltyPoints } from "./loyalty"
@@ -16,7 +17,7 @@ export function registerCompleteCartPromotionValidation() {
         const { data: [detailedCart] } = await query.graph(
             {
                 entity: "cart",
-                fields: ["id", "customer_id", "promotions.id", "promotions.code", "customer.tier.id"],
+                fields: ["id", "customer_id", "promotions.id", "promotions.code", "customer.has_account", "customer.tier.id"],
                 filters: { id: cart.id },
             },
             { throwIfKeyNotFound: true },
@@ -32,7 +33,8 @@ export function registerCompleteCartPromotionValidation() {
         const entitlementService = container.resolve(
             PROMOTION_ENTITLEMENT_MODULE,
         ) as PromotionEntitlementModuleService
-        await validateConditionalPromotions(query, cart.id, entitlementService)
+        const conditionalService = container.resolve(CONDITIONAL_PROMOTION_MODULE) as ConditionalPromotionModuleService
+        await validateConditionalPromotions(query, cart.id, entitlementService, conditionalService)
 
         const loyaltyModuleService = container.resolve(LOYALTY_MODULE) as LoyaltyModuleService
         await validateLoyaltyPoints(query, cart.id, loyaltyModuleService)

@@ -1,7 +1,7 @@
 const earnRun = jest.fn()
 const redeemRun = jest.fn()
 
-jest.mock("@/src/workflows", () => ({
+jest.mock("@/workflows", () => ({
   earnLoyaltyOnOrderWorkflow: jest.fn(() => ({ run: earnRun })),
   handleOrderRedemptionWorkflow: jest.fn(() => ({ run: redeemRun })),
 }))

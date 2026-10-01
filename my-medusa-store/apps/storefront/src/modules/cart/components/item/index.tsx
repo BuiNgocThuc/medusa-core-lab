@@ -12,6 +12,7 @@ import LineItemUnitPrice from '@modules/common/components/line-item-unit-price'
 import LocalizedClientLink from '@modules/common/components/localized-client-link'
 import Spinner from '@modules/common/icons/spinner'
 import Thumbnail from '@modules/products/components/thumbnail'
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
 type ItemProps = {
@@ -21,6 +22,7 @@ type ItemProps = {
 }
 
 const Item = ({ item, type = 'full', currencyCode }: ItemProps) => {
+    const router = useRouter()
     const [updating, setUpdating] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
@@ -28,16 +30,21 @@ const Item = ({ item, type = 'full', currencyCode }: ItemProps) => {
         setError(null)
         setUpdating(true)
 
-        await updateLineItem({
-            lineId: item.id,
-            quantity,
-        })
-            .catch((err) => {
+        try {
+            await updateLineItem({
+                lineId: item.id,
+                quantity,
+            })
+            router.refresh()
+        } catch (err) {
+            if (err instanceof Error) {
                 setError(err.message)
-            })
-            .finally(() => {
-                setUpdating(false)
-            })
+            } else {
+                setError('Could not update this cart item.')
+            }
+        } finally {
+            setUpdating(false)
+        }
     }
 
     // TODO: Update this to grab the actual max inventory

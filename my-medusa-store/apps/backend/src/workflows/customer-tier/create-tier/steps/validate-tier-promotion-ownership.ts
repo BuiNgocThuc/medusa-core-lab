@@ -1,6 +1,6 @@
 import { createStep, StepResponse } from "@medusajs/framework/workflows-sdk";
 import { MedusaError } from "@medusajs/framework/utils";
-import { TIER_MODULE, TierModuleService } from "@/src/modules/tier";
+import { TIER_MODULE, TierModuleService } from "../../../../modules/tier";
 
 type ValidateTierPromotionOwnershipInput = {
     promo_id: string;

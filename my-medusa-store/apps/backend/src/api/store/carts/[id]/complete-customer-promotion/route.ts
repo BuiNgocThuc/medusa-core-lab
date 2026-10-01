@@ -1,6 +1,6 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
-import { completeCustomerPromotionCartWorkflow } from "@/src/workflows"
+import { completeCustomerPromotionCartWorkflow } from "@/workflows"
 
 export async function POST(req: MedusaRequest, res: MedusaResponse) {
     const { result } = await completeCustomerPromotionCartWorkflow(req.scope).run({

@@ -10,8 +10,8 @@ import {
     releaseLockStep,
     useQueryGraphStep,
 } from "@medusajs/medusa/core-flows";
-import { FIRST_PURCHASE_PROMOTION_CODE } from "@/src/constant";
-import { earnLoyaltyOnOrderWorkflow } from "@/src/workflows/loyalty/earn-loyalty-on-order";
+import { FIRST_PURCHASE_PROMOTION_CODE } from "@/constant";
+import { earnLoyaltyOnOrderWorkflow } from "@/workflows/loyalty/earn-loyalty-on-order";
 
 type CompleteCustomerPromotionCartInput = {
     cart_id: string;

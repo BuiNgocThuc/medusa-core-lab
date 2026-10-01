@@ -1,4 +1,4 @@
-import { LOYALTY_MODULE, LoyaltyModuleService } from "@/src/modules/loyalty";
+import { LOYALTY_MODULE, LoyaltyModuleService } from "@/modules/loyalty";
 import { MedusaContainer } from "@medusajs/framework";
 
 export async function seedLoyaltyBalance(

@@ -1,5 +1,5 @@
 import { PromotionDTO, CustomerDTO, CartDTO, OrderDTO } from "@medusajs/framework/types";
-import { CUSTOMER_ID_PROMOTION_RULE_ATTRIBUTE } from "@/src/constant";
+import { CUSTOMER_ID_PROMOTION_RULE_ATTRIBUTE } from "../constant";
 
 export type CartData = CartDTO & {
     promotions?: PromotionDTO[];

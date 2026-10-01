@@ -6,7 +6,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse): Promise<void
     const { id } = req.params;
 
     // Query customers linked to this tier
-    const { data: customers, metadata } = await query.index({
+    const { data: customers, metadata } = await query.graph({
         entity: "customer",
         filters: {
             tier: {
@@ -18,7 +18,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse): Promise<void
 
     res.json({
         customers,
-        count: metadata?.estimate_count || 0,
+        count: metadata?.count || 0,
         offset: metadata?.skip || 0,
         limit: metadata?.take || 15,
     });

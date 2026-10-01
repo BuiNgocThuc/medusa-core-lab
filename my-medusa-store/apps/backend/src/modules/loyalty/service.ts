@@ -3,7 +3,7 @@ import LoyaltyPoint from "./models/loyalty-point";
 import { LoyaltyReservation, LoyaltyTransaction } from "./models";
 import { LoyaltyAccount } from "./models/loyalty-account";
 import { InferTypeOf } from "@medusajs/framework/types";
-import { LOYALTY_EARN_VND_PER_POINT, LOYALTY_REDEEM_VND_PER_POINT } from "@/src/constant";
+import { LOYALTY_EARN_VND_PER_POINT, LOYALTY_REDEEM_VND_PER_POINT } from "../../constant";
 
 type LoyaltyPoint = InferTypeOf<typeof LoyaltyPoint>;
 

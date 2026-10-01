@@ -5,9 +5,10 @@ import {
     validateAndTransformQuery,
 } from "@medusajs/framework/http";
 import { createFindParams, createSelectParams } from "@medusajs/medusa/api/utils/validators";
-import { NextTierSchema } from "@/src/api/store/customers";
-import { CreateTierSchema, UpdateTierSchema } from "@/src/api/admin/tiers";
-import { RedeemLoyaltyPointsSchema } from "@/src/api/store/carts/[id]/loyalty-points/validators.ts";
+import { NextTierSchema } from "@/api/store/customers";
+import { CreateTierSchema, UpdateTierSchema } from "@/api/admin/tiers";
+import { ConditionalPromotionSchema } from "@/api/admin/conditional-promotions/validators";
+import { RedeemLoyaltyPointsSchema } from "@/api/store/carts/[id]/loyalty-points/validators.ts";
 import { customerAdditionalDataSchema } from "../utils/customer-additional-data";
 
 export const adminCreateCustomerAdditionalDataValidator = customerAdditionalDataSchema.shape;
@@ -48,6 +49,8 @@ export default defineMiddlewares({
                 }),
             ],
         },
+        { matcher: "/admin/conditional-promotions", methods: ["POST"], middlewares: [validateAndTransformBody(ConditionalPromotionSchema)] },
+        { matcher: "/admin/conditional-promotions/:id", methods: ["POST"], middlewares: [validateAndTransformBody(ConditionalPromotionSchema)] },
         // update tier
         {
             matcher: "/admin/tiers/:id",

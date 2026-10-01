@@ -4,6 +4,7 @@ import { OptionValueIds } from '@lib/util/product-option-filters'
 import SkeletonProductGrid from '@modules/skeletons/templates/skeleton-product-grid'
 import RefinementList from '@modules/store/components/refinement-list'
 import { SortOptions } from '@modules/store/components/refinement-list/sort-products'
+import ProductSearch from '@modules/store/components/product-search'
 
 import PaginatedProducts from './paginated-products'
 
@@ -11,11 +12,13 @@ const StoreTemplate = ({
     sortBy,
     page,
     countryCode,
+    searchQuery,
     optionValueIds,
 }: {
     sortBy?: SortOptions
     page?: string
     countryCode: string
+    searchQuery?: string
     optionValueIds?: OptionValueIds
 }) => {
     const pageNumber = page ? parseInt(page) : 1
@@ -31,11 +34,15 @@ const StoreTemplate = ({
                 <div className="mb-8 text-2xl-semi">
                     <h1 data-testid="store-page-title">All products</h1>
                 </div>
+                <div className="mb-8">
+                    <ProductSearch initialQuery={searchQuery} />
+                </div>
                 <Suspense fallback={<SkeletonProductGrid />}>
                     <PaginatedProducts
                         sortBy={sort}
                         page={pageNumber}
                         countryCode={countryCode}
+                        searchQuery={searchQuery}
                         optionValueIds={optionValueIds}
                     />
                 </Suspense>

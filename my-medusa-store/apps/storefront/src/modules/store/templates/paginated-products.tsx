@@ -13,6 +13,7 @@ type PaginatedProductsParams = {
     category_id?: string[]
     id?: string[]
     order?: string
+    q?: string
 }
 
 export default async function PaginatedProducts({
@@ -22,6 +23,7 @@ export default async function PaginatedProducts({
     categoryId,
     productsIds,
     countryCode,
+    searchQuery,
     optionValueIds,
 }: {
     sortBy?: SortOptions
@@ -30,6 +32,7 @@ export default async function PaginatedProducts({
     categoryId?: string
     productsIds?: string[]
     countryCode: string
+    searchQuery?: string
     optionValueIds?: OptionValueIds
 }) {
     const queryParams: PaginatedProductsParams = {
@@ -46,6 +49,10 @@ export default async function PaginatedProducts({
 
     if (productsIds) {
         queryParams['id'] = productsIds
+    }
+
+    if (searchQuery?.trim()) {
+        queryParams.q = searchQuery.trim()
     }
 
     if (sortBy === 'created_at') {
