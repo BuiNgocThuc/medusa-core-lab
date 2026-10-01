@@ -88,6 +88,14 @@ export interface GhnModuleOptions {
   returnDistrictName?: string
   returnProvinceName?: string
   isNewReturnAddress?: boolean
+
+  /**
+   * Mức khai giá bảo hiểm tối đa (VND) gửi sang GHN.
+   * GHN đền bù tối đa 5.000.000₫ đối với tài khoản thường không ký hợp đồng bảo hiểm giá trị cao.
+   * Nếu có hợp đồng riêng với GHN, có thể cấu hình lên đến 50.000.000₫.
+   * Mặc định: 5.000.000₫
+   */
+  maxInsuranceValue?: number
 }
 
 export interface GhnApiResponse<T = any> {
@@ -575,6 +583,12 @@ export interface GhnCreateOrderResponseData {
   /** Mã hóa quận/huyện phân tuyến (nếu có) */
   district_encode?: string
 }
+
+/**
+ * Dữ liệu trả về từ API Xem trước đơn hàng (/v2/shipping-order/preview)
+ * Cùng cấu trúc với GhnCreateOrderResponseData, order_code rỗng vì không tạo đơn.
+ */
+export type GhnPreviewOrderResponseData = GhnCreateOrderResponseData
 
 export interface GhnCancelOrderRequest {
   order_codes: string[]

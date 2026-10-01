@@ -298,6 +298,7 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
     toProvinceName,
     toDistrictId,
     toWardCode,
+    toWardName,
     items,
     fallbackLocationId,
   }: {
@@ -305,6 +306,7 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
     toProvinceName: string
     toDistrictId?: number
     toWardCode?: string
+    toWardName?: string
     items?: any[]
     fallbackLocationId?: string
   }): Promise<{
@@ -386,6 +388,58 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
 
     // 3. Miền Trung (CENTRAL) hoặc trường hợp giáp ranh / không rõ vùng:
     // So sánh cước GHN thực tế giữa các kho ứng viên để chọn kho có cước rẻ nhất
+    if (toProvinceName && toWardName) {
+      try {
+        const feePromises = eligibleWarehouses.map(async (wh) => {
+          try {
+            const preview = await this.client_.previewOrder({
+              to_name: "Khách Hàng",
+              to_phone: "0901234567",
+              to_address: toWardName,
+              to_ward_name: toWardName,
+              to_province_name: toProvinceName,
+              is_new_to_address: true,
+              from_name: wh.company || wh.name,
+              from_phone: wh.phone || "0901234567",
+              from_address: wh.address_1 || "Kho hàng",
+              from_ward_name: wh.wardName,
+              from_district_name: wh.districtName,
+              from_province_name: wh.provinceName,
+              is_new_from_address: true,
+              weight: 500,
+              length: 10,
+              width: 10,
+              height: 10,
+              service_type_id: 2,
+              payment_type_id: 1,
+              required_note: "CHOXEMHANGKHONGTHU",
+            })
+            return {
+              warehouse: wh,
+              fee: Number(preview.total_fee || preview.fee?.main_service || Infinity),
+            }
+          } catch {
+            return { warehouse: wh, fee: Infinity }
+          }
+        })
+
+        const feeResults = await Promise.all(feePromises)
+        const validResults = feeResults.filter((r) => r.fee < Infinity)
+        if (validResults.length > 0) {
+          validResults.sort((a, b) => a.fee - b.fee)
+          const best = validResults[0]
+          this.logger_.info?.(
+            `[GHN Smart Routing] Selected warehouse with lowest preview fee (${best.fee}₫): "${best.warehouse.name}" for "${toProvinceName}"`
+          )
+          return best.warehouse
+        }
+      } catch (err: any) {
+        this.logger_.warn?.(
+          `[GHN Smart Routing] Preview fee comparison failed: ${err?.message}`
+        )
+      }
+    }
+
     if (toDistrictId) {
       try {
         const feePromises = eligibleWarehouses.map(async (wh) => {
@@ -776,6 +830,7 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
         toProvinceName: String(toProvinceName || ""),
         toDistrictId: effectiveToDistrict,
         toWardCode: toWardCode ? String(toWardCode) : undefined,
+        toWardName: toWardName ? String(toWardName) : undefined,
         items,
         fallbackLocationId: fromLocation?.id,
       })
@@ -796,11 +851,182 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       )
 
 
+      // Khai giá bảo hiểm: chỉ tính trên giá trị thực tế của hàng hóa (subtotal)
+      // GHN: Miễn phí bảo hiểm dưới 1M. Từ 1M trở lên tính phí 0.5%.
+      // Mức trần mặc định 5.000.000₫ cho tài khoản thường hoặc theo maxInsuranceValue config.
+      const cartSubtotal = items.reduce((sum: number, it: any) => {
+        return sum + Number(it?.unit_price || 0) * Number(it?.quantity || 1)
+      }, 0)
+      const maxInsurance = this.options_.maxInsuranceValue ?? 5_000_000
+      const insuranceValue = Math.min(maxInsurance, Math.max(0, Math.round(cartSubtotal)))
+
+      // =========================================================================
+      // CHIẾN LƯỢC 1 (ƯU TIÊN): TÍNH PHÍ BẰNG API PREVIEW (/v2/shipping-order/preview)
+      // Khi khách dùng mô hình 2 cấp mới (GHN v3) hoặc có tên Tỉnh + Phường/Xã:
+      // Engine Geocoding của GHN tự phân giải chính xác tuyến huyện/xã và trả về:
+      // 1. Phí cước chính xác 100% khớp với lúc Tạo đơn (Fulfillment)
+      // 2. Thời gian giao hàng dự kiến (expected_delivery_time)
+      // =========================================================================
+      if (toProvinceName && toWardName) {
+        const recipientName =
+          [shippingAddress?.first_name, shippingAddress?.last_name]
+            .filter(Boolean)
+            .join(" ")
+            .trim()
+            .slice(0, 1024) || "Khách Hàng"
+
+        const recipientPhone = String(
+          shippingAddress?.phone || (context as any)?.cart?.customer?.phone || "0901234567"
+        ).trim()
+
+        const recipientAddress = (
+          shippingAddress?.address_1 ||
+          [shippingAddress?.address_1, shippingAddress?.address_2].filter(Boolean).join(", ") ||
+          toWardName ||
+          "Địa chỉ nhận hàng"
+        ).trim().slice(0, 1024)
+
+        const fromName = String(
+          optimalWarehouse?.company ||
+          optimalWarehouse?.name ||
+          this.options_.fromName ||
+          "South Warehouse"
+        ).slice(0, 1024)
+
+        const fromPhone = String(
+          optimalWarehouse?.phone ||
+          this.options_.fromPhone ||
+          "0901234567"
+        )
+
+        const fromAddress = String(
+          optimalWarehouse?.address_1 ||
+          this.options_.fromAddress ||
+          "123 Đường Hiệp Bình, Phường Hiệp Bình, TP. Hồ Chí Minh"
+        ).slice(0, 1024)
+
+        const fromWardName = String(
+          optimalWarehouse?.wardName ||
+          this.options_.fromWardName ||
+          "Phường Hiệp Bình"
+        )
+
+        const fromDistrictName = String(
+          optimalWarehouse?.districtName ||
+          this.options_.fromDistrictName ||
+          "Thành Phố Thủ Đức"
+        )
+
+        const fromProvinceName = String(
+          optimalWarehouse?.provinceName ||
+          this.options_.fromProvinceName ||
+          "Hồ Chí Minh"
+        )
+
+        const previewPayload: GhnCreateOrderRequest = {
+          to_name: recipientName,
+          to_phone: recipientPhone,
+          to_address: recipientAddress,
+          to_ward_name: toWardName,
+          to_province_name: toProvinceName,
+          is_new_to_address: true,
+
+          from_name: fromName,
+          from_phone: fromPhone,
+          from_address: fromAddress,
+          from_ward_name: fromWardName,
+          from_district_name: fromDistrictName,
+          from_province_name: fromProvinceName,
+          is_new_from_address: true,
+
+          weight: Math.round(totalWeight),
+          length: this.options_.defaultDimensions?.length || 10,
+          width: this.options_.defaultDimensions?.width || 10,
+          height: this.options_.defaultDimensions?.height || 10,
+
+          service_type_id: (serviceTypeId === 5 ? 5 : 2),
+          payment_type_id: 1,
+          required_note: "CHOXEMHANGKHONGTHU",
+          insurance_value: insuranceValue,
+          items: ghnItems,
+        }
+
+        try {
+          this.logger_.info?.(
+            `[GHN Fulfillment] Calculating fee via PREVIEW API: "${fromProvinceName}" -> "${toProvinceName}" (ward: "${toWardName}") | weight=${previewPayload.weight}g | service_type_id=${previewPayload.service_type_id}`
+          )
+          const previewData = await this.client_.previewOrder(previewPayload)
+
+          if (previewData && typeof previewData.total_fee === "number") {
+            const calculatedAmount = Number(previewData.total_fee || previewData.fee?.main_service || 0)
+            this.logger_.info?.(
+              `[GHN Fulfillment] Preview fee success: total=${calculatedAmount}₫ (main_service=${previewData.fee?.main_service}₫, insurance=${previewData.fee?.insurance || 0}₫) | expected_delivery=${previewData.expected_delivery_time}`
+            )
+
+            return {
+              calculated_amount: calculatedAmount,
+              is_calculated_price_tax_inclusive: true,
+              data: {
+                expected_delivery_time: previewData.expected_delivery_time,
+                leadtime: previewData.expected_delivery_time,
+                ghn_trans_type: previewData.trans_type,
+                ghn_sort_code: previewData.sort_code,
+                main_service_fee: previewData.fee?.main_service,
+                insurance_fee: previewData.fee?.insurance,
+                from_warehouse_id: optimalWarehouse?.id,
+                from_warehouse_name: optimalWarehouse?.name,
+              },
+            } as any as CalculatedShippingOptionPrice
+          }
+        } catch (previewErr: any) {
+          // Nếu preview với gói 5 fail, tự động retry với gói 2
+          if (previewPayload.service_type_id === 5) {
+            try {
+              previewPayload.service_type_id = 2
+              const retryData = await this.client_.previewOrder(previewPayload)
+              if (retryData && typeof retryData.total_fee === "number") {
+                const calculatedAmount = Number(retryData.total_fee || retryData.fee?.main_service || 0)
+                this.logger_.info?.(
+                  `[GHN Fulfillment] Preview fee retry success with service_type_id=2: total=${calculatedAmount}₫ | expected_delivery=${retryData.expected_delivery_time}`
+                )
+                return {
+                  calculated_amount: calculatedAmount,
+                  is_calculated_price_tax_inclusive: true,
+                  data: {
+                    expected_delivery_time: retryData.expected_delivery_time,
+                    leadtime: retryData.expected_delivery_time,
+                    ghn_trans_type: retryData.trans_type,
+                    ghn_sort_code: retryData.sort_code,
+                    main_service_fee: retryData.fee?.main_service,
+                    insurance_fee: retryData.fee?.insurance,
+                    from_warehouse_id: optimalWarehouse?.id,
+                    from_warehouse_name: optimalWarehouse?.name,
+                  },
+                } as any as CalculatedShippingOptionPrice
+              }
+            } catch (retryErr: any) {
+              this.logger_.warn?.(
+                `[GHN Fulfillment] Preview failed on both service_type_id 5 & 2 (${retryErr?.message}), falling back to legacy fee API`
+              )
+            }
+          } else {
+            this.logger_.warn?.(
+              `[GHN Fulfillment] Preview failed (${previewErr?.message}), falling back to legacy fee API`
+            )
+          }
+        }
+      }
+
+      // =========================================================================
+      // CHIẾN LƯỢC 2 (FALLBACK): TÍNH PHÍ BẰNG API LEGACY (/v2/shipping-order/fee)
+      // Dành cho trường hợp thiếu tên xã hoặc khi API preview gặp sự cố mạng
+      // =========================================================================
       const feePayload: GhnFeeRequest = {
         from_district_id: fromDistrictId,
         from_ward_code: fromWardCode,
         service_type_id: serviceTypeId,
         weight: Math.round(totalWeight),
+        insurance_value: insuranceValue,
       }
 
       if (toDistrictId) {
@@ -826,7 +1052,7 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       }
 
       this.logger_.info?.(
-        `[GHN Fulfillment] Requesting fee calculation: route ${fromDistrictId} → ${feePayload.to_district_id} | service_type_id=${feePayload.service_type_id} | weight=${feePayload.weight}g | items=${feePayload.items?.length || 0}`
+        `[GHN Fulfillment] Requesting fallback fee calculation: route ${fromDistrictId} → ${feePayload.to_district_id} | service_type_id=${feePayload.service_type_id} | weight=${feePayload.weight}g | items=${feePayload.items?.length || 0}`
       )
 
       let feeData: any
@@ -871,7 +1097,13 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       return {
         calculated_amount: Number(feeData.total || 0),
         is_calculated_price_tax_inclusive: true,
-      }
+        data: {
+          main_service_fee: feeData.service_fee,
+          insurance_fee: feeData.insurance_fee,
+          from_warehouse_id: optimalWarehouse?.id,
+          from_warehouse_name: optimalWarehouse?.name,
+        },
+      } as any as CalculatedShippingOptionPrice
     } catch (error: any) {
       this.logger_.error?.(
         `[GHN Fulfillment] Calculate price failed: ${error?.message}`,
@@ -1172,13 +1404,31 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       )
     }
 
-    // Giá trị đơn hàng & COD
+    // Giá trị đơn hàng & COD & Hình thức thanh toán cước
     const orderTotal = Math.round(Number((order as any)?.total ?? 0))
+    const shippingTotal = Math.round(Number((order as any)?.shipping_total ?? 0))
     const isPaid = (order as any)?.payment_status === "captured"
     const isCodPayment =
       metadata?.payment_method === "cod" ||
       additionalData?.is_cod === true ||
       (!isPaid && metadata?.cod_amount !== undefined)
+
+    // Xác định payment_type_id:
+    // 1: Người gửi trả cước (Shop trả)
+    // 2: Người nhận trả cước (Khách tự trả tiền ship cho shipper khi nhận hàng)
+    //
+    // Quy tắc an toàn E-commerce:
+    // - Đơn đã thanh toán online (isPaid) -> BẮT BUỘC là 1 (vì khách đã thanh toán ship trên web, không để shipper thu thêm lần 2).
+    // - Đơn được Free Ship (shippingTotal === 0) -> BẮT BUỘC là 1 (vì Shop tài trợ cước cho khách).
+    // - Đơn COD: mặc định là 1 (Chuẩn E-commerce thu trọn gói đối soát) hoặc 2 nếu Shop chủ động cấu hình.
+    let resolvedPaymentTypeId: 1 | 2 = 1
+    if (isPaid || shippingTotal === 0) {
+      resolvedPaymentTypeId = 1
+    } else if (additionalData?.payment_type_id !== undefined) {
+      resolvedPaymentTypeId = Number(additionalData.payment_type_id) === 2 ? 2 : 1
+    } else if (this.options_.paymentTypeId !== undefined) {
+      resolvedPaymentTypeId = Number(this.options_.paymentTypeId) === 2 ? 2 : 1
+    }
 
     let codAmount = 0
     if (additionalData?.cod_amount !== undefined) {
@@ -1186,14 +1436,39 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
     } else if (metadata?.cod_amount !== undefined) {
       codAmount = Math.max(0, Math.round(Number(metadata.cod_amount)))
     } else if (isCodPayment && !isPaid && orderTotal > 0) {
-      codAmount = Math.min(50_000_000, orderTotal)
+      if (resolvedPaymentTypeId === 2) {
+        // Người nhận tự trả cước cho shipper: COD chỉ thu tiền hàng thuần túy (tránh khách bị thu ship 2 lần)
+        const goodsOnly = Math.max(0, orderTotal - shippingTotal)
+        codAmount = Math.min(50_000_000, goodsOnly)
+      } else {
+        // Chuẩn E-commerce (payment_type_id = 1): COD thu trọn gói orderTotal (tiền hàng + tiền ship)
+        // GHN sẽ đối soát trừ cước ship và hoàn tiền hàng lại cho Shop.
+        codAmount = Math.min(50_000_000, orderTotal)
+      }
     }
 
-    const insuranceValue = Math.min(
-      5_000_000,
-      Math.max(0, orderTotal)
+    // Giá trị khai giá bảo hiểm: chỉ tính trên giá trị thực tế của hàng hóa (subtotal hoặc tổng các items)
+    const itemsTotal = ghnItems.reduce(
+      (sum, item) => sum + (item.price || 0) * item.quantity,
+      0
     )
-    const orderValue = Math.max(0, orderTotal)
+    const goodsValue =
+      itemsTotal > 0
+        ? itemsTotal
+        : Math.round(Number((order as any)?.subtotal ?? orderTotal))
+
+    const maxInsurance = this.options_.maxInsuranceValue ?? 5_000_000
+    let insuranceValue = Math.min(
+      maxInsurance,
+      Math.max(0, goodsValue)
+    )
+    if (additionalData?.insurance_value !== undefined) {
+      insuranceValue = Math.min(
+        maxInsurance,
+        Math.max(0, Math.round(Number(additionalData.insurance_value)))
+      )
+    }
+    const orderValue = Math.max(0, goodsValue)
 
     const orderRef = (order as any)?.display_id
       ? `ORD-${(order as any)?.display_id}`
@@ -1240,11 +1515,7 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
 
       // 3. Khối dịch vụ & thanh toán (Bắt buộc) - Ưu tiên additional_data nếu caller truyền vào
       service_type_id: serviceTypeId,
-      payment_type_id: (Number(
-        additionalData?.payment_type_id ??
-        this.options_.paymentTypeId ??
-        1
-      ) === 2 ? 2 : 1) as 1 | 2,
+      payment_type_id: resolvedPaymentTypeId,
       required_note: (String(
         additionalData?.required_note ||
         additionalData?.carrier_instruction ||

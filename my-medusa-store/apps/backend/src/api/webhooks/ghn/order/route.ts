@@ -194,7 +194,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       }
 
       // 1. Cập nhật shipped_at nếu kiện hàng đã rời kho và chưa có shipped_at
-      if (lifecycle.isShipped && !matchedFulfillment.shipped_at) {
+      if (lifecycle.isShipped && shouldUpdateMainStatus && !matchedFulfillment.shipped_at) {
         fulfillmentUpdates.shipped_at = lifecycle.eventTime
       }
 

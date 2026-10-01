@@ -46,6 +46,20 @@ function formatAddress(address: HttpTypes.StoreCartAddress) {
     return ret
 }
 
+function formatDeliveryDate(isoString?: string) {
+    if (!isoString) return ''
+    try {
+        const d = new Date(isoString)
+        if (isNaN(d.getTime())) return isoString
+        const weekday = new Intl.DateTimeFormat('vi-VN', { weekday: 'long' }).format(d)
+        const dateStr = new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit' }).format(d)
+        const capitalizedWeekday = weekday.charAt(0).toUpperCase() + weekday.slice(1)
+        return `${capitalizedWeekday}, ${dateStr}`
+    } catch {
+        return isoString
+    }
+}
+
 const Shipping: React.FC<ShippingProps> = ({
     cart,
     availableShippingMethods,
@@ -57,6 +71,9 @@ const Shipping: React.FC<ShippingProps> = ({
         useState<string>(PICKUP_OPTION_OFF)
     const [calculatedPricesMap, setCalculatedPricesMap] = useState<
         Record<string, number>
+    >({})
+    const [deliveryTimeMap, setDeliveryTimeMap] = useState<
+        Record<string, string>
     >({})
     const [error, setError] = useState<string | null>(null)
     const [shippingMethodId, setShippingMethodId] = useState<string | null>(
@@ -110,13 +127,20 @@ const Shipping: React.FC<ShippingProps> = ({
             if (promises.length) {
                 Promise.allSettled(promises).then((res) => {
                     const pricesMap: Record<string, number> = {}
+                    const deliveryMap: Record<string, string> = {}
                     res.filter((r) => r.status === 'fulfilled').forEach((p) => {
                         if (p.value?.id) {
                             pricesMap[p.value.id] = p.value.amount ?? 0
+                            const optData = (p.value as any)?.data || (p.value as any)?.calculated_price?.data
+                            const leadtime = optData?.expected_delivery_time || optData?.leadtime
+                            if (leadtime) {
+                                deliveryMap[p.value.id] = String(leadtime)
+                            }
                         }
                     })
 
                     setCalculatedPricesMap(pricesMap)
+                    setDeliveryTimeMap(deliveryMap)
                     setIsLoadingPrices(false)
                 })
             }
@@ -305,9 +329,19 @@ const Shipping: React.FC<ShippingProps> = ({
                                                             shippingMethodId
                                                         }
                                                     />
-                                                    <span className="text-base-regular">
-                                                        {option.name}
-                                                    </span>
+                                                    <div className="flex flex-col text-left">
+                                                        <span className="text-base-regular">
+                                                            {option.name}
+                                                        </span>
+                                                        {deliveryTimeMap[option.id] && (
+                                                            <span className="text-xs text-ui-fg-muted mt-0.5 flex items-center gap-x-1">
+                                                                <span>Dự kiến giao:</span>
+                                                                <span className="font-medium text-ui-fg-subtle">
+                                                                    {formatDeliveryDate(deliveryTimeMap[option.id])}
+                                                                </span>
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                                 <span className="justify-self-end text-ui-fg-base">
                                                     {option.price_type ===
@@ -465,6 +499,11 @@ const Shipping: React.FC<ShippingProps> = ({
                                         currency_code: cart?.currency_code,
                                     })}
                                 </Text>
+                                {Boolean((cart.shipping_methods!.at(-1) as any)?.data?.expected_delivery_time) && (
+                                    <Text className="text-xs text-ui-fg-muted mt-0.5">
+                                        Dự kiến giao: {formatDeliveryDate((cart.shipping_methods!.at(-1) as any).data.expected_delivery_time)}
+                                    </Text>
+                                )}
                             </div>
                         )}
                     </div>

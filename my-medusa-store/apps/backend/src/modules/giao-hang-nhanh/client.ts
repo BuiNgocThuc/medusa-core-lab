@@ -187,6 +187,43 @@ export class GhnClient {
   }
 
   /**
+   * Xem trước đơn hàng để tính cước chính xác và thời gian giao dự kiến (hỗ trợ mô hình 2 cấp v3)
+   * Endpoint: POST /v2/shipping-order/preview
+   */
+  async previewOrder(request: GhnCreateOrderRequest): Promise<GhnCreateOrderResponseData> {
+    if (this.mockEnabled || !this.token) {
+      this.logger?.info?.("[GHN Mock] Previewing mock GHN shipping order")
+      return {
+        order_code: "",
+        sort_code: "MOCK-SORT",
+        trans_type: "truck",
+        ward_encode: "MOCK",
+        district_encode: "MOCK",
+        fee: {
+          main_service: 25000,
+          insurance: 0,
+          cod_fee: 0,
+          station_do: 0,
+          station_pu: 0,
+          return: 0,
+          r2s: 0,
+          coupon: 0,
+          cod_failed_fee: 0,
+        },
+        total_fee: 25000,
+        expected_delivery_time: new Date(Date.now() + 3 * 86400000).toISOString(),
+      }
+    }
+
+    return await this.request<GhnCreateOrderResponseData>(
+      "/v2/shipping-order/preview",
+      "POST",
+      request,
+      true
+    )
+  }
+
+  /**
    * Hủy đơn vận chuyển GHN
    */
   async cancelOrder(orderCodes: string[]): Promise<GhnCancelOrderResponseData[]> {
