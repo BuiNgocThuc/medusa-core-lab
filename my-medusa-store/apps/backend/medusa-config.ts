@@ -20,6 +20,9 @@ const VNPAY_CONFIGURED = Boolean(
         process.env.VNPAY_HASH_SECRET &&
         process.env.VNPAY_RETURN_URL
 );
+const GOOGLE_AUTH_CONFIGURED = Boolean(
+    process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+);
 
 module.exports = defineConfig({
     projectConfig: {
@@ -40,7 +43,37 @@ module.exports = defineConfig({
 
     modules: [
         {
+            resolve: "@medusajs/medusa/auth",
+            options: {
+                providers: [
+                    {
+                        resolve: "@medusajs/medusa/auth-emailpass",
+                        id: "emailpass",
+                    },
+                    ...(GOOGLE_AUTH_CONFIGURED
+                        ? [
+                              {
+                                  resolve: "@medusajs/medusa/auth-google",
+                                  id: "google",
+                                  options: {
+                                      clientId: process.env.GOOGLE_CLIENT_ID,
+                                      clientSecret:
+                                          process.env.GOOGLE_CLIENT_SECRET,
+                                      callbackUrl:
+                                          process.env.GOOGLE_CALLBACK_URL ||
+                                          "http://localhost:8000/api/auth/callback/google",
+                                  },
+                              },
+                          ]
+                        : []),
+                ],
+            },
+        },
+        {
             resolve: "./src/modules/tier",
+        },
+        {
+            resolve: "./src/modules/customer-identity-link",
         },
         {
             resolve: "@medusajs/index",
@@ -206,6 +239,12 @@ module.exports = defineConfig({
         },
         ...(REDIS_URL
             ? [
+                  {
+                      resolve: "@medusajs/medusa/cache-redis",
+                      options: {
+                          redisUrl: REDIS_URL,
+                      },
+                  },
                   {
                       resolve: "@medusajs/medusa/workflow-engine-redis",
                       options: {
