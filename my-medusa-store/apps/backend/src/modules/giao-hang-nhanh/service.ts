@@ -1116,14 +1116,50 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       Math.min(200, Math.round(this.options_.defaultDimensions?.height || 10))
     )
 
-    // Resolve service_type_id động tại thời điểm tạo đơn: 2 (<20kg) hoặc 5 (>=20kg)
-    let serviceTypeId: 2 | 5 = totalWeight >= 20_000 ? 5 : 2
     const toDistrictId = Number(
       mappedOrderAddress?.districtId || metadata?.ghn_district_id || metadata?.district_id || 1442
     )
+
+    // Khối thông tin người gửi (from):
+    // Tầng 1: Ưu tiên additional_data (nếu caller, custom API hoặc workflow truyền vào -> không tốn query DB)
+    const customFrom = (
+      additionalData?.stock_location ||
+      additionalData?.from_location ||
+      additionalData?.sender ||
+      additionalData
+    ) as Record<string, any> | undefined
+
+    const hasCustomSender = Boolean(
+      customFrom?.from_address ||
+      customFrom?.address_1 ||
+      customFrom?.from_district_id ||
+      customFrom?.district_id ||
+      customFrom?.from_ward_code ||
+      customFrom?.ward_code
+    )
+
+    const targetLocationId =
+      (fulfillment as any)?.location_id ||
+      customFrom?.location_id ||
+      additionalData?.location_id
+
+    // Tầng 2: Lấy thông tin kho gửi hàng theo đúng kho mà Admin đã chọn (fulfillment.location_id)
+    const resolvedStockLocation = hasCustomSender
+      ? null
+      : await this.resolveStockLocation(targetLocationId)
+
+
+    const senderDistrictId =
+      customFrom?.from_district_id ||
+      resolvedStockLocation?.districtId ||
+      this.options_.fromDistrictId ||
+      3695
+
+    // Resolve service_type_id động tại thời điểm tạo đơn: 2 (<20kg) hoặc 5 (>=20kg)
+    let serviceTypeId: 2 | 5 = totalWeight >= 20_000 ? 5 : 2
     try {
       const resolved = await this.resolveServiceTypeId(
-        this.options_.fromDistrictId || 1442,
+        senderDistrictId,
         toDistrictId,
         totalWeight
       )
@@ -1229,36 +1265,6 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       items: ghnItems,
     }
 
-    // Khối thông tin người gửi (from):
-    // Tầng 1: Ưu tiên additional_data (nếu caller, custom API hoặc workflow truyền vào -> không tốn query DB)
-    const customFrom = (
-      additionalData?.stock_location ||
-      additionalData?.from_location ||
-      additionalData?.sender ||
-      additionalData
-    ) as Record<string, any> | undefined
-
-    const hasCustomSender = Boolean(
-      customFrom?.from_address ||
-      customFrom?.address_1 ||
-      customFrom?.from_district_id ||
-      customFrom?.district_id ||
-      customFrom?.from_ward_code ||
-      customFrom?.ward_code
-    )
-
-    // Tầng 2: Nếu additional_data không có địa chỉ kho, tự động áp dụng Smart Routing theo địa chỉ nhận
-    const resolvedStockLocation = hasCustomSender
-      ? null
-      : await this.selectOptimalStockLocation({
-          toProvinceId: metadata?.ghn_province_id ? Number(metadata.ghn_province_id) : undefined,
-          toProvinceName,
-          toDistrictId,
-          toWardCode: mappedOrderAddress?.wardCode || metadata?.ghn_ward_code,
-          items: orderItems,
-          fallbackLocationId: (fulfillment as any)?.location_id,
-        })
-
     const fromName = String(
       customFrom?.from_name ||
       customFrom?.name ||
@@ -1271,7 +1277,6 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
 
     const fromPhone = String(
       customFrom?.from_phone ||
-      customFrom?.phone ||
       customFrom?.phone ||
       resolvedStockLocation?.phone ||
       this.options_.fromPhone ||
