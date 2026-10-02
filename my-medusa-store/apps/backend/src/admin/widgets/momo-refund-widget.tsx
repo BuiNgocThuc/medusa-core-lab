@@ -1,6 +1,6 @@
 /**
- * Admin UI Widget cho VNPay Refund:
- * - Hiển thị trong trang chi tiết đơn hàng (zone order.details.side.after) nếu dùng VNPay.
+ * Admin UI Widget cho MoMo Refund:
+ * - Hiển thị trong trang chi tiết đơn hàng nếu payment provider là MoMo.
  * - Xem audit refund & gửi yêu cầu refund thông qua Medusa Admin API.
  */
 import { defineWidgetConfig } from "@medusajs/admin-sdk"
@@ -33,6 +33,9 @@ type OrderWithPayments = AdminOrder & {
 }
 
 type AdminPaymentWithRefunds = AdminPayment & {
+  payment_session?: {
+    id?: string
+  }
   refunds?: Array<{
     amount?: number
   }>
@@ -43,15 +46,15 @@ type PaymentSession = {
   provider_id?: string
 }
 
-type VnpayRefund = {
+type MomoRefund = {
   id: string
+  refund_order_id: string
   request_id: string
   amount: number
-  transaction_type: string
-  status: "pending" | "processing" | "succeeded" | "failed" | "manual_review"
-  response_code?: string | null
-  transaction_status?: string | null
-  refund_transaction_no?: string | null
+  status: "pending" | "succeeded" | "failed" | "manual_review"
+  result_code?: number | null
+  message?: string | null
+  refund_trans_id?: string | null
   created_at?: string
 }
 
@@ -61,25 +64,35 @@ type AuditResponse = {
     amount: number
     currency_code: string
     status: string
-    vnp_txn_ref: string
-    transaction_no?: string | null
-    pay_date?: string | null
+    momo_order_id: string
+    request_id: string
+    trans_id?: string | null
+    pay_type?: string | null
+    payment_option?: string | null
+    paid_at?: string | null
   }
-  refunds: VnpayRefund[]
+  refunds: MomoRefund[]
 }
 
-const VnpayRefundWidget = ({ data }: { data: OrderWithPayments }) => {
+const MomoRefundWidget = ({ data }: { data: OrderWithPayments }) => {
   const paymentCollection = getPaymentCollection(data)
   const payment = paymentCollection?.payments?.find((candidate) =>
-    candidate.provider_id?.startsWith("pp_vnpay")
+    candidate.provider_id?.startsWith("pp_momo")
   )
   const paymentSession = paymentCollection?.payment_sessions?.find((session) =>
-    session.provider_id?.startsWith("pp_vnpay")
+    session.provider_id?.startsWith("pp_momo")
   )
   const paymentSessionId =
     payment?.payment_session?.id ?? paymentSession?.id ?? undefined
   const currencyCode = payment?.currency_code ?? data.currency_code
-  const refundedAmount = useMemo(
+
+  const [audit, setAudit] = useState<AuditResponse | null>(null)
+  const [amount, setAmount] = useState("")
+  const [note, setNote] = useState("")
+  const [isLoadingAudit, setIsLoadingAudit] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const coreRefundedAmount = useMemo(
     () =>
       payment?.refunds?.reduce(
         (total, refund) => total + Number(refund.amount ?? 0),
@@ -87,13 +100,16 @@ const VnpayRefundWidget = ({ data }: { data: OrderWithPayments }) => {
       ) ?? 0,
     [payment?.refunds]
   )
-  const refundableAmount = Math.max(Number(payment?.amount ?? 0) - refundedAmount, 0)
-
-  const [audit, setAudit] = useState<AuditResponse | null>(null)
-  const [amount, setAmount] = useState("")
-  const [note, setNote] = useState("")
-  const [isLoadingAudit, setIsLoadingAudit] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const auditedRefundedAmount = useMemo(
+    () =>
+      audit?.refunds
+        .filter((refund) => refund.status === "succeeded")
+        .reduce((total, refund) => total + Number(refund.amount ?? 0), 0) ?? 0,
+    [audit?.refunds]
+  )
+  const refundedAmount = Math.max(coreRefundedAmount, auditedRefundedAmount)
+  const paidAmount = Number(payment?.amount ?? audit?.payment.amount ?? 0)
+  const refundableAmount = Math.max(paidAmount - refundedAmount, 0)
 
   useEffect(() => {
     if (!paymentSessionId) {
@@ -126,12 +142,12 @@ const VnpayRefundWidget = ({ data }: { data: OrderWithPayments }) => {
         amount: parsedAmount,
         note: note || undefined,
       })
-      toast.success("VNPay refund submitted")
+      toast.success("MoMo refund submitted")
       setAmount("")
       setNote("")
       await loadAudit(paymentSessionId, setAudit, setIsLoadingAudit)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "VNPay refund failed")
+      toast.error(error instanceof Error ? error.message : "MoMo refund failed")
     } finally {
       setIsSubmitting(false)
     }
@@ -141,9 +157,9 @@ const VnpayRefundWidget = ({ data }: { data: OrderWithPayments }) => {
     <Container className="divide-y p-0">
       <div className="flex items-center justify-between gap-x-3 px-6 py-4">
         <div>
-          <Heading level="h2">VNPay Refund</Heading>
+          <Heading level="h2">MoMo Refund</Heading>
           <Text size="small" className="text-ui-fg-subtle">
-            {audit?.payment.vnp_txn_ref ?? paymentSessionId}
+            {audit?.payment.momo_order_id ?? paymentSessionId}
           </Text>
         </div>
         <StatusBadge color={getStatusColor(audit?.payment.status)}>
@@ -152,17 +168,19 @@ const VnpayRefundWidget = ({ data }: { data: OrderWithPayments }) => {
       </div>
 
       <div className="grid grid-cols-2 gap-3 px-6 py-4">
-        <Metric label="Paid" value={formatMoney(Number(payment.amount ?? 0), currencyCode)} />
+        <Metric label="Paid" value={formatMoney(paidAmount, currencyCode)} />
         <Metric label="Refundable" value={formatMoney(refundableAmount, currencyCode)} />
-        <Metric label="VNPay trans" value={audit?.payment.transaction_no ?? "-"} />
-        <Metric label="Pay date" value={formatCompactDate(audit?.payment.pay_date)} />
+        <Metric label="MoMo trans" value={audit?.payment.trans_id ?? "-"} />
+        <Metric label="Paid at" value={formatCompactDate(audit?.payment.paid_at)} />
+        <Metric label="Pay type" value={audit?.payment.pay_type ?? "-"} />
+        <Metric label="Option" value={audit?.payment.payment_option ?? "-"} />
       </div>
 
       <div className="flex flex-col gap-y-3 px-6 py-4">
         <div className="flex flex-col gap-y-1">
-          <Label htmlFor="vnpay-refund-amount">Amount</Label>
+          <Label htmlFor="momo-refund-amount">Amount</Label>
           <Input
-            id="vnpay-refund-amount"
+            id="momo-refund-amount"
             type="number"
             min={0}
             max={refundableAmount}
@@ -174,9 +192,9 @@ const VnpayRefundWidget = ({ data }: { data: OrderWithPayments }) => {
         </div>
 
         <div className="flex flex-col gap-y-1">
-          <Label htmlFor="vnpay-refund-note">Note</Label>
+          <Label htmlFor="momo-refund-note">Note</Label>
           <Textarea
-            id="vnpay-refund-note"
+            id="momo-refund-note"
             value={note}
             onChange={(event) => setNote(event.target.value)}
             rows={2}
@@ -190,7 +208,7 @@ const VnpayRefundWidget = ({ data }: { data: OrderWithPayments }) => {
           disabled={!canSubmit}
           onClick={handleRefund}
         >
-          Refund with VNPay
+          Refund with MoMo
         </Button>
       </div>
 
@@ -222,20 +240,25 @@ const VnpayRefundWidget = ({ data }: { data: OrderWithPayments }) => {
                   </StatusBadge>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Badge size="xsmall" color="grey">
-                    {refund.transaction_type === "02" ? "Full" : "Partial"}
-                  </Badge>
-                  {refund.response_code && (
+                  {typeof refund.result_code === "number" && (
                     <Badge size="xsmall" color="grey">
-                      RC {refund.response_code}
+                      RC {refund.result_code}
                     </Badge>
                   )}
-                  {refund.transaction_status && (
+                  {refund.refund_trans_id && (
                     <Badge size="xsmall" color="grey">
-                      TS {refund.transaction_status}
+                      TX {refund.refund_trans_id}
+                    </Badge>
+                  )}
+                  {refund.message && (
+                    <Badge size="xsmall" color="grey">
+                      {refund.message}
                     </Badge>
                   )}
                 </div>
+                <Text size="xsmall" className="text-ui-fg-muted break-all">
+                  {refund.refund_order_id}
+                </Text>
                 <Text size="xsmall" className="text-ui-fg-muted break-all">
                   {refund.request_id}
                 </Text>
@@ -244,7 +267,7 @@ const VnpayRefundWidget = ({ data }: { data: OrderWithPayments }) => {
           </div>
         ) : (
           <Text size="small" className="text-ui-fg-subtle">
-            No VNPay refunds yet.
+            No MoMo refunds yet.
           </Text>
         )}
       </div>
@@ -276,7 +299,7 @@ async function loadAudit(
 
   try {
     const response = await fetch(
-      `/admin/vnpay-refunds?payment_session_id=${encodeURIComponent(paymentSessionId)}`,
+      `/admin/momo-refunds?payment_session_id=${encodeURIComponent(paymentSessionId)}`,
       {
         credentials: "include",
       }
@@ -293,7 +316,7 @@ async function loadAudit(
 
     setAudit((await response.json()) as AuditResponse)
   } catch (error) {
-    toast.error(error instanceof Error ? error.message : "Could not load VNPay refunds")
+    toast.error(error instanceof Error ? error.message : "Could not load MoMo refunds")
   } finally {
     setIsLoading(false)
   }
@@ -337,8 +360,13 @@ function formatCompactDate(value?: string | null) {
     return "-"
   }
 
-  if (/^\d{14}$/.test(value)) {
-    return `${value.slice(6, 8)}/${value.slice(4, 6)}/${value.slice(0, 4)} ${value.slice(8, 10)}:${value.slice(10, 12)}`
+  const date = new Date(value)
+
+  if (!Number.isNaN(date.getTime())) {
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: "short",
+      timeStyle: "short",
+    }).format(date)
   }
 
   return value
@@ -349,7 +377,7 @@ function getStatusColor(status?: string | null) {
     return "green"
   }
 
-  if (status === "processing" || status === "partially_refunded") {
+  if (status === "pending" || status === "partially_refunded") {
     return "blue"
   }
 
@@ -362,7 +390,7 @@ function getStatusColor(status?: string | null) {
 
 export const config = defineWidgetConfig({
   zone: "order.details.side.after",
-  id: "vnpay-refund-widget",
+  id: "momo-refund-widget",
 })
 
-export default VnpayRefundWidget
+export default MomoRefundWidget

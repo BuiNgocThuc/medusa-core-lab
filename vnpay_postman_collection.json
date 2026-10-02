@@ -1,0 +1,1876 @@
+{
+  "info": {
+    "_postman_id": "medusa-payment-vnpay-momo-full-suite-2026",
+    "name": "Medusa Payment Full Suite - VNPay, MoMo, Bank Transfer",
+    "description": "Bộ Postman test tay cho payment trong medusa-core-lab: Medusa Store/Admin payment APIs, VNPay custom hook/audit, MoMo standard webhook/audit, Bank Transfer webhook, và các API gateway sandbox VNPay/MoMo phổ biến. Không chứa secrets thật; điền Collection Variables trước khi chạy.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "backend_url",
+      "value": "http://localhost:9001",
+      "type": "string"
+    },
+    {
+      "key": "storefront_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "publishable_key",
+      "value": "pk_...",
+      "type": "string"
+    },
+    {
+      "key": "admin_email",
+      "value": "admin@example.com",
+      "type": "string"
+    },
+    {
+      "key": "admin_password",
+      "value": "supersecret",
+      "type": "string"
+    },
+    {
+      "key": "admin_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "region_id",
+      "value": "reg_...",
+      "type": "string"
+    },
+    {
+      "key": "cart_id",
+      "value": "cart_...",
+      "type": "string"
+    },
+    {
+      "key": "payment_collection_id",
+      "value": "paycol_...",
+      "type": "string"
+    },
+    {
+      "key": "payment_session_id",
+      "value": "payses_...",
+      "type": "string"
+    },
+    {
+      "key": "payment_id",
+      "value": "pay_...",
+      "type": "string"
+    },
+    {
+      "key": "order_id",
+      "value": "order_...",
+      "type": "string"
+    },
+    {
+      "key": "amount_vnd",
+      "value": "100000",
+      "type": "string"
+    },
+    {
+      "key": "refund_amount_vnd",
+      "value": "50000",
+      "type": "string"
+    },
+    {
+      "key": "client_ip",
+      "value": "127.0.0.1",
+      "type": "string"
+    },
+    {
+      "key": "vnpay_tmn_code",
+      "value": "YOUR_VNPAY_TMN_CODE",
+      "type": "string"
+    },
+    {
+      "key": "vnpay_hash_secret",
+      "value": "YOUR_VNPAY_HASH_SECRET",
+      "type": "string"
+    },
+    {
+      "key": "vnpay_payment_url",
+      "value": "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html",
+      "type": "string"
+    },
+    {
+      "key": "vnpay_transaction_api",
+      "value": "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction",
+      "type": "string"
+    },
+    {
+      "key": "vnpay_bank_list_api",
+      "value": "https://sandbox.vnpayment.vn/qrpayauth/api/merchant/get_bank_list",
+      "type": "string"
+    },
+    {
+      "key": "vnpay_return_url",
+      "value": "http://localhost:8000/api/payment-return/vnpay",
+      "type": "string"
+    },
+    {
+      "key": "vnpay_locale",
+      "value": "vn",
+      "type": "string"
+    },
+    {
+      "key": "vnpay_order_type",
+      "value": "other",
+      "type": "string"
+    },
+    {
+      "key": "vnpay_bank_code",
+      "value": "NCB",
+      "type": "string"
+    },
+    {
+      "key": "vnpay_card_type",
+      "value": "ATM",
+      "type": "string"
+    },
+    {
+      "key": "vnpay_order_info",
+      "value": "Medusa Postman VNPay payment",
+      "type": "string"
+    },
+    {
+      "key": "vnpay_txn_ref",
+      "value": "VNP_MANUAL_001",
+      "type": "string"
+    },
+    {
+      "key": "vnpay_transaction_no",
+      "value": "14500000",
+      "type": "string"
+    },
+    {
+      "key": "vnpay_transaction_date",
+      "value": "20261001120000",
+      "type": "string"
+    },
+    {
+      "key": "vnpay_refund_transaction_type",
+      "value": "03",
+      "type": "string"
+    },
+    {
+      "key": "vnpay_refund_create_by",
+      "value": "postman",
+      "type": "string"
+    },
+    {
+      "key": "momo_endpoint",
+      "value": "https://test-payment.momo.vn",
+      "type": "string"
+    },
+    {
+      "key": "momo_partner_code",
+      "value": "YOUR_MOMO_PARTNER_CODE",
+      "type": "string"
+    },
+    {
+      "key": "momo_access_key",
+      "value": "YOUR_MOMO_ACCESS_KEY",
+      "type": "string"
+    },
+    {
+      "key": "momo_secret_key",
+      "value": "YOUR_MOMO_SECRET_KEY",
+      "type": "string"
+    },
+    {
+      "key": "momo_store_id",
+      "value": "MedusaStore",
+      "type": "string"
+    },
+    {
+      "key": "momo_partner_name",
+      "value": "Medusa Store",
+      "type": "string"
+    },
+    {
+      "key": "momo_redirect_url",
+      "value": "http://localhost:8000/api/payment-return/momo",
+      "type": "string"
+    },
+    {
+      "key": "momo_ipn_url",
+      "value": "http://localhost:9001/hooks/payment/momo_default",
+      "type": "string"
+    },
+    {
+      "key": "momo_request_type",
+      "value": "payWithMethod",
+      "type": "string"
+    },
+    {
+      "key": "momo_lang",
+      "value": "vi",
+      "type": "string"
+    },
+    {
+      "key": "momo_extra_data",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "momo_order_info",
+      "value": "Medusa Postman MoMo payment",
+      "type": "string"
+    },
+    {
+      "key": "momo_order_id",
+      "value": "MM_MANUAL_001",
+      "type": "string"
+    },
+    {
+      "key": "momo_request_id",
+      "value": "MR_MANUAL_001",
+      "type": "string"
+    },
+    {
+      "key": "momo_trans_id",
+      "value": "1234567890",
+      "type": "string"
+    },
+    {
+      "key": "momo_partner_client_id",
+      "value": "customer@example.com",
+      "type": "string"
+    },
+    {
+      "key": "bank_webhook_secret",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "bank_payment_reference",
+      "value": "PAY ABC123XYZ",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "00 - Setup / Medusa Store & Admin",
+      "description": "",
+      "item": [
+        {
+          "name": "Admin Auth - Login email/password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{backend_url}}/auth/user/emailpass",
+              "host": [
+                "{{backend_url}}"
+              ],
+              "path": [
+                "auth",
+                "user",
+                "emailpass"
+              ]
+            },
+            "description": "Lấy admin token để gọi Admin API. Nếu project của bạn đang dùng cookie session, vẫn có thể login từ browser rồi dùng cookie trong Postman.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let data = {}",
+                  "try { data = pm.response.json() } catch (e) {}",
+                  "const token = data.token || data.access_token || data.auth_token || data?.user?.token",
+                  "if (token) pm.collectionVariables.set('admin_token', token)",
+                  "pm.test('admin auth response received', () => pm.response.code < 500)"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Store - List Regions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{publishable_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{backend_url}}/store/regions",
+              "host": [
+                "{{backend_url}}"
+              ],
+              "path": [
+                "store",
+                "regions"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let data = {}",
+                  "try { data = pm.response.json() } catch (e) {}",
+                  "const region = data.regions?.[0]",
+                  "if (region?.id) pm.collectionVariables.set('region_id', region.id)",
+                  "pm.test('regions endpoint responds', () => pm.response.code < 500)"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Store - List Payment Providers by Region",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{publishable_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{backend_url}}/store/payment-providers?region_id={{region_id}}",
+              "host": [
+                "{{backend_url}}"
+              ],
+              "path": [
+                "store",
+                "payment-providers"
+              ],
+              "query": [
+                {
+                  "key": "region_id",
+                  "value": "{{region_id}}"
+                }
+              ]
+            },
+            "description": "Dùng để kiểm tra region đã bật pp_vnpay_default, pp_momo_default, pp_bank-transfer_default hay chưa."
+          }
+        },
+        {
+          "name": "Store - Retrieve Cart With Payment Collection",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{publishable_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{backend_url}}/store/custom-cart/{{cart_id}}",
+              "host": [
+                "{{backend_url}}"
+              ],
+              "path": [
+                "store",
+                "custom-cart",
+                "{{cart_id}}"
+              ]
+            },
+            "description": "Custom route trong repo có trả payment_collection.payment_sessions để lấy payment_collection_id/payment_session_id."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let data = {}",
+                  "try { data = pm.response.json() } catch (e) {}",
+                  "const cart = data.cart || data",
+                  "if (cart?.id) pm.collectionVariables.set('cart_id', cart.id)",
+                  "if (cart?.region_id) pm.collectionVariables.set('region_id', cart.region_id)",
+                  "if (cart?.payment_collection?.id) pm.collectionVariables.set('payment_collection_id', cart.payment_collection.id)",
+                  "const sessions = cart?.payment_collection?.payment_sessions || []",
+                  "if (sessions.length) {",
+                  "  const session = sessions[sessions.length - 1]",
+                  "  pm.collectionVariables.set('payment_session_id', session.id)",
+                  "  if (session.provider_id) pm.collectionVariables.set('last_provider_id', session.provider_id)",
+                  "  if (session.data?.payment_url) pm.collectionVariables.set('vnpay_generated_payment_url', session.data.payment_url)",
+                  "  if (session.data?.pay_url) pm.collectionVariables.set('momo_generated_pay_url', session.data.pay_url)",
+                  "  if (session.data?.momo_order_id) pm.collectionVariables.set('momo_order_id', session.data.momo_order_id)",
+                  "  if (session.data?.request_id) pm.collectionVariables.set('momo_request_id', session.data.request_id)",
+                  "  if (session.data?.payment_reference) pm.collectionVariables.set('bank_payment_reference', session.data.payment_reference)",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Store - Create Payment Collection For Cart",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{publishable_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{backend_url}}/store/payment-collections",
+              "host": [
+                "{{backend_url}}"
+              ],
+              "path": [
+                "store",
+                "payment-collections"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cart_id\": \"{{cart_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let data = {}",
+                  "try { data = pm.response.json() } catch (e) {}",
+                  "const pc = data.payment_collection || data",
+                  "if (pc?.id) pm.collectionVariables.set('payment_collection_id', pc.id)",
+                  "const sessions = pc?.payment_sessions || []",
+                  "if (sessions.length) {",
+                  "  const session = sessions[sessions.length - 1]",
+                  "  pm.collectionVariables.set('payment_session_id', session.id)",
+                  "  if (session.provider_id) pm.collectionVariables.set('last_provider_id', session.provider_id)",
+                  "  if (session.data?.payment_url) pm.collectionVariables.set('vnpay_generated_payment_url', session.data.payment_url)",
+                  "  if (session.data?.pay_url) pm.collectionVariables.set('momo_generated_pay_url', session.data.pay_url)",
+                  "  if (session.data?.momo_order_id) pm.collectionVariables.set('momo_order_id', session.data.momo_order_id)",
+                  "  if (session.data?.request_id) pm.collectionVariables.set('momo_request_id', session.data.request_id)",
+                  "  if (session.data?.payment_reference) pm.collectionVariables.set('bank_payment_reference', session.data.payment_reference)",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Store - Initialize Payment Session (VNPay)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{publishable_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{backend_url}}/store/payment-collections/{{payment_collection_id}}/payment-sessions",
+              "host": [
+                "{{backend_url}}"
+              ],
+              "path": [
+                "store",
+                "payment-collections",
+                "{{payment_collection_id}}",
+                "payment-sessions"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider_id\": \"pp_vnpay_default\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let data = {}",
+                  "try { data = pm.response.json() } catch (e) {}",
+                  "const pc = data.payment_collection || data",
+                  "if (pc?.id) pm.collectionVariables.set('payment_collection_id', pc.id)",
+                  "const sessions = pc?.payment_sessions || []",
+                  "if (sessions.length) {",
+                  "  const session = sessions[sessions.length - 1]",
+                  "  pm.collectionVariables.set('payment_session_id', session.id)",
+                  "  if (session.provider_id) pm.collectionVariables.set('last_provider_id', session.provider_id)",
+                  "  if (session.data?.payment_url) pm.collectionVariables.set('vnpay_generated_payment_url', session.data.payment_url)",
+                  "  if (session.data?.pay_url) pm.collectionVariables.set('momo_generated_pay_url', session.data.pay_url)",
+                  "  if (session.data?.momo_order_id) pm.collectionVariables.set('momo_order_id', session.data.momo_order_id)",
+                  "  if (session.data?.request_id) pm.collectionVariables.set('momo_request_id', session.data.request_id)",
+                  "  if (session.data?.payment_reference) pm.collectionVariables.set('bank_payment_reference', session.data.payment_reference)",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Store - Initialize Payment Session (MoMo)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{publishable_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{backend_url}}/store/payment-collections/{{payment_collection_id}}/payment-sessions",
+              "host": [
+                "{{backend_url}}"
+              ],
+              "path": [
+                "store",
+                "payment-collections",
+                "{{payment_collection_id}}",
+                "payment-sessions"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider_id\": \"pp_momo_default\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let data = {}",
+                  "try { data = pm.response.json() } catch (e) {}",
+                  "const pc = data.payment_collection || data",
+                  "if (pc?.id) pm.collectionVariables.set('payment_collection_id', pc.id)",
+                  "const sessions = pc?.payment_sessions || []",
+                  "if (sessions.length) {",
+                  "  const session = sessions[sessions.length - 1]",
+                  "  pm.collectionVariables.set('payment_session_id', session.id)",
+                  "  if (session.provider_id) pm.collectionVariables.set('last_provider_id', session.provider_id)",
+                  "  if (session.data?.payment_url) pm.collectionVariables.set('vnpay_generated_payment_url', session.data.payment_url)",
+                  "  if (session.data?.pay_url) pm.collectionVariables.set('momo_generated_pay_url', session.data.pay_url)",
+                  "  if (session.data?.momo_order_id) pm.collectionVariables.set('momo_order_id', session.data.momo_order_id)",
+                  "  if (session.data?.request_id) pm.collectionVariables.set('momo_request_id', session.data.request_id)",
+                  "  if (session.data?.payment_reference) pm.collectionVariables.set('bank_payment_reference', session.data.payment_reference)",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Store - Initialize Payment Session (Bank Transfer)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-publishable-api-key",
+                "value": "{{publishable_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{backend_url}}/store/payment-collections/{{payment_collection_id}}/payment-sessions",
+              "host": [
+                "{{backend_url}}"
+              ],
+              "path": [
+                "store",
+                "payment-collections",
+                "{{payment_collection_id}}",
+                "payment-sessions"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider_id\": \"pp_bank-transfer_default\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let data = {}",
+                  "try { data = pm.response.json() } catch (e) {}",
+                  "const pc = data.payment_collection || data",
+                  "if (pc?.id) pm.collectionVariables.set('payment_collection_id', pc.id)",
+                  "const sessions = pc?.payment_sessions || []",
+                  "if (sessions.length) {",
+                  "  const session = sessions[sessions.length - 1]",
+                  "  pm.collectionVariables.set('payment_session_id', session.id)",
+                  "  if (session.provider_id) pm.collectionVariables.set('last_provider_id', session.provider_id)",
+                  "  if (session.data?.payment_url) pm.collectionVariables.set('vnpay_generated_payment_url', session.data.payment_url)",
+                  "  if (session.data?.pay_url) pm.collectionVariables.set('momo_generated_pay_url', session.data.pay_url)",
+                  "  if (session.data?.momo_order_id) pm.collectionVariables.set('momo_order_id', session.data.momo_order_id)",
+                  "  if (session.data?.request_id) pm.collectionVariables.set('momo_request_id', session.data.request_id)",
+                  "  if (session.data?.payment_reference) pm.collectionVariables.set('bank_payment_reference', session.data.payment_reference)",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin - Refund Payment (Core Medusa)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{backend_url}}/admin/payments/{{payment_id}}/refund",
+              "host": [
+                "{{backend_url}}"
+              ],
+              "path": [
+                "admin",
+                "payments",
+                "{{payment_id}}",
+                "refund"
+              ]
+            },
+            "description": "Core Admin refund endpoint. Với payment VNPay/MoMo sẽ gọi provider refundPayment tương ứng nếu payment_id đúng.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": \"{{refund_amount_vnd}}\",\n  \"note\": \"Postman manual refund\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 - Backend Hooks & Audit APIs (Repo hiện có)",
+      "description": "",
+      "item": [
+        {
+          "name": "VNPay - Custom IPN Hook Success",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{backend_url}}/hooks/payment/vnpay?vnp_Amount={{vnpay_amount_x100}}&vnp_BankCode={{vnpay_bank_code}}&vnp_BankTranNo=VNP{{vnpay_transaction_no}}&vnp_CardType={{vnpay_card_type}}&vnp_OrderInfo={{vnpay_order_info}}&vnp_PayDate={{vnpay_pay_date}}&vnp_ResponseCode=00&vnp_TmnCode={{vnpay_tmn_code}}&vnp_TransactionNo={{vnpay_transaction_no}}&vnp_TransactionStatus=00&vnp_TxnRef={{vnpay_txn_ref}}&vnp_SecureHash={{vnpay_ipn_hash}}",
+              "host": [
+                "{{backend_url}}"
+              ],
+              "path": [
+                "hooks",
+                "payment",
+                "vnpay"
+              ],
+              "query": [
+                {
+                  "key": "vnp_Amount",
+                  "value": "{{vnpay_amount_x100}}"
+                },
+                {
+                  "key": "vnp_BankCode",
+                  "value": "{{vnpay_bank_code}}"
+                },
+                {
+                  "key": "vnp_BankTranNo",
+                  "value": "VNP{{vnpay_transaction_no}}"
+                },
+                {
+                  "key": "vnp_CardType",
+                  "value": "{{vnpay_card_type}}"
+                },
+                {
+                  "key": "vnp_OrderInfo",
+                  "value": "{{vnpay_order_info}}"
+                },
+                {
+                  "key": "vnp_PayDate",
+                  "value": "{{vnpay_pay_date}}"
+                },
+                {
+                  "key": "vnp_ResponseCode",
+                  "value": "00"
+                },
+                {
+                  "key": "vnp_TmnCode",
+                  "value": "{{vnpay_tmn_code}}"
+                },
+                {
+                  "key": "vnp_TransactionNo",
+                  "value": "{{vnpay_transaction_no}}"
+                },
+                {
+                  "key": "vnp_TransactionStatus",
+                  "value": "00"
+                },
+                {
+                  "key": "vnp_TxnRef",
+                  "value": "{{vnpay_txn_ref}}"
+                },
+                {
+                  "key": "vnp_SecureHash",
+                  "value": "{{vnpay_ipn_hash}}"
+                }
+              ]
+            },
+            "description": "Gọi custom route src/api/hooks/payment/vnpay/route.ts. Cần vnpay_txn_ref đã tồn tại trong bảng vnpay_payment, thường tạo bằng init payment session trước."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const CryptoJS = require('crypto-js')",
+                  "const pad = (n) => String(n).padStart(2, '0')",
+                  "const now = new Date()",
+                  "const payDate = now.getFullYear() + pad(now.getMonth() + 1) + pad(now.getDate()) + pad(now.getHours()) + pad(now.getMinutes()) + pad(now.getSeconds())",
+                  "const amount = String(Number(pm.collectionVariables.get('amount_vnd') || 100000) * 100)",
+                  "const txnRef = pm.collectionVariables.get('vnpay_txn_ref') || ('VNP' + Date.now())",
+                  "pm.collectionVariables.set('vnpay_txn_ref', txnRef)",
+                  "pm.collectionVariables.set('vnpay_pay_date', payDate)",
+                  "pm.collectionVariables.set('vnpay_amount_x100', amount)",
+                  "const params = {",
+                  "  vnp_Amount: amount,",
+                  "  vnp_BankCode: pm.collectionVariables.get('vnpay_bank_code') || 'NCB',",
+                  "  vnp_BankTranNo: pm.collectionVariables.get('vnpay_bank_tran_no') || ('VNP' + Date.now()),",
+                  "  vnp_CardType: pm.collectionVariables.get('vnpay_card_type') || 'ATM',",
+                  "  vnp_OrderInfo: pm.collectionVariables.get('vnpay_order_info') || 'Medusa Postman VNPay IPN',",
+                  "  vnp_PayDate: payDate,",
+                  "  vnp_ResponseCode: pm.collectionVariables.get('vnpay_response_code') || '00',",
+                  "  vnp_TmnCode: pm.collectionVariables.get('vnpay_tmn_code'),",
+                  "  vnp_TransactionNo: pm.collectionVariables.get('vnpay_transaction_no') || String(Date.now()).slice(-10),",
+                  "  vnp_TransactionStatus: pm.collectionVariables.get('vnpay_transaction_status') || '00',",
+                  "  vnp_TxnRef: txnRef,",
+                  "}",
+                  "const signData = new URLSearchParams(Object.keys(params).sort().map((key) => [key, params[key]])).toString()",
+                  "pm.collectionVariables.set('vnpay_ipn_hash', CryptoJS.HmacSHA512(signData, pm.collectionVariables.get('vnpay_hash_secret')).toString(CryptoJS.enc.Hex))"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "VNPay - Custom IPN Amount Mismatch",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{backend_url}}/hooks/payment/vnpay?vnp_Amount=1&vnp_BankCode={{vnpay_bank_code}}&vnp_BankTranNo=VNP{{vnpay_transaction_no}}&vnp_CardType={{vnpay_card_type}}&vnp_OrderInfo={{vnpay_order_info}}&vnp_PayDate={{vnpay_pay_date}}&vnp_ResponseCode=00&vnp_TmnCode={{vnpay_tmn_code}}&vnp_TransactionNo={{vnpay_transaction_no}}&vnp_TransactionStatus=00&vnp_TxnRef={{vnpay_txn_ref}}&vnp_SecureHash={{vnpay_ipn_hash}}",
+              "host": [
+                "{{backend_url}}"
+              ],
+              "path": [
+                "hooks",
+                "payment",
+                "vnpay"
+              ],
+              "query": [
+                {
+                  "key": "vnp_Amount",
+                  "value": "1"
+                },
+                {
+                  "key": "vnp_BankCode",
+                  "value": "{{vnpay_bank_code}}"
+                },
+                {
+                  "key": "vnp_BankTranNo",
+                  "value": "VNP{{vnpay_transaction_no}}"
+                },
+                {
+                  "key": "vnp_CardType",
+                  "value": "{{vnpay_card_type}}"
+                },
+                {
+                  "key": "vnp_OrderInfo",
+                  "value": "{{vnpay_order_info}}"
+                },
+                {
+                  "key": "vnp_PayDate",
+                  "value": "{{vnpay_pay_date}}"
+                },
+                {
+                  "key": "vnp_ResponseCode",
+                  "value": "00"
+                },
+                {
+                  "key": "vnp_TmnCode",
+                  "value": "{{vnpay_tmn_code}}"
+                },
+                {
+                  "key": "vnp_TransactionNo",
+                  "value": "{{vnpay_transaction_no}}"
+                },
+                {
+                  "key": "vnp_TransactionStatus",
+                  "value": "00"
+                },
+                {
+                  "key": "vnp_TxnRef",
+                  "value": "{{vnpay_txn_ref}}"
+                },
+                {
+                  "key": "vnp_SecureHash",
+                  "value": "{{vnpay_ipn_hash}}"
+                }
+              ]
+            },
+            "description": "Negative test: sửa amount trên URL sau khi ký sẽ cho invalid checksum; nếu muốn test mismatch thật, ký lại với amount=1."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const CryptoJS = require('crypto-js')",
+                  "const pad = (n) => String(n).padStart(2, '0')",
+                  "const now = new Date()",
+                  "const payDate = now.getFullYear() + pad(now.getMonth() + 1) + pad(now.getDate()) + pad(now.getHours()) + pad(now.getMinutes()) + pad(now.getSeconds())",
+                  "const amount = String(Number(pm.collectionVariables.get('amount_vnd') || 100000) * 100)",
+                  "const txnRef = pm.collectionVariables.get('vnpay_txn_ref') || ('VNP' + Date.now())",
+                  "pm.collectionVariables.set('vnpay_txn_ref', txnRef)",
+                  "pm.collectionVariables.set('vnpay_pay_date', payDate)",
+                  "pm.collectionVariables.set('vnpay_amount_x100', amount)",
+                  "const params = {",
+                  "  vnp_Amount: amount,",
+                  "  vnp_BankCode: pm.collectionVariables.get('vnpay_bank_code') || 'NCB',",
+                  "  vnp_BankTranNo: pm.collectionVariables.get('vnpay_bank_tran_no') || ('VNP' + Date.now()),",
+                  "  vnp_CardType: pm.collectionVariables.get('vnpay_card_type') || 'ATM',",
+                  "  vnp_OrderInfo: pm.collectionVariables.get('vnpay_order_info') || 'Medusa Postman VNPay IPN',",
+                  "  vnp_PayDate: payDate,",
+                  "  vnp_ResponseCode: pm.collectionVariables.get('vnpay_response_code') || '00',",
+                  "  vnp_TmnCode: pm.collectionVariables.get('vnpay_tmn_code'),",
+                  "  vnp_TransactionNo: pm.collectionVariables.get('vnpay_transaction_no') || String(Date.now()).slice(-10),",
+                  "  vnp_TransactionStatus: pm.collectionVariables.get('vnpay_transaction_status') || '00',",
+                  "  vnp_TxnRef: txnRef,",
+                  "}",
+                  "const signData = new URLSearchParams(Object.keys(params).sort().map((key) => [key, params[key]])).toString()",
+                  "pm.collectionVariables.set('vnpay_ipn_hash', CryptoJS.HmacSHA512(signData, pm.collectionVariables.get('vnpay_hash_secret')).toString(CryptoJS.enc.Hex))"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "MoMo - Standard Payment Webhook/IPN Success",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{backend_url}}/hooks/payment/momo_default",
+              "host": [
+                "{{backend_url}}"
+              ],
+              "path": [
+                "hooks",
+                "payment",
+                "momo_default"
+              ]
+            },
+            "description": "Medusa standard provider webhook route. Cần provider pp_momo_default đã được register.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"partnerCode\": \"{{momo_partner_code}}\",\n  \"orderId\": \"{{momo_order_id}}\",\n  \"requestId\": \"{{momo_request_id}}\",\n  \"amount\": \"{{amount_vnd}}\",\n  \"orderInfo\": \"{{momo_order_info}}\",\n  \"orderType\": \"{{momo_order_type}}\",\n  \"transId\": \"{{momo_trans_id}}\",\n  \"resultCode\": 0,\n  \"message\": \"{{momo_ipn_message}}\",\n  \"payType\": \"{{momo_pay_type}}\",\n  \"responseTime\": \"{{momo_response_time}}\",\n  \"extraData\": \"{{momo_extra_data}}\",\n  \"signature\": \"{{momo_ipn_signature}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const CryptoJS = require('crypto-js')",
+                  "const responseTime = Date.now()",
+                  "pm.collectionVariables.set('momo_response_time', String(responseTime))",
+                  "const raw = [",
+                  "  'accessKey=' + pm.collectionVariables.get('momo_access_key'),",
+                  "  'amount=' + (pm.collectionVariables.get('amount_vnd') || 100000),",
+                  "  'extraData=' + (pm.collectionVariables.get('momo_extra_data') || ''),",
+                  "  'message=' + (pm.collectionVariables.get('momo_ipn_message') || 'Successful.'),",
+                  "  'orderId=' + pm.collectionVariables.get('momo_order_id'),",
+                  "  'orderInfo=' + (pm.collectionVariables.get('momo_order_info') || 'Medusa Postman MoMo payment'),",
+                  "  'orderType=' + (pm.collectionVariables.get('momo_order_type') || 'momo_wallet'),",
+                  "  'partnerCode=' + pm.collectionVariables.get('momo_partner_code'),",
+                  "  'payType=' + (pm.collectionVariables.get('momo_pay_type') || 'web'),",
+                  "  'requestId=' + pm.collectionVariables.get('momo_request_id'),",
+                  "  'responseTime=' + responseTime,",
+                  "  'resultCode=' + (pm.collectionVariables.get('momo_result_code') || '0'),",
+                  "  'transId=' + pm.collectionVariables.get('momo_trans_id')",
+                  "].join('&')",
+                  "pm.collectionVariables.set('momo_ipn_signature', CryptoJS.HmacSHA256(raw, pm.collectionVariables.get('momo_secret_key')).toString(CryptoJS.enc.Hex))"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bank Transfer - Standard Webhook Completed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-bank-signature",
+                "value": "{{bank_webhook_secret}}"
+              }
+            ],
+            "url": {
+              "raw": "{{backend_url}}/hooks/payment/bank-transfer_default",
+              "host": [
+                "{{backend_url}}"
+              ],
+              "path": [
+                "hooks",
+                "payment",
+                "bank-transfer_default"
+              ]
+            },
+            "description": "Nếu BANK_TRANSFER_WEBHOOK_SECRET không cấu hình thì header x-bank-signature không bắt buộc. Nếu có, value phải đúng secret.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"bank_evt_{{$timestamp}}\",\n  \"event_type\": \"bank_transfer.completed\",\n  \"transaction_id\": \"BANK{{$timestamp}}\",\n  \"amount\": \"{{amount_vnd}}\",\n  \"currency_code\": \"vnd\",\n  \"payment_reference\": \"{{bank_payment_reference}}\",\n  \"description\": \"Transfer {{bank_payment_reference}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Admin - Audit VNPay Refunds",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{backend_url}}/admin/vnpay-refunds?payment_session_id={{payment_session_id}}",
+              "host": [
+                "{{backend_url}}"
+              ],
+              "path": [
+                "admin",
+                "vnpay-refunds"
+              ],
+              "query": [
+                {
+                  "key": "payment_session_id",
+                  "value": "{{payment_session_id}}"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Admin - Audit MoMo Refunds",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{backend_url}}/admin/momo-refunds?payment_session_id={{payment_session_id}}",
+              "host": [
+                "{{backend_url}}"
+              ],
+              "path": [
+                "admin",
+                "momo-refunds"
+              ],
+              "query": [
+                {
+                  "key": "payment_session_id",
+                  "value": "{{payment_session_id}}"
+                }
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - VNPay Gateway Sandbox APIs",
+      "description": "",
+      "item": [
+        {
+          "name": "VNPay - Build Redirect Payment URL (PAY)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{vnpay_payment_url}}?{{vnpay_payment_querystring}}&vnp_SecureHash={{vnpay_payment_hash}}",
+              "host": [
+                "{{vnpay_payment_url}}"
+              ],
+              "path": [],
+              "query": [
+                {
+                  "key": "{{vnpay_payment_querystring}}",
+                  "value": ""
+                },
+                {
+                  "key": "vnp_SecureHash",
+                  "value": "{{vnpay_payment_hash}}"
+                }
+              ]
+            },
+            "description": "Mở request này bằng Send/Open in browser để đi sang VNPay Sandbox. vnp_Amount trong URL là amount_vnd * 100."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const CryptoJS = require('crypto-js')",
+                  "const pad = (n) => String(n).padStart(2, '0')",
+                  "const now = new Date()",
+                  "const ymdhms = now.getFullYear() + pad(now.getMonth() + 1) + pad(now.getDate()) + pad(now.getHours()) + pad(now.getMinutes()) + pad(now.getSeconds())",
+                  "const expire = new Date(now.getTime() + 15 * 60 * 1000)",
+                  "const expireDate = expire.getFullYear() + pad(expire.getMonth() + 1) + pad(expire.getDate()) + pad(expire.getHours()) + pad(expire.getMinutes()) + pad(expire.getSeconds())",
+                  "const txnRef = 'VNP' + Date.now()",
+                  "pm.collectionVariables.set('vnpay_txn_ref', txnRef)",
+                  "pm.collectionVariables.set('vnpay_create_date', ymdhms)",
+                  "pm.collectionVariables.set('vnpay_expire_date', expireDate)",
+                  "const amount = String(Number(pm.collectionVariables.get('amount_vnd') || 100000) * 100)",
+                  "pm.collectionVariables.set('vnpay_amount_x100', amount)",
+                  "const params = {",
+                  "  vnp_Amount: amount,",
+                  "  vnp_Command: 'pay',",
+                  "  vnp_CreateDate: ymdhms,",
+                  "  vnp_CurrCode: 'VND',",
+                  "  vnp_ExpireDate: expireDate,",
+                  "  vnp_IpAddr: pm.collectionVariables.get('client_ip') || '127.0.0.1',",
+                  "  vnp_Locale: pm.collectionVariables.get('vnpay_locale') || 'vn',",
+                  "  vnp_OrderInfo: pm.collectionVariables.get('vnpay_order_info') || 'Medusa Postman VNPay payment',",
+                  "  vnp_OrderType: pm.collectionVariables.get('vnpay_order_type') || 'other',",
+                  "  vnp_ReturnUrl: pm.collectionVariables.get('vnpay_return_url') || pm.collectionVariables.get('storefront_url') || 'http://localhost:8000/api/payment-return/vnpay',",
+                  "  vnp_TmnCode: pm.collectionVariables.get('vnpay_tmn_code'),",
+                  "  vnp_TxnRef: txnRef,",
+                  "  vnp_Version: '2.1.0',",
+                  "}",
+                  "const bankCode = pm.collectionVariables.get('vnpay_bank_code')",
+                  "if (bankCode) params.vnp_BankCode = bankCode",
+                  "const signData = new URLSearchParams(Object.keys(params).sort().map((key) => [key, params[key]])).toString()",
+                  "pm.collectionVariables.set('vnpay_payment_querystring', signData)",
+                  "pm.collectionVariables.set('vnpay_payment_hash', CryptoJS.HmacSHA512(signData, pm.collectionVariables.get('vnpay_hash_secret')).toString(CryptoJS.enc.Hex))"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "VNPay - Get Bank List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "url": {
+              "raw": "{{vnpay_bank_list_api}}",
+              "host": [
+                "{{vnpay_bank_list_api}}"
+              ],
+              "path": []
+            },
+            "description": "",
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "tmn_code",
+                  "value": "{{vnpay_tmn_code}}",
+                  "type": "text"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "VNPay - QueryDR Transaction",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{vnpay_transaction_api}}",
+              "host": [
+                "{{vnpay_transaction_api}}"
+              ],
+              "path": []
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vnp_RequestId\": \"{{vnpay_query_request_id}}\",\n  \"vnp_Version\": \"2.1.0\",\n  \"vnp_Command\": \"querydr\",\n  \"vnp_TmnCode\": \"{{vnpay_tmn_code}}\",\n  \"vnp_TxnRef\": \"{{vnpay_txn_ref}}\",\n  \"vnp_OrderInfo\": \"{{vnpay_order_info}}\",\n  \"vnp_TransactionNo\": \"{{vnpay_transaction_no}}\",\n  \"vnp_TransactionDate\": \"{{vnpay_transaction_date}}\",\n  \"vnp_CreateDate\": \"{{vnpay_query_create_date}}\",\n  \"vnp_IpAddr\": \"{{client_ip}}\",\n  \"vnp_SecureHash\": \"{{vnpay_query_hash}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const CryptoJS = require('crypto-js')",
+                  "const pad = (n) => String(n).padStart(2, '0')",
+                  "const now = new Date()",
+                  "const createDate = now.getFullYear() + pad(now.getMonth() + 1) + pad(now.getDate()) + pad(now.getHours()) + pad(now.getMinutes()) + pad(now.getSeconds())",
+                  "const requestId = 'QDR' + Date.now()",
+                  "pm.collectionVariables.set('vnpay_query_request_id', requestId)",
+                  "pm.collectionVariables.set('vnpay_query_create_date', createDate)",
+                  "const data = [",
+                  "  requestId,",
+                  "  '2.1.0',",
+                  "  'querydr',",
+                  "  pm.collectionVariables.get('vnpay_tmn_code'),",
+                  "  pm.collectionVariables.get('vnpay_txn_ref'),",
+                  "  pm.collectionVariables.get('vnpay_transaction_date') || pm.collectionVariables.get('vnpay_create_date') || createDate,",
+                  "  createDate,",
+                  "  pm.collectionVariables.get('client_ip') || '127.0.0.1',",
+                  "  pm.collectionVariables.get('vnpay_order_info') || 'Medusa Postman VNPay querydr'",
+                  "].join('|')",
+                  "pm.collectionVariables.set('vnpay_query_hash', CryptoJS.HmacSHA512(data, pm.collectionVariables.get('vnpay_hash_secret')).toString(CryptoJS.enc.Hex))"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "VNPay - Refund Transaction",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{vnpay_transaction_api}}",
+              "host": [
+                "{{vnpay_transaction_api}}"
+              ],
+              "path": []
+            },
+            "description": "transaction_type 02 = full refund, 03 = partial refund. Sandbox có thể hạn chế refund tùy tài khoản.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vnp_RequestId\": \"{{vnpay_refund_request_id}}\",\n  \"vnp_Version\": \"2.1.0\",\n  \"vnp_Command\": \"refund\",\n  \"vnp_TmnCode\": \"{{vnpay_tmn_code}}\",\n  \"vnp_TransactionType\": \"{{vnpay_refund_transaction_type}}\",\n  \"vnp_TxnRef\": \"{{vnpay_txn_ref}}\",\n  \"vnp_Amount\": \"{{vnpay_refund_amount_x100}}\",\n  \"vnp_OrderInfo\": \"{{vnpay_refund_order_info}}\",\n  \"vnp_TransactionNo\": \"{{vnpay_transaction_no}}\",\n  \"vnp_TransactionDate\": \"{{vnpay_transaction_date}}\",\n  \"vnp_CreateBy\": \"{{vnpay_refund_create_by}}\",\n  \"vnp_CreateDate\": \"{{vnpay_refund_create_date}}\",\n  \"vnp_IpAddr\": \"{{client_ip}}\",\n  \"vnp_SecureHash\": \"{{vnpay_refund_hash}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const CryptoJS = require('crypto-js')",
+                  "const pad = (n) => String(n).padStart(2, '0')",
+                  "const now = new Date()",
+                  "const createDate = now.getFullYear() + pad(now.getMonth() + 1) + pad(now.getDate()) + pad(now.getHours()) + pad(now.getMinutes()) + pad(now.getSeconds())",
+                  "const requestId = 'VNR' + Date.now()",
+                  "pm.collectionVariables.set('vnpay_refund_request_id', requestId)",
+                  "pm.collectionVariables.set('vnpay_refund_create_date', createDate)",
+                  "const amount = String(Number(pm.collectionVariables.get('refund_amount_vnd') || pm.collectionVariables.get('amount_vnd') || 100000) * 100)",
+                  "pm.collectionVariables.set('vnpay_refund_amount_x100', amount)",
+                  "const data = [",
+                  "  requestId,",
+                  "  '2.1.0',",
+                  "  'refund',",
+                  "  pm.collectionVariables.get('vnpay_tmn_code'),",
+                  "  pm.collectionVariables.get('vnpay_refund_transaction_type') || '03',",
+                  "  pm.collectionVariables.get('vnpay_txn_ref'),",
+                  "  amount,",
+                  "  pm.collectionVariables.get('vnpay_transaction_no'),",
+                  "  pm.collectionVariables.get('vnpay_transaction_date') || pm.collectionVariables.get('vnpay_pay_date'),",
+                  "  pm.collectionVariables.get('vnpay_refund_create_by') || 'postman',",
+                  "  createDate,",
+                  "  pm.collectionVariables.get('client_ip') || '127.0.0.1',",
+                  "  pm.collectionVariables.get('vnpay_refund_order_info') || 'Medusa Postman VNPay refund'",
+                  "].join('|')",
+                  "pm.collectionVariables.set('vnpay_refund_hash', CryptoJS.HmacSHA512(data, pm.collectionVariables.get('vnpay_hash_secret')).toString(CryptoJS.enc.Hex))"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - MoMo Gateway Sandbox APIs",
+      "description": "",
+      "item": [
+        {
+          "name": "MoMo - Create Payment payWithMethod",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{momo_endpoint}}/v2/gateway/api/create",
+              "host": [
+                "{{momo_endpoint}}"
+              ],
+              "path": [
+                "v2",
+                "gateway",
+                "api",
+                "create"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"partnerCode\": \"{{momo_partner_code}}\",\n  \"partnerName\": \"{{momo_partner_name}}\",\n  \"storeId\": \"{{momo_store_id}}\",\n  \"requestId\": \"{{momo_request_id}}\",\n  \"amount\": \"{{amount_vnd}}\",\n  \"orderId\": \"{{momo_order_id}}\",\n  \"orderInfo\": \"{{momo_order_info}}\",\n  \"redirectUrl\": \"{{momo_redirect_url}}\",\n  \"ipnUrl\": \"{{momo_ipn_url}}\",\n  \"requestType\": \"{{momo_request_type}}\",\n  \"extraData\": \"{{momo_extra_data}}\",\n  \"autoCapture\": true,\n  \"lang\": \"{{momo_lang}}\",\n  \"signature\": \"{{momo_create_signature}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const CryptoJS = require('crypto-js')",
+                  "const orderId = 'MM' + Date.now()",
+                  "const requestId = 'MR' + Date.now()",
+                  "pm.collectionVariables.set('momo_order_id', orderId)",
+                  "pm.collectionVariables.set('momo_request_id', requestId)",
+                  "const amount = String(pm.collectionVariables.get('amount_vnd') || 100000)",
+                  "const extraData = pm.collectionVariables.get('momo_extra_data') || ''",
+                  "const raw = [",
+                  "  'accessKey=' + pm.collectionVariables.get('momo_access_key'),",
+                  "  'amount=' + amount,",
+                  "  'extraData=' + extraData,",
+                  "  'ipnUrl=' + pm.collectionVariables.get('momo_ipn_url'),",
+                  "  'orderId=' + orderId,",
+                  "  'orderInfo=' + (pm.collectionVariables.get('momo_order_info') || 'Medusa Postman MoMo payment'),",
+                  "  'partnerCode=' + pm.collectionVariables.get('momo_partner_code'),",
+                  "  'redirectUrl=' + pm.collectionVariables.get('momo_redirect_url'),",
+                  "  'requestId=' + requestId,",
+                  "  'requestType=' + (pm.collectionVariables.get('momo_request_type') || 'payWithMethod')",
+                  "].join('&')",
+                  "pm.collectionVariables.set('momo_create_signature', CryptoJS.HmacSHA256(raw, pm.collectionVariables.get('momo_secret_key')).toString(CryptoJS.enc.Hex))"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let data = {}",
+                  "try { data = pm.response.json() } catch (e) {}",
+                  "if (data.payUrl) pm.collectionVariables.set('momo_pay_url', data.payUrl)",
+                  "if (data.deeplink) pm.collectionVariables.set('momo_deeplink', data.deeplink)",
+                  "if (data.qrCodeUrl) pm.collectionVariables.set('momo_qr_code_url', data.qrCodeUrl)"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "MoMo - Query Payment Status",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{momo_endpoint}}/v2/gateway/api/query",
+              "host": [
+                "{{momo_endpoint}}"
+              ],
+              "path": [
+                "v2",
+                "gateway",
+                "api",
+                "query"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"partnerCode\": \"{{momo_partner_code}}\",\n  \"requestId\": \"{{momo_request_id}}\",\n  \"orderId\": \"{{momo_order_id}}\",\n  \"lang\": \"{{momo_lang}}\",\n  \"signature\": \"{{momo_query_signature}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const CryptoJS = require('crypto-js')",
+                  "const raw = [",
+                  "  'accessKey=' + pm.collectionVariables.get('momo_access_key'),",
+                  "  'orderId=' + pm.collectionVariables.get('momo_order_id'),",
+                  "  'partnerCode=' + pm.collectionVariables.get('momo_partner_code'),",
+                  "  'requestId=' + pm.collectionVariables.get('momo_request_id')",
+                  "].join('&')",
+                  "pm.collectionVariables.set('momo_query_signature', CryptoJS.HmacSHA256(raw, pm.collectionVariables.get('momo_secret_key')).toString(CryptoJS.enc.Hex))"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let data = {}",
+                  "try { data = pm.response.json() } catch (e) {}",
+                  "if (data.transId) pm.collectionVariables.set('momo_trans_id', String(data.transId))"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "MoMo - Refund Transaction",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{momo_endpoint}}/v2/gateway/api/refund",
+              "host": [
+                "{{momo_endpoint}}"
+              ],
+              "path": [
+                "v2",
+                "gateway",
+                "api",
+                "refund"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"partnerCode\": \"{{momo_partner_code}}\",\n  \"orderId\": \"{{momo_refund_order_id}}\",\n  \"requestId\": \"{{momo_refund_request_id}}\",\n  \"amount\": \"{{refund_amount_vnd}}\",\n  \"transId\": \"{{momo_trans_id}}\",\n  \"lang\": \"{{momo_lang}}\",\n  \"description\": \"{{momo_refund_description}}\",\n  \"signature\": \"{{momo_refund_signature}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const CryptoJS = require('crypto-js')",
+                  "const orderId = 'MRO' + Date.now()",
+                  "const requestId = 'MRF' + Date.now()",
+                  "const amount = String(pm.collectionVariables.get('refund_amount_vnd') || pm.collectionVariables.get('amount_vnd') || 100000)",
+                  "const description = pm.collectionVariables.get('momo_refund_description') || 'Medusa Postman MoMo refund'",
+                  "pm.collectionVariables.set('momo_refund_order_id', orderId)",
+                  "pm.collectionVariables.set('momo_refund_request_id', requestId)",
+                  "pm.collectionVariables.set('momo_refund_description', description)",
+                  "const raw = [",
+                  "  'accessKey=' + pm.collectionVariables.get('momo_access_key'),",
+                  "  'amount=' + amount,",
+                  "  'description=' + description,",
+                  "  'orderId=' + orderId,",
+                  "  'partnerCode=' + pm.collectionVariables.get('momo_partner_code'),",
+                  "  'requestId=' + requestId,",
+                  "  'transId=' + pm.collectionVariables.get('momo_trans_id')",
+                  "].join('&')",
+                  "pm.collectionVariables.set('momo_refund_signature', CryptoJS.HmacSHA256(raw, pm.collectionVariables.get('momo_secret_key')).toString(CryptoJS.enc.Hex))"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "MoMo - Query Refund Result",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{momo_endpoint}}/v2/gateway/api/refund/query",
+              "host": [
+                "{{momo_endpoint}}"
+              ],
+              "path": [
+                "v2",
+                "gateway",
+                "api",
+                "refund",
+                "query"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"partnerCode\": \"{{momo_partner_code}}\",\n  \"requestId\": \"{{momo_refund_request_id}}\",\n  \"orderId\": \"{{momo_refund_order_id}}\",\n  \"lang\": \"{{momo_lang}}\",\n  \"signature\": \"{{momo_refund_query_signature}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const CryptoJS = require('crypto-js')",
+                  "const raw = [",
+                  "  'accessKey=' + pm.collectionVariables.get('momo_access_key'),",
+                  "  'orderId=' + pm.collectionVariables.get('momo_refund_order_id'),",
+                  "  'partnerCode=' + pm.collectionVariables.get('momo_partner_code'),",
+                  "  'requestId=' + pm.collectionVariables.get('momo_refund_request_id')",
+                  "].join('&')",
+                  "pm.collectionVariables.set('momo_refund_query_signature', CryptoJS.HmacSHA256(raw, pm.collectionVariables.get('momo_secret_key')).toString(CryptoJS.enc.Hex))"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "MoMo - Confirm Authorized Payment (capture)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{momo_endpoint}}/v2/gateway/api/confirm",
+              "host": [
+                "{{momo_endpoint}}"
+              ],
+              "path": [
+                "v2",
+                "gateway",
+                "api",
+                "confirm"
+              ]
+            },
+            "description": "Chỉ dùng cho giao dịch đã authorized khi autoCapture=false/direct flow hỗ trợ trạng thái 9000.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"partnerCode\": \"{{momo_partner_code}}\",\n  \"requestId\": \"{{momo_confirm_request_id}}\",\n  \"orderId\": \"{{momo_order_id}}\",\n  \"requestType\": \"capture\",\n  \"amount\": \"{{amount_vnd}}\",\n  \"lang\": \"{{momo_lang}}\",\n  \"description\": \"{{momo_confirm_description}}\",\n  \"signature\": \"{{momo_confirm_signature}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const CryptoJS = require('crypto-js')",
+                  "const requestId = 'MCF' + Date.now()",
+                  "const requestType = pm.collectionVariables.get('momo_confirm_request_type') || 'capture'",
+                  "const description = pm.collectionVariables.get('momo_confirm_description') || 'Medusa Postman MoMo confirm'",
+                  "pm.collectionVariables.set('momo_confirm_request_id', requestId)",
+                  "pm.collectionVariables.set('momo_confirm_description', description)",
+                  "const raw = [",
+                  "  'accessKey=' + pm.collectionVariables.get('momo_access_key'),",
+                  "  'amount=' + (pm.collectionVariables.get('amount_vnd') || 100000),",
+                  "  'description=' + description,",
+                  "  'orderId=' + pm.collectionVariables.get('momo_order_id'),",
+                  "  'partnerCode=' + pm.collectionVariables.get('momo_partner_code'),",
+                  "  'requestId=' + requestId,",
+                  "  'requestType=' + requestType",
+                  "].join('&')",
+                  "pm.collectionVariables.set('momo_confirm_signature', CryptoJS.HmacSHA256(raw, pm.collectionVariables.get('momo_secret_key')).toString(CryptoJS.enc.Hex))"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "MoMo - Cancel Authorized Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{momo_endpoint}}/v2/gateway/api/confirm",
+              "host": [
+                "{{momo_endpoint}}"
+              ],
+              "path": [
+                "v2",
+                "gateway",
+                "api",
+                "confirm"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"partnerCode\": \"{{momo_partner_code}}\",\n  \"requestId\": \"{{momo_confirm_request_id}}\",\n  \"orderId\": \"{{momo_order_id}}\",\n  \"requestType\": \"cancel\",\n  \"amount\": \"{{amount_vnd}}\",\n  \"lang\": \"{{momo_lang}}\",\n  \"description\": \"{{momo_confirm_description}}\",\n  \"signature\": \"{{momo_confirm_signature}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const CryptoJS = require('crypto-js')",
+                  "const requestId = 'MCF' + Date.now()",
+                  "const requestType = 'cancel'",
+                  "const description = pm.collectionVariables.get('momo_confirm_description') || 'Medusa Postman MoMo confirm'",
+                  "pm.collectionVariables.set('momo_confirm_request_id', requestId)",
+                  "pm.collectionVariables.set('momo_confirm_description', description)",
+                  "const raw = [",
+                  "  'accessKey=' + pm.collectionVariables.get('momo_access_key'),",
+                  "  'amount=' + (pm.collectionVariables.get('amount_vnd') || 100000),",
+                  "  'description=' + description,",
+                  "  'orderId=' + pm.collectionVariables.get('momo_order_id'),",
+                  "  'partnerCode=' + pm.collectionVariables.get('momo_partner_code'),",
+                  "  'requestId=' + requestId,",
+                  "  'requestType=' + requestType",
+                  "].join('&')",
+                  "pm.collectionVariables.set('momo_confirm_signature', CryptoJS.HmacSHA256(raw, pm.collectionVariables.get('momo_secret_key')).toString(CryptoJS.enc.Hex))"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 - MoMo Extended API Templates (chưa gắn vào backend)",
+      "description": "",
+      "item": [
+        {
+          "name": "MoMo Tokenization - Callback Token Query",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{momo_endpoint}}/v2/gateway/api/tokenization/cbQuery",
+              "host": [
+                "{{momo_endpoint}}"
+              ],
+              "path": [
+                "v2",
+                "gateway",
+                "api",
+                "tokenization",
+                "cbQuery"
+              ]
+            },
+            "description": "Template theo docs MoMo tokenization. Backend hiện tại chưa lưu callbackToken/token.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"partnerCode\": \"{{momo_partner_code}}\",\n  \"requestId\": \"{{momo_request_id}}\",\n  \"orderId\": \"{{momo_order_id}}\",\n  \"partnerClientId\": \"{{momo_partner_client_id}}\",\n  \"lang\": \"{{momo_lang}}\",\n  \"signature\": \"{{momo_cb_query_signature}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const CryptoJS = require('crypto-js')",
+                  "const raw = [",
+                  "  'accessKey=' + pm.collectionVariables.get('momo_access_key'),",
+                  "  'orderId=' + pm.collectionVariables.get('momo_order_id'),",
+                  "  'partnerClientId=' + pm.collectionVariables.get('momo_partner_client_id'),",
+                  "  'partnerCode=' + pm.collectionVariables.get('momo_partner_code'),",
+                  "  'requestId=' + pm.collectionVariables.get('momo_request_id')",
+                  "].join('&')",
+                  "pm.collectionVariables.set('momo_cb_query_signature', CryptoJS.HmacSHA256(raw, pm.collectionVariables.get('momo_secret_key')).toString(CryptoJS.enc.Hex))"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "MoMo Tokenization - Delete Token (manual signature/RSA fields)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{momo_endpoint}}/v2/gateway/api/tokenization/delete",
+              "host": [
+                "{{momo_endpoint}}"
+              ],
+              "path": [
+                "v2",
+                "gateway",
+                "api",
+                "tokenization",
+                "delete"
+              ]
+            },
+            "description": "Template cho tokenization delete. Cần token/encrypted payload và signature theo hợp đồng MoMo.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"partnerCode\": \"{{momo_partner_code}}\",\n  \"requestId\": \"MTD{{$timestamp}}\",\n  \"orderId\": \"{{momo_order_id}}\",\n  \"storeId\": \"{{momo_store_id}}\",\n  \"token\": \"{{momo_encrypted_token_payload}}\",\n  \"lang\": \"{{momo_lang}}\",\n  \"signature\": \"{{momo_token_delete_signature}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "MoMo Subscription - Callback Token Query",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{momo_endpoint}}/v2/gateway/api/subscription/cbQuery",
+              "host": [
+                "{{momo_endpoint}}"
+              ],
+              "path": [
+                "v2",
+                "gateway",
+                "api",
+                "subscription",
+                "cbQuery"
+              ]
+            },
+            "description": "Template cho subscription callback token inquiry. Backend hiện chưa implement subscription.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"partnerCode\": \"{{momo_partner_code}}\",\n  \"requestId\": \"{{momo_request_id}}\",\n  \"orderId\": \"{{momo_order_id}}\",\n  \"partnerClientId\": \"{{momo_partner_client_id}}\",\n  \"lang\": \"{{momo_lang}}\",\n  \"signature\": \"{{momo_cb_query_signature}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const CryptoJS = require('crypto-js')",
+                  "const raw = [",
+                  "  'accessKey=' + pm.collectionVariables.get('momo_access_key'),",
+                  "  'orderId=' + pm.collectionVariables.get('momo_order_id'),",
+                  "  'partnerClientId=' + pm.collectionVariables.get('momo_partner_client_id'),",
+                  "  'partnerCode=' + pm.collectionVariables.get('momo_partner_code'),",
+                  "  'requestId=' + pm.collectionVariables.get('momo_request_id')",
+                  "].join('&')",
+                  "pm.collectionVariables.set('momo_cb_query_signature', CryptoJS.HmacSHA256(raw, pm.collectionVariables.get('momo_secret_key')).toString(CryptoJS.enc.Hex))"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "MoMo Disbursement - Balance (manual signature)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{momo_endpoint}}/v2/gateway/api/disbursement/balance",
+              "host": [
+                "{{momo_endpoint}}"
+              ],
+              "path": [
+                "v2",
+                "gateway",
+                "api",
+                "disbursement",
+                "balance"
+              ]
+            },
+            "description": "Template disbursement. Thường cần MoMo enable capability riêng và quy tắc ký/RSA theo hợp đồng.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"partnerCode\": \"{{momo_partner_code}}\",\n  \"orderId\": \"MDB{{$timestamp}}\",\n  \"requestId\": \"MDBR{{$timestamp}}\",\n  \"lang\": \"{{momo_lang}}\",\n  \"orderGroupId\": \"{{momo_order_group_id}}\",\n  \"signature\": \"{{momo_disbursement_balance_signature}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

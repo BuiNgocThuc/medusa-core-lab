@@ -266,6 +266,30 @@ class MomoPaymentProviderService extends AbstractPaymentProvider<MomoProviderOpt
       )
     }
 
+    if (payment.status !== "paid" && payment.status !== "partially_refunded") {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "MoMo refund requires a paid payment"
+      )
+    }
+
+    if (!Number.isInteger(amount) || amount <= 0) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "MoMo refund amount must be a positive VND integer"
+      )
+    }
+
+    const alreadyRefunded =
+      (await this.momoPaymentService_?.sumRefundAmount(payment.id)) ?? 0
+
+    if (alreadyRefunded + amount > payment.amount) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "MoMo refund amount exceeds the paid amount"
+      )
+    }
+
     const requestId = randomMomoId("MRF")
     const refundOrderId = randomMomoId("MRO")
     const description = `Refund MoMo payment ${payment.momo_order_id}`
@@ -279,6 +303,7 @@ class MomoPaymentProviderService extends AbstractPaymentProvider<MomoProviderOpt
 
     await this.momoPaymentService_?.createRefund({
       momo_payment_id: payment.id,
+      payment_id: this.getString(input.data, "payment_id"),
       refund_order_id: refundOrderId,
       request_id: requestId,
       amount,
@@ -300,6 +325,12 @@ class MomoPaymentProviderService extends AbstractPaymentProvider<MomoProviderOpt
       )
     }
 
+    const acceptedRefundedAmount = alreadyRefunded + amount
+    await this.momoPaymentService_?.markRefundedStatus(
+      payment.id,
+      acceptedRefundedAmount
+    )
+
     return {
       data: {
         ...input.data,
@@ -307,6 +338,9 @@ class MomoPaymentProviderService extends AbstractPaymentProvider<MomoProviderOpt
         last_refund_status: "succeeded",
         last_refund_order_id: refundOrderId,
         last_refund_request_id: requestId,
+        last_refund_trans_id: response.transId?.toString(),
+        last_refund_result_code: response.resultCode,
+        last_refund_requested_at: new Date().toISOString(),
       },
     }
   }
@@ -492,6 +526,12 @@ class MomoPaymentProviderService extends AbstractPaymentProvider<MomoProviderOpt
     const requestId = data?.request_id
 
     return typeof requestId === "string" ? requestId : undefined
+  }
+
+  private getString(data: Record<string, unknown> | undefined, key: string) {
+    const value = data?.[key]
+
+    return typeof value === "string" && value ? value : undefined
   }
 
   private getExpiresAt() {

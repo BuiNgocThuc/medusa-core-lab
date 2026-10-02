@@ -5,6 +5,13 @@ import { CartData, getCartLoyaltyPromotion } from "@/src/utils";
 
 type ProcessOrderLoyaltyInput = { order_id: string };
 
+type ProcessOrderLoyaltyOutput = {
+    skipped: boolean;
+    reason?: string;
+    redeemed_points?: number;
+    earned_points?: number;
+};
+
 export const processOrderLoyaltyStep = createStep(
     "process-order-loyalty",
     async ({ order_id }: ProcessOrderLoyaltyInput, { container }) => {
@@ -39,11 +46,11 @@ export const processOrderLoyaltyStep = createStep(
         );
 
         if (!order || !order.customer?.id) {
-            return new StepResponse({ skipped: true, reason: "No customer linked to order" });
+            return new StepResponse<ProcessOrderLoyaltyOutput>({ skipped: true, reason: "No customer linked to order" });
         }
 
         if (order.metadata?.loyalty_redemption_processed === true || order.metadata?.loyalty_processed === true) {
-            return new StepResponse({ skipped: true, reason: "Already processed" });
+            return new StepResponse<ProcessOrderLoyaltyOutput>({ skipped: true, reason: "Already processed" });
         }
 
         const loyaltyPromotion = order.cart ? getCartLoyaltyPromotion(order.cart as CartData) : undefined;
@@ -103,7 +110,7 @@ export const processOrderLoyaltyStep = createStep(
             },
         });
 
-        return new StepResponse({
+        return new StepResponse<ProcessOrderLoyaltyOutput>({
             skipped: false,
             redeemed_points: redeemedPoints,
             earned_points: earnedPoints ?? 0,

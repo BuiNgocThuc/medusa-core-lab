@@ -12,6 +12,7 @@ import type {
   CompleteMomoPaymentInput,
   CompleteMomoPaymentResult,
   CreateMomoRefundInput,
+  MomoRefundStatus,
   MomoPaymentStatus,
   UpdateMomoRefundInput,
   UpsertMomoPaymentInput,
@@ -330,6 +331,58 @@ class MomoPaymentModuleService extends MedusaService({
       raw_response: input.raw_response ?? null,
       processed_at: new Date(),
     })
+  }
+
+  async sumRefundAmount(
+    momoPaymentId: string,
+    statuses: MomoRefundStatus[] = ["succeeded"]
+  ) {
+    const refunds = await this.methods().listMomoRefunds(
+      {
+        momo_payment_id: momoPaymentId,
+        status: statuses,
+      },
+      { take: 1000 }
+    )
+
+    return refunds.reduce((total, refund) => total + Number(refund.amount ?? 0), 0)
+  }
+
+  async markRefundedStatus(paymentId: string, refundedAmount: number) {
+    const [payment] = await this.methods().listMomoPayments(
+      {
+        id: paymentId,
+      },
+      { take: 1 }
+    )
+
+    if (!payment) {
+      return
+    }
+
+    const status =
+      refundedAmount >= Number(payment.amount ?? 0)
+        ? "refunded"
+        : "partially_refunded"
+
+    return this.methods().updateMomoPayments({
+      id: paymentId,
+      status,
+    })
+  }
+
+  async listRefundsForPayment(momoPaymentId: string) {
+    return this.methods().listMomoRefunds(
+      {
+        momo_payment_id: momoPaymentId,
+      },
+      {
+        take: 100,
+        order: {
+          created_at: "DESC",
+        },
+      }
+    )
   }
 
   private async markPaymentAndEvent(
