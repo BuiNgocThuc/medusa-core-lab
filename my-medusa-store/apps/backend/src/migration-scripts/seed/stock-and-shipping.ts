@@ -20,8 +20,9 @@ export async function seedStockAndShipping(
     const query = container.resolve(ContainerRegistrationKeys.QUERY);
     const fulfillmentModuleService = container.resolve(ModuleRegistrationName.FULFILLMENT);
 
-    const southWarehouseMeta = {
-        company: "South Warehouse",
+    // Cấu hình Kho Trung Tâm (Central Warehouse - Ralley Badminton Store)
+    const centralWarehouseMeta = {
+        company: "Ralley Badminton Store",
         ghn: {
             province_id: 1000001,
             province_name: "Hồ Chí Minh",
@@ -57,46 +58,12 @@ export async function seedStockAndShipping(
         is_new_address: true,
     };
 
-    const northWarehouseMeta = {
-        company: "North Warehouse",
-        ghn: {
-            province_id: 1000000,
-            province_name: "Hà Nội",
-            ward_id: 1003460,
-            ward_name: "Phường Long Biên",
-            district_id: 1491,
-            district_name: "Quận Long Biên",
-            ward_code: "1A0906",
-            is_new_address: true,
-            name_extension: [
-                "phường long biên",
-                "p.long biên",
-                "p long biên",
-                "long biên",
-                "long bien",
-                "phuong long bien",
-                "phuonglongbien",
-                "longbien",
-            ],
-        },
-        province_id: 1000000,
-        province_name: "Hà Nội",
-        ward_id: 1003460,
-        ward_name: "Phường Long Biên",
-        district_id: 1491,
-        district_name: "Quận Long Biên",
-        ward_code: "1A0906",
-        v3_province_id: 1000000,
-        v3_ward_id: 1003460,
-        is_new_from_address: true,
-        is_new_address: true,
-    };
-
+    // 1. Tạo 1 Stock Location duy nhất đại diện cho toàn bộ shop
     const { result: stockLocationResult } = await createStockLocationsWorkflow(container).run({
         input: {
             locations: [
                 {
-                    name: "South Warehouse",
+                    name: "Central Warehouse",
                     address: {
                         address_1: "123 Đường Hiệp Bình, Phường Hiệp Bình, TP. Thủ Đức, TP. Hồ Chí Minh",
                         city: "Hồ Chí Minh",
@@ -104,43 +71,26 @@ export async function seedStockAndShipping(
                         postal_code: "700000",
                         country_code: "vn",
                         phone: "0901234567",
-                        metadata: southWarehouseMeta,
+                        metadata: centralWarehouseMeta,
                     },
-                    metadata: southWarehouseMeta,
-                },
-                {
-                    name: "North Warehouse",
-                    address: {
-                        address_1: "456 Đường Nguyễn Văn Linh, Phường Long Biên, Quận Long Biên, Hà Nội",
-                        city: "Hà Nội",
-                        province: "Hà Nội",
-                        postal_code: "100000",
-                        country_code: "vn",
-                        phone: "0901234568",
-                        metadata: northWarehouseMeta,
-                    },
-                    metadata: northWarehouseMeta,
+                    metadata: centralWarehouseMeta,
                 },
             ],
         },
     });
     const stockLocation = stockLocationResult[0];
 
-    // Link fulfillment providers: GHN và Manual cho từng stock location
-    const providerLinks: any[] = [];
-    for (const loc of stockLocationResult) {
-        providerLinks.push(
-            {
-                [Modules.STOCK_LOCATION]: { stock_location_id: loc.id },
-                [Modules.FULFILLMENT]: { fulfillment_provider_id: "ghn_ghn" },
-            },
-            {
-                [Modules.STOCK_LOCATION]: { stock_location_id: loc.id },
-                [Modules.FULFILLMENT]: { fulfillment_provider_id: "manual_manual" },
-            }
-        );
-    }
-    await link.create(providerLinks);
+    // 2. Link fulfillment providers: GHN và Manual cho Stock Location
+    await link.create([
+        {
+            [Modules.STOCK_LOCATION]: { stock_location_id: stockLocation.id },
+            [Modules.FULFILLMENT]: { fulfillment_provider_id: "ghn_ghn" },
+        },
+        {
+            [Modules.STOCK_LOCATION]: { stock_location_id: stockLocation.id },
+            [Modules.FULFILLMENT]: { fulfillment_provider_id: "manual_manual" },
+        },
+    ]);
 
     const { data: shippingProfileResult } = await query.graph({
         entity: "shipping_profile",
@@ -148,6 +98,7 @@ export async function seedStockAndShipping(
     });
     const shippingProfile = shippingProfileResult[0];
 
+    // 3. Tạo 1 Fulfillment Set duy nhất (loại shipping) phủ sóng toàn quốc
     const fulfillmentSet = await fulfillmentModuleService.createFulfillmentSets({
         name: "Vietnam delivery",
         type: "shipping",
@@ -159,12 +110,13 @@ export async function seedStockAndShipping(
         ],
     });
 
-    const setLinks = stockLocationResult.map((loc) => ({
-        [Modules.STOCK_LOCATION]: { stock_location_id: loc.id },
+    // 4. Link 1-1 giữa Stock Location và Fulfillment Set (tuân thủ chặt chẽ Issue #16115)
+    await link.create({
+        [Modules.STOCK_LOCATION]: { stock_location_id: stockLocation.id },
         [Modules.FULFILLMENT]: { fulfillment_set_id: fulfillmentSet.id },
-    }));
-    await link.create(setLinks);
+    });
 
+    // 5. Tạo bộ 3 Shipping Options tiêu chuẩn cho Storefront
     await createShippingOptionsWorkflow(container).run({
         input: [
             {
@@ -242,11 +194,10 @@ export async function seedStockAndShipping(
         ],
     });
 
-    for (const loc of stockLocationResult) {
-        await linkSalesChannelsToStockLocationWorkflow(container).run({
-            input: { id: loc.id, add: [salesChannelId] },
-        });
-    }
+    // 6. Link Stock Location vào Sales Channel
+    await linkSalesChannelsToStockLocationWorkflow(container).run({
+        input: { id: stockLocation.id, add: [salesChannelId] },
+    });
 
-    return { stockLocation, stockLocations: stockLocationResult, shippingProfile };
+    return { stockLocation, stockLocations: [stockLocation], shippingProfile };
 }

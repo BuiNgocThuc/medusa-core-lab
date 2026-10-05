@@ -181,9 +181,12 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
   }>> {
     try {
       const knex = this.getPgConnection()
+      // Chỉ lấy các Stock Location có liên kết với Fulfillment Set đang hoạt động (loại bỏ các kho đã disable/chưa cấu hình)
       const rows = await knex("stock_location as sl")
+        .innerJoin("location_fulfillment_set as lfs", "sl.id", "lfs.stock_location_id")
         .leftJoin("stock_location_address as sla", "sl.address_id", "sla.id")
         .whereNull("sl.deleted_at")
+        .distinctOn("sl.id")
         .select(
           "sl.id",
           "sl.name",
@@ -195,7 +198,7 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
           "sla.phone",
           "sla.metadata as sla_metadata"
         )
-        .orderBy("sl.created_at", "asc")
+        .orderBy("sl.id", "asc")
 
       return rows.map((row: any) => {
         const meta = (row.sla_metadata || row.sl_metadata || {}) as Record<string, any>
@@ -329,6 +332,15 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
     const allWarehouses = await this.resolveAllStockLocations()
     if (!allWarehouses || allWarehouses.length === 0) {
       return this.resolveStockLocation(fallbackLocationId)
+    }
+
+    // 0. Ưu tiên số 1: Nếu Shipping Option gắn liền với 1 kho cụ thể (context.from_location)
+    // và kho đó nằm trong danh sách kho hợp lệ có Fulfillment Set -> dùng chính xác kho này!
+    if (fallbackLocationId) {
+      const boundWh = allWarehouses.find((w) => w.id === fallbackLocationId)
+      if (boundWh) {
+        return boundWh
+      }
     }
 
     if (allWarehouses.length === 1) {
@@ -709,6 +721,15 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
         {}
       ) as Record<string, any>
 
+      this.logger_.info?.(
+        `[GHN calculatePrice] ======================== START CALCULATION ========================\n` +
+        `  Cart ID        : ${(context as any)?.id || (context as any)?.cart?.id || "N/A"}\n` +
+        `  item_total     : ${(context as any)?.item_total ?? "undefined"}₫\n` +
+        `  subtotal       : ${(context as any)?.subtotal ?? "undefined"}₫\n` +
+        `  discount_total : ${(context as any)?.discount_total ?? "undefined"}₫\n` +
+        `  total          : ${(context as any)?.total ?? "undefined"}₫`
+      )
+
       // Ánh xạ địa chỉ người nhận (hỗ trợ cả mô hình 2 cấp GHN v3 và 3 cấp truyền thống)
       const mappedAddress = resolveLegacyAddress({
         provinceId: metadata?.ghn_province_id,
@@ -737,6 +758,14 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
         metadata?.ward_name ||
         shippingAddress?.city
 
+      this.logger_.info?.(
+        `[GHN calculatePrice] Destination parsed:\n` +
+        `  Province : "${toProvinceName || "N/A"}"\n` +
+        `  District : ID=${toDistrictId || "N/A"} (${mappedAddress?.districtName || "N/A"})\n` +
+        `  Ward     : "${toWardName || "N/A"}" (code: ${toWardCode || "N/A"})\n` +
+        `  Address1 : "${shippingAddress?.address_1 || "N/A"}"`
+      )
+
       // Tính tổng cân nặng từ các items trong giỏ hàng
       const items = ((context as any)?.items || (context as any)?.cart?.items || []) as any[]
       let totalWeight = 0
@@ -759,12 +788,31 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
         totalWeight = this.options_.defaultWeight || 500
       }
 
-      this.logger_.info?.(
-        `[GHN Fulfillment] Calculated total cart weight: ${totalWeight}g from ${items.length} items`
-      )
+      // Lấy danh sách adjustments (giảm giá/voucher/khuyến mãi) của các line items từ DB
+      // Vì Medusa Core không nạp computed totals hoặc adjustments vào cartFieldsForCalculateShippingOptionsPrices
+      const itemDiscounts: Record<string, number> = {}
+      const itemIds = items.map((i: any) => i.id).filter(Boolean)
+      if (itemIds.length > 0) {
+        try {
+          const knex = this.getPgConnection()
+          const rows = await knex("cart_line_item_adjustment")
+            .whereIn("item_id", itemIds)
+            .whereNull("deleted_at")
+            .select("item_id")
+            .sum("amount as discount_amount")
+            .groupBy("item_id")
 
-      // Map items sang cấu trúc GHN DTO (chuẩn bị cho cả tính phí service_type_id 5 và tạo đơn)
-      const ghnItems: GhnOrderItem[] = items.map((item: any) => {
+          for (const row of rows) {
+            itemDiscounts[row.item_id] = Number(row.discount_amount || 0)
+          }
+        } catch (dbErr: any) {
+          this.logger_.warn?.(`[GHN calculatePrice] Could not query line item adjustments: ${dbErr?.message}`)
+        }
+      }
+
+      // Map items sang cấu trúc GHN DTO:
+      // Medusa v2 tự động tính toán và cung cấp item.total (đã trừ khuyến mãi/voucher) trên từng dòng sản phẩm
+      const ghnItems: GhnOrderItem[] = items.map((item: any, idx: number) => {
         const variantWeight = Number(item?.variant?.weight || 0)
         const productWeight = Number(item?.product?.weight || item?.variant?.product?.weight || 0)
         const fallbackWeight = this.options_.defaultWeight || 500
@@ -785,11 +833,24 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
         const fallbackHeight = this.options_.defaultDimensions?.height || 10
         const itemHeight = variantHeight > 0 ? variantHeight : (productHeight > 0 ? productHeight : fallbackHeight)
 
+        const qty = Math.max(1, Number(item?.quantity || 1))
+        const itemDiscount = itemDiscounts[item?.id] || 0
+        const rawLineTotal = item?.total !== undefined
+          ? Number(item.total)
+          : Math.max(0, Number(item?.unit_price || 0) * qty - itemDiscount)
+
+        // Đơn giá thực tế sau khi phân bổ giảm giá (lineItem.total / qty)
+        const netUnitPrice = Math.max(0, Math.round(rawLineTotal / qty))
+
+        this.logger_.info?.(
+          `[GHN calculatePrice] Item [${idx + 1}/${items.length}]: "${item?.title || item?.variant?.title || "Sản phẩm"}" | qty=${qty} | unit_price=${item?.unit_price || 0}₫ | discount=${itemDiscount}₫ | line_total=${rawLineTotal}₫ -> net_unit_price=${netUnitPrice}₫ (${Math.round(itemWeight)}g)`
+        )
+
         return {
           name: item?.title || item?.variant?.title || "Sản phẩm",
           code: item?.variant?.sku || undefined,
-          quantity: Math.max(1, Number(item?.quantity || 1)),
-          price: Math.max(0, Number(item?.unit_price || 0)),
+          quantity: qty,
+          price: netUnitPrice,
           weight: Math.round(itemWeight),
           length: Math.round(itemLength),
           width: Math.round(itemWidth),
@@ -808,10 +869,14 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
         })
       }
 
+      this.logger_.info?.(
+        `[GHN calculatePrice] Total cart weight: ${totalWeight}g from ${items.length} items`
+      )
+
       // Fallback giá tạm tính khi không có địa chỉ người nhận nào
       if (!toDistrictId && !toProvinceName) {
         this.logger_.warn?.(
-          "[GHN Fulfillment] No destination address found. Returning fallback fee 30.000₫."
+          "[GHN calculatePrice] No destination address found. Returning fallback fee 30.000₫."
         )
         return {
           calculated_amount: 30000,
@@ -839,7 +904,9 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       const fromWardCode = optimalWarehouse?.wardCode || "90741"
 
       this.logger_.info?.(
-        `[GHN Smart Routing] Routed checkout to warehouse: "${optimalWarehouse?.name || "Default"}" (${optimalWarehouse?.provinceName}) [districtId=${fromDistrictId}, wardCode=${fromWardCode}] for destination "${toProvinceName}"`
+        `[GHN Smart Routing] Selected Warehouse: "${optimalWarehouse?.name || "Default"}" (${optimalWarehouse?.provinceName || ""})\n` +
+        `  fromDistrictId: ${fromDistrictId} | fromWardCode: ${fromWardCode}\n` +
+        `  fromAddress   : "${optimalWarehouse?.address_1 || this.options_.fromAddress || ""}"`
       )
 
       // Resolve service_type_id động dựa vào tuyến đường và cân nặng
@@ -850,15 +917,34 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
         totalWeight
       )
 
+      // Khai giá bảo hiểm: lấy đúng 100% giá trị tiền hàng thực tế sau khuyến mãi.
+      // Medusa v2 spread trực tiếp toàn bộ cart vào context: (context.item_total, context.total, context.items)
+      const rawGoodsTotal = (context as any)?.item_total !== undefined
+        ? Number((context as any).item_total)
+        : (context as any)?.total !== undefined
+        ? Number((context as any).total)
+        : (context as any)?.cart?.item_total !== undefined
+        ? Number((context as any).cart.item_total)
+        : items.reduce((sum: number, it: any) => {
+            const itDiscount = itemDiscounts[it?.id] || 0
+            const itTotal = it?.total !== undefined
+              ? Number(it.total)
+              : Math.max(0, Number(it?.unit_price || 0) * Number(it?.quantity || 1) - itDiscount)
+            return sum + itTotal
+          }, 0)
 
-      // Khai giá bảo hiểm: chỉ tính trên giá trị thực tế của hàng hóa (subtotal)
-      // GHN: Miễn phí bảo hiểm dưới 1M. Từ 1M trở lên tính phí 0.5%.
-      // Mức trần mặc định 5.000.000₫ cho tài khoản thường hoặc theo maxInsuranceValue config.
-      const cartSubtotal = items.reduce((sum: number, it: any) => {
-        return sum + Number(it?.unit_price || 0) * Number(it?.quantity || 1)
-      }, 0)
-      const maxInsurance = this.options_.maxInsuranceValue ?? 5_000_000
-      const insuranceValue = Math.min(maxInsurance, Math.max(0, Math.round(cartSubtotal)))
+      const goodsTotal = Math.max(0, Math.round(rawGoodsTotal))
+      const insuranceValue = this.options_.maxInsuranceValue
+        ? Math.min(this.options_.maxInsuranceValue, goodsTotal)
+        : goodsTotal
+
+      this.logger_.info?.(
+        `[GHN calculatePrice] Insurance Value Calculation:\n` +
+        `  rawGoodsTotal   : ${rawGoodsTotal}₫ (from context.item_total / context.total / sum(item.total))\n` +
+        `  goodsTotal      : ${goodsTotal}₫\n` +
+        `  insuranceValue  : ${insuranceValue}₫\n` +
+        `  GHN Fee Policy  : <= 1.000.000₫ => 0₫ fee | > 1.000.000₫ => 0.5% surcharge`
+      )
 
       // =========================================================================
       // CHIẾN LƯỢC 1 (ƯU TIÊN): TÍNH PHÍ BẰNG API PREVIEW (/v2/shipping-order/preview)
@@ -953,14 +1039,24 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
 
         try {
           this.logger_.info?.(
-            `[GHN Fulfillment] Calculating fee via PREVIEW API: "${fromProvinceName}" -> "${toProvinceName}" (ward: "${toWardName}") | weight=${previewPayload.weight}g | service_type_id=${previewPayload.service_type_id}`
+            `[GHN calculatePrice] Sending PREVIEW request (/v2/shipping-order/preview):\n` +
+            `  From    : "${fromName}" (${fromPhone}) - ${fromAddress}, ${fromWardName}, ${fromDistrictName}, ${fromProvinceName}\n` +
+            `  To      : "${recipientName}" (${recipientPhone}) - ${recipientAddress}, ${toWardName}, ${toProvinceName}\n` +
+            `  Weight  : ${previewPayload.weight}g | Service Type: ${previewPayload.service_type_id} | Insurance: ${previewPayload.insurance_value}₫\n` +
+            `  Items (${previewPayload.items?.length || 0}): ${JSON.stringify(previewPayload.items)}`
           )
           const previewData = await this.client_.previewOrder(previewPayload)
 
           if (previewData && typeof previewData.total_fee === "number") {
             const calculatedAmount = Number(previewData.total_fee || previewData.fee?.main_service || 0)
             this.logger_.info?.(
-              `[GHN Fulfillment] Preview fee success: total=${calculatedAmount}₫ (main_service=${previewData.fee?.main_service}₫, insurance=${previewData.fee?.insurance || 0}₫) | expected_delivery=${previewData.expected_delivery_time}`
+              `[GHN calculatePrice] Preview SUCCESS:\n` +
+              `  Calculated Amount : ${calculatedAmount}₫\n` +
+              `  Main Service Fee  : ${previewData.fee?.main_service || 0}₫\n` +
+              `  Insurance Fee     : ${previewData.fee?.insurance || 0}₫\n` +
+              `  Expected Delivery : ${previewData.expected_delivery_time || "N/A"}\n` +
+              `  Sort Code         : ${previewData.sort_code || "N/A"}\n` +
+              `[GHN calculatePrice] ======================== END CALCULATION SUCCESS ========================`
             )
 
             return {
@@ -983,11 +1079,19 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
           if (previewPayload.service_type_id === 5) {
             try {
               previewPayload.service_type_id = 2
+              this.logger_.warn?.(
+                `[GHN calculatePrice] Preview with service_type_id=5 failed (${previewErr?.message}), retrying with service_type_id=2...`
+              )
               const retryData = await this.client_.previewOrder(previewPayload)
               if (retryData && typeof retryData.total_fee === "number") {
                 const calculatedAmount = Number(retryData.total_fee || retryData.fee?.main_service || 0)
                 this.logger_.info?.(
-                  `[GHN Fulfillment] Preview fee retry success with service_type_id=2: total=${calculatedAmount}₫ | expected_delivery=${retryData.expected_delivery_time}`
+                  `[GHN calculatePrice] Preview Retry SUCCESS (service_type_id=2):\n` +
+                  `  Calculated Amount : ${calculatedAmount}₫\n` +
+                  `  Main Service Fee  : ${retryData.fee?.main_service || 0}₫\n` +
+                  `  Insurance Fee     : ${retryData.fee?.insurance || 0}₫\n` +
+                  `  Expected Delivery : ${retryData.expected_delivery_time || "N/A"}\n` +
+                  `[GHN calculatePrice] ======================== END CALCULATION SUCCESS ========================`
                 )
                 return {
                   calculated_amount: calculatedAmount,
@@ -1006,12 +1110,12 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
               }
             } catch (retryErr: any) {
               this.logger_.warn?.(
-                `[GHN Fulfillment] Preview failed on both service_type_id 5 & 2 (${retryErr?.message}), falling back to legacy fee API`
+                `[GHN calculatePrice] Preview failed on both service_type_id 5 & 2 (${retryErr?.message}), falling back to legacy fee API`
               )
             }
           } else {
             this.logger_.warn?.(
-              `[GHN Fulfillment] Preview failed (${previewErr?.message}), falling back to legacy fee API`
+              `[GHN calculatePrice] Preview failed (${previewErr?.message}), falling back to legacy fee API`
             )
           }
         }
@@ -1052,7 +1156,9 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       }
 
       this.logger_.info?.(
-        `[GHN Fulfillment] Requesting fallback fee calculation: route ${fromDistrictId} → ${feePayload.to_district_id} | service_type_id=${feePayload.service_type_id} | weight=${feePayload.weight}g | items=${feePayload.items?.length || 0}`
+        `[GHN calculatePrice] Executing FALLBACK Fee API (/v2/shipping-order/fee):\n` +
+        `  Route: ${fromDistrictId} -> ${feePayload.to_district_id} (Ward: ${feePayload.to_ward_code})\n` +
+        `  Service Type: ${feePayload.service_type_id} | Weight: ${feePayload.weight}g | Insurance: ${feePayload.insurance_value}₫`
       )
 
       let feeData: any
@@ -1064,7 +1170,7 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
         // 2. Nếu gói 2 fail nhưng có items, thử fallback sang gói 5
         if (feePayload.service_type_id === 5) {
           this.logger_.warn?.(
-            `[GHN Fulfillment] Calculate fee failed with service_type_id=5 (${err?.message}), falling back to service_type_id=2`
+            `[GHN calculatePrice] Calculate fee failed with service_type_id=5 (${err?.message}), falling back to service_type_id=2`
           )
           const fallbackPayload: GhnFeeRequest = {
             ...feePayload,
@@ -1077,7 +1183,7 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
           feeData = await this.client_.calculateFee(fallbackPayload)
         } else if (feePayload.service_type_id === 2 && ghnItems.length > 0) {
           this.logger_.warn?.(
-            `[GHN Fulfillment] Calculate fee failed with service_type_id=2 (${err?.message}), retrying with service_type_id=5`
+            `[GHN calculatePrice] Calculate fee failed with service_type_id=2 (${err?.message}), retrying with service_type_id=5`
           )
           const fallbackPayload: GhnFeeRequest = {
             ...feePayload,
@@ -1091,7 +1197,11 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       }
 
       this.logger_.info?.(
-        `[GHN Fulfillment] Fee calculation result: total=${feeData.total}₫ (service_fee=${feeData.service_fee}₫, cod_fee=${feeData.cod_fee || 0}₫, insurance_fee=${feeData.insurance_fee || 0}₫)`
+        `[GHN calculatePrice] Fallback fee SUCCESS:\n` +
+        `  Total Fee     : ${feeData.total}₫\n` +
+        `  Service Fee   : ${feeData.service_fee}₫\n` +
+        `  Insurance Fee : ${feeData.insurance_fee || 0}₫\n` +
+        `[GHN calculatePrice] ======================== END CALCULATION SUCCESS ========================`
       )
 
       return {
@@ -1106,8 +1216,12 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       } as any as CalculatedShippingOptionPrice
     } catch (error: any) {
       this.logger_.error?.(
-        `[GHN Fulfillment] Calculate price failed: ${error?.message}`,
+        `[GHN calculatePrice] Calculate price FAILED with error: ${error?.message}`,
         error
+      )
+      this.logger_.info?.(
+        `[GHN calculatePrice] Returning fallback amount: 35.000₫\n` +
+        `[GHN calculatePrice] ======================== END CALCULATION ERROR ========================`
       )
       return {
         calculated_amount: 35000,
@@ -1278,11 +1392,17 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
         item.barcode ||
         undefined
 
-      // 4. Đơn giá thực tế (VND)
-      const finalPrice = Math.max(
-        0,
-        Number(lineItem?.unit_price ?? item.unit_price ?? 0)
-      )
+      // 4. Đơn giá thực tế (VND): ưu tiên đơn giá sau phân bổ khuyến mãi (lineItem.total / qty)
+      const qty = Math.max(1, Math.round(Number(item.quantity || lineItem?.quantity || 1)))
+      const lineItemDiscountedTotal = lineItem?.total !== undefined
+        ? Number(lineItem.total)
+        : lineItem?.subtotal !== undefined
+        ? Math.max(0, Number(lineItem.subtotal) - Number(lineItem?.discount_total || 0))
+        : undefined
+
+      const finalPrice = lineItemDiscountedTotal !== undefined
+        ? Math.max(0, Math.round(lineItemDiscountedTotal / qty))
+        : Math.max(0, Number(lineItem?.unit_price ?? item.unit_price ?? 0))
 
       // 5. Khối lượng (g): ưu tiên variant > lineItem > product > default
       const variantWeight = Number(
@@ -1447,28 +1567,43 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
       }
     }
 
-    // Giá trị khai giá bảo hiểm: chỉ tính trên giá trị thực tế của hàng hóa (subtotal hoặc tổng các items)
+    // Giá trị khai giá bảo hiểm: chỉ tính trên giá trị thực tế của hàng hóa sau khuyến mãi (item_total)
+    // Medusa v2 tự động cung cấp computed field `order.item_total` (subtotal - discount_total).
     const itemsTotal = ghnItems.reduce(
       (sum, item) => sum + (item.price || 0) * item.quantity,
       0
     )
+    const orderItemTotal = (order as any)?.item_total !== undefined
+      ? Math.round(Number((order as any).item_total))
+      : (order as any)?.subtotal !== undefined
+      ? Math.round(Math.max(0, Number((order as any).subtotal) - Number((order as any)?.discount_total || 0)))
+      : undefined
+
     const goodsValue =
-      itemsTotal > 0
+      orderItemTotal !== undefined && orderItemTotal >= 0
+        ? orderItemTotal
+        : itemsTotal > 0
         ? itemsTotal
         : Math.round(Number((order as any)?.subtotal ?? orderTotal))
 
-    const maxInsurance = this.options_.maxInsuranceValue ?? 5_000_000
-    let insuranceValue = Math.min(
-      maxInsurance,
-      Math.max(0, goodsValue)
-    )
+    let insuranceValue = this.options_.maxInsuranceValue
+      ? Math.min(this.options_.maxInsuranceValue, Math.max(0, goodsValue))
+      : Math.max(0, goodsValue)
+
     if (additionalData?.insurance_value !== undefined) {
-      insuranceValue = Math.min(
-        maxInsurance,
-        Math.max(0, Math.round(Number(additionalData.insurance_value)))
-      )
+      const explicitIns = Math.max(0, Math.round(Number(additionalData.insurance_value)))
+      insuranceValue = this.options_.maxInsuranceValue
+        ? Math.min(this.options_.maxInsuranceValue, explicitIns)
+        : explicitIns
     }
     const orderValue = Math.max(0, goodsValue)
+
+    this.logger_.info?.(
+      `[GHN Fulfillment] Insurance Value determined:\n` +
+      `  orderItemTotal : ${orderItemTotal ?? "undefined"}₫ | itemsTotal: ${itemsTotal}₫ | orderTotal: ${orderTotal}₫\n` +
+      `  goodsValue     : ${goodsValue}₫\n` +
+      `  insuranceValue : ${insuranceValue}₫ (GHN Policy: <= 1.000.000₫ => 0₫ fee, > 1.000.000₫ => 0.5% surcharge)`
+    )
 
     const orderRef = (order as any)?.display_id
       ? `ORD-${(order as any)?.display_id}`
@@ -1613,7 +1748,12 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
     if (this.options_.isNewReturnAddress !== undefined) createOrderPayload.is_new_return_address = this.options_.isNewReturnAddress
 
     this.logger_.info?.(
-      `[GHN Fulfillment] Submitting createOrder to GHN: recipient="${recipientName}" | phone="${recipientPhone}" | province="${toProvinceName}" | district="${toDistrictName || '(none)'}" | ward="${toWardName}" | is_new_to_address=${createOrderPayload.is_new_to_address} | service_type_id=${createOrderPayload.service_type_id} | totalWeight=${createOrderPayload.weight}g | items=${createOrderPayload.items?.length || 0}`
+      `[GHN Fulfillment] Submitting createOrder to GHN:\n` +
+      `  Client Code : ${clientOrderCode}\n` +
+      `  From        : "${createOrderPayload.from_name}" (${createOrderPayload.from_phone}) - ${createOrderPayload.from_address}, ${createOrderPayload.from_ward_name}, ${createOrderPayload.from_district_name}, ${createOrderPayload.from_province_name}\n` +
+      `  To          : "${recipientName}" (${recipientPhone}) - ${createOrderPayload.to_address}, ${toWardName}, ${toProvinceName}\n` +
+      `  Weight      : ${createOrderPayload.weight}g | COD: ${createOrderPayload.cod_amount}₫ | Insurance: ${createOrderPayload.insurance_value}₫\n` +
+      `  Items (${createOrderPayload.items?.length || 0}): ${JSON.stringify(createOrderPayload.items)}`
     )
 
     let ghnOrder: any
@@ -1634,7 +1774,11 @@ export class GiaoHangNhanhProviderService extends AbstractFulfillmentProviderSer
     const orderCode = ghnOrder.order_code
 
     this.logger_.info?.(
-      `[GHN Fulfillment] Order created successfully: order_code=${orderCode} | total_fee=${ghnOrder.total_fee}₫ | sort_code=${ghnOrder.sort_code}`
+      `[GHN Fulfillment] Order created successfully:\n` +
+      `  GHN Code      : ${orderCode}\n` +
+      `  Total Fee     : ${ghnOrder.total_fee}₫\n` +
+      `  Sort Code     : ${ghnOrder.sort_code}\n` +
+      `  Expected Time : ${ghnOrder.expected_delivery_time}`
     )
 
     // Lấy token in phiếu gửi A5
