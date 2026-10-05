@@ -6,4 +6,10 @@ export type ConditionalPromotionCandidate = {
   custom?: boolean
   promoId?: string
   configId?: string
+  flashSale?: {
+    schedule: any
+    sourcePromotion: any
+    campaign: any
+    usageLimit: number
+  }
 }

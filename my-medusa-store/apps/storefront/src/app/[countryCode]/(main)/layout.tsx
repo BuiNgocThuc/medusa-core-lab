@@ -9,6 +9,8 @@ import Footer from '@modules/layout/templates/footer'
 import Nav from '@modules/layout/templates/nav'
 import FreeShippingPriceNudge from '@modules/shipping/components/free-shipping-price-nudge'
 import DiscountPopup from '@modules/common/components/discount-popup'
+import FlashSaleBanner from '@modules/cart/components/flash-sale-banner'
+import { listActiveFlashSales } from '@lib/data/flash-sales'
 
 export const metadata: Metadata = {
     metadataBase: new URL(getBaseURL()),
@@ -17,6 +19,7 @@ export const metadata: Metadata = {
 export default async function PageLayout(props: { children: React.ReactNode }) {
     const customer = await retrieveCustomer()
     const cart = await retrieveCart()
+    const flashSales = await listActiveFlashSales()
     let shippingOptions: StoreCartShippingOption[] = []
 
     if (cart) {
@@ -40,6 +43,7 @@ export default async function PageLayout(props: { children: React.ReactNode }) {
                 />
             )}
             {!customer && <DiscountPopup />}
+            <FlashSaleBanner flashSales={flashSales} />
             {props.children}
             <Footer />
         </>

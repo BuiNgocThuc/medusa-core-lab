@@ -34,6 +34,7 @@ export async function retrievePromotionCart(container: any, cartId: string) {
             "promotions.id",
             "promotions.code",
             "promotions.is_automatic",
+            "promotions.metadata",
             "metadata",
         ],
         filters: { id: cartId },

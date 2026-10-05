@@ -8,13 +8,14 @@ import { createFindParams, createSelectParams } from "@medusajs/medusa/api/utils
 import { NextTierSchema } from "@/api/store/customers";
 import { CreateTierSchema, UpdateTierSchema } from "@/api/admin/tiers";
 import { ConditionalPromotionSchema } from "@/api/admin/conditional-promotions/validators";
+import { FlashSaleSchema } from "@/api/admin/flash-sales/validators";
+import { ClaimFlashSaleSchema } from "@/api/store/carts/[id]/flash-sales/validators";
 import { RedeemLoyaltyPointsSchema } from "@/api/store/carts/[id]/loyalty-points/validators.ts";
 import { customerAdditionalDataSchema } from "../utils/customer-additional-data";
 
 export const adminCreateCustomerAdditionalDataValidator = customerAdditionalDataSchema.shape;
 
 export default defineMiddlewares({
-
     routes: [
         {
             methods: ["POST"],
@@ -49,8 +50,34 @@ export default defineMiddlewares({
                 }),
             ],
         },
-        { matcher: "/admin/conditional-promotions", methods: ["POST"], middlewares: [validateAndTransformBody(ConditionalPromotionSchema)] },
-        { matcher: "/admin/conditional-promotions/:id", methods: ["POST"], middlewares: [validateAndTransformBody(ConditionalPromotionSchema)] },
+        {
+            matcher: "/admin/conditional-promotions",
+            methods: ["POST"],
+            middlewares: [validateAndTransformBody(ConditionalPromotionSchema)],
+        },
+        {
+            matcher: "/admin/conditional-promotions/:id",
+            methods: ["POST"],
+            middlewares: [validateAndTransformBody(ConditionalPromotionSchema)],
+        },
+        {
+            matcher: "/admin/flash-sales",
+            methods: ["POST"],
+            middlewares: [validateAndTransformBody(FlashSaleSchema)],
+        },
+        {
+            matcher: "/store/carts/:id/flash-sales/claim",
+            methods: ["POST"],
+            middlewares: [
+                authenticate("customer", ["session", "bearer"]),
+                validateAndTransformBody(ClaimFlashSaleSchema),
+            ],
+        },
+        {
+            matcher: "/store/carts/:id/flash-sales/claim",
+            methods: ["DELETE"],
+            middlewares: [authenticate("customer", ["session", "bearer"])],
+        },
         // update tier
         {
             matcher: "/admin/tiers/:id",

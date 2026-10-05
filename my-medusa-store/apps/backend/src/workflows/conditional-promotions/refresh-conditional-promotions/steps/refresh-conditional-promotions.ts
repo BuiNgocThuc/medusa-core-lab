@@ -13,7 +13,6 @@ export const refreshConditionalPromotionsStep = createStep(
         const cart = await retrievePromotionCart(container, cart_id);
 
         const { configs, promotions } = await retrieveActiveCustomPromotions(container);
-
         // console.log("cart: ", cart, " - configs: ", configs, " - promotions: ", promotions);
 
         const selected = selectConditionalPromotion(cart, configs, promotions);

@@ -1,12 +1,10 @@
 import {
     ContainerRegistrationKeys,
-    MedusaError,
     Modules,
     PromotionActions,
 } from "@medusajs/framework/utils";
 import { updateCartPromotionsWorkflow } from "@medusajs/medusa/core-flows";
 import {
-    FLASH_CAMPAIGN_IDENTIFIER,
     FLASH_PROMOTION_CODE_PREFIX,
     RACKET_SUMMER_GET_SOCK_PROMOTION_CODE,
     VIP_BUNDLE_PROMOTION_CODE,
@@ -17,6 +15,7 @@ import {
 } from "@/modules/promotion-entitlement";
 import { orderPromotionCodes } from "@/utils";
 import { ConditionalPromotionCandidate } from "./types";
+import { isFlashSaleCarrier } from "@/workflows/flash-sales";
 
 // The Summer carrier must always be managed, even if the promotion lookup is
 // temporarily unavailable during a cart refresh. Otherwise an ineligible code
@@ -26,11 +25,13 @@ const BUILT_IN_CONDITIONAL_CODES = new Set([
     RACKET_SUMMER_GET_SOCK_PROMOTION_CODE,
 ]);
 
-function isManagedConditionalPromotion(code: string, customCodes: Set<string>) {
+function isManagedConditionalPromotion(promotion: any, customCodes: Set<string>) {
+    const code = promotion.code ?? "";
     return (
         BUILT_IN_CONDITIONAL_CODES.has(code) ||
         customCodes.has(code) ||
-        code.startsWith(FLASH_PROMOTION_CODE_PREFIX)
+        code.startsWith(FLASH_PROMOTION_CODE_PREFIX) ||
+        isFlashSaleCarrier(promotion)
     );
 }
 
@@ -100,58 +101,6 @@ async function syncConditionalMetadata(
     });
 }
 
-async function syncFlashPromotion(
-    container: any,
-    cart: any,
-    candidate: ConditionalPromotionCandidate,
-) {
-    const promotionModule = container.resolve(Modules.PROMOTION) as any;
-    const entitlementService = container.resolve(
-        PROMOTION_ENTITLEMENT_MODULE,
-    ) as PromotionEntitlementModuleService;
-    const [existing] = await promotionModule.listPromotions({ code: candidate.code });
-    const [campaignPromotion] = await promotionModule.listPromotions(
-        { code: `${FLASH_PROMOTION_CODE_PREFIX}SEED` },
-        { relations: ["campaign"] },
-    );
-    const campaignId = campaignPromotion?.campaign_id ?? campaignPromotion?.campaign?.id;
-
-    if (!campaignId) {
-        throw new MedusaError(
-            MedusaError.Types.INVALID_DATA,
-            `Missing ${FLASH_CAMPAIGN_IDENTIFIER} campaign seed`,
-        );
-    }
-
-    const applicationMethod = {
-        type: "fixed",
-        value: candidate.amount,
-        target_type: "order",
-        allocation: "across",
-        currency_code: "vnd",
-    };
-
-    if (existing) {
-        await promotionModule.updatePromotions({
-            id: existing.id,
-            status: "active",
-            application_method: applicationMethod,
-        });
-    } else {
-        await promotionModule.createPromotions({
-            code: candidate.code,
-            type: "standard",
-            status: "active",
-            is_automatic: false,
-            campaign_id: campaignId,
-            application_method: applicationMethod,
-            rules: [{ attribute: "customer_id", operator: "eq", values: [cart.customer.id] }],
-        });
-    }
-
-    await entitlementService.reserveFlashRedemption(cart.customer.id, cart.id, candidate.amount);
-}
-
 export async function syncConditionalPromotions(
     container: any,
     logger: { debug: (message: string) => void },
@@ -161,11 +110,14 @@ export async function syncConditionalPromotions(
 ) {
     const currentCodes = existingPromotionCodes(cart);
     const retainedPromotions = (cart.promotions ?? []).filter(
-        (promotion: any) => !isManagedConditionalPromotion(promotion.code, customCodes),
+        (promotion: any) => !isManagedConditionalPromotion(promotion, customCodes),
     );
     const entitlementService = container.resolve(
         PROMOTION_ENTITLEMENT_MODULE,
     ) as PromotionEntitlementModuleService;
+    const hasClaimedFlash = (cart.promotions ?? []).some(
+        (promotion: any) => promotion.metadata?.flash_source === true,
+    );
 
     logger.debug(
         `[conditional-promotions] syncing ${JSON.stringify({
@@ -183,14 +135,12 @@ export async function syncConditionalPromotions(
         if (!samePromotionCodes(promoCodes, currentCodes)) {
             await replaceCartPromotions(container, cart.id, promoCodes);
         }
-        await entitlementService.releaseFlashRedemption(cart.id);
+        if (!hasClaimedFlash) await entitlementService.releaseFlashRedemption(cart.id);
         await syncConditionalMetadata(container, cart, null);
         return null;
     }
 
-    if (selected.flash) {
-        await syncFlashPromotion(container, cart, selected);
-    } else {
+    if (!hasClaimedFlash) {
         await entitlementService.releaseFlashRedemption(cart.id);
     }
 

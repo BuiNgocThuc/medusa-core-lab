@@ -16,12 +16,12 @@ export default async function consumeFlashPromotionHandler({
         const query = container.resolve(ContainerRegistrationKeys.QUERY) as any
         const { data: orders } = await query.graph({
             entity: "order",
-            fields: ["id", "cart.id", "cart.promotions.code"],
+            fields: ["id", "cart.id", "cart.promotions.code", "cart.promotions.metadata"],
             filters: { id: data.id },
         })
         const order = orders[0]
         const hasFlashPromotion = order?.cart?.promotions?.some((promotion: any) =>
-            promotion?.code?.startsWith(FLASH_PROMOTION_CODE_PREFIX),
+            promotion?.code?.startsWith(FLASH_PROMOTION_CODE_PREFIX) || promotion?.metadata?.source === "flash-sale-schedule",
         )
 
         if (!hasFlashPromotion || !order?.cart?.id) return

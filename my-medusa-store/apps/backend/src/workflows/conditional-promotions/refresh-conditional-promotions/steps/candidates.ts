@@ -84,10 +84,10 @@ export function selectConditionalPromotion(
     configs: any[],
     promotions: any[],
 ): ConditionalPromotionCandidate | null {
+    if ((cart.promotions ?? []).some((promotion: any) => promotion.metadata?.flash_source === true)) {
+        return null;
+    }
     const customPromotionCandidates = configuredCandidates(configs, promotions, cart.items ?? []);
-
-    // Flash Sale (Condition 3) is intentionally on hold. Its existing code is
-    // treated as managed by sync, so the next refresh removes it from the cart.
     const candidates = [
         vipCandidate(cart),
         ...customPromotionCandidates,

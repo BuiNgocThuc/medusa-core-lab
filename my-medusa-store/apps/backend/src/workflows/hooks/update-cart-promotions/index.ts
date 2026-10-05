@@ -123,8 +123,15 @@ export function registerUpdateCartPromotionValidation() {
                 .map((promotion: any) => promotion.id),
         )
 
+        if (codesToValidate.length > 1) {
+            throw new MedusaError(
+                MedusaError.Types.INVALID_DATA,
+                "Mỗi đơn hàng chỉ được dùng một ưu đãi.",
+            )
+        }
+
         if (!isTrustedPromotionUpdate) {
-            if (promotions.some((promotion: any) => promotion.metadata?.source === "conditional-promotion-engine")) {
+            if (promotions.some((promotion: any) => ["conditional-promotion-engine", "flash-sale-schedule"].includes(promotion.metadata?.source))) {
                 throw new MedusaError(MedusaError.Types.NOT_ALLOWED, "Ưu đãi tự động không thể áp dụng bằng mã.")
             }
             if (input.action === PromotionActions.ADD && requestedTierPromotionIds.size) {

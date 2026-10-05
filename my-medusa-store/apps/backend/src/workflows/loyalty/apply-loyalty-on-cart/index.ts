@@ -15,6 +15,7 @@ import {
     applyLoyaltyAdjustmentStep,
     reserveLoyaltyReservationStep,
     GetCartLoyaltyPromoAmountStepInput,
+    assertCartHasNoPromotionsStep,
 } from "./steps";
 import { CartData, orderPromotionCodes } from "@/utils";
 import { CUSTOMER_ID_PROMOTION_RULE_ATTRIBUTE } from "@/constant";
@@ -53,6 +54,8 @@ export const applyLoyaltyOnCartWorkflow = createWorkflow(
         validateCustomerExistsStep({
             customer: carts[0].customer,
         } as ValidateCustomerExistsStepInput);
+
+        assertCartHasNoPromotionsStep({ promotions: carts[0].promotions as unknown[] });
 
         const lockKeys = transform({ carts }, ({ carts }) => [
             carts[0].id,
