@@ -12,7 +12,11 @@
         "lint": "turbo lint",
         "test": "turbo test",
         "backend:seed": "turbo seed --filter=@dtc/backend",
+        "backend:seed:flash-sales": "pnpm --dir apps/backend run seed:flash-sales",
         "backend:dev": "turbo dev --filter=@dtc/backend",
+        "backend:db:migrate": "pnpm --dir apps/backend run db:migrate",
+        "backend:db:generate:flash-sale-schedule": "pnpm --dir apps/backend run db:generate:flash-sale-schedule",
+        "backend:db:generate:promotion-entitlement": "pnpm --dir apps/backend run db:generate:promotion-entitlement",
         "storefront:dev": "turbo dev --filter=@dtc/storefront",
         "format": "prettier --write .",
         "format:check": "prettier --check ."
