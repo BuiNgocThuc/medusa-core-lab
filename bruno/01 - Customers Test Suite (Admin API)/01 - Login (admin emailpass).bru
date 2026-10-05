@@ -1,0 +1,54 @@
+meta {
+  name: 01 - Login (admin emailpass)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/auth/user/emailpass
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "{{adminEmail}}",
+    "password": "{{adminPassword}}"
+  }
+}
+
+script:post-response {
+  const json = res.getBody();
+  if (json && json.token) {
+    bru.setVar('token', json.token);
+    bru.setEnvVar('token', json.token);
+  }
+}
+
+tests {
+  test("200 OK", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("returns valid token string", function () {
+    expect(res.getBody().token).to.be.a('string');
+  });
+}
+
+docs {
+  # 01 - Login (admin emailpass)
+
+  Đăng nhập tài khoản Admin bằng email và mật khẩu qua endpoint chuẩn của Medusa v2: `POST /auth/user/emailpass`.
+
+  ## Cơ chế lưu Token (Dual-Scope Token Storage):
+  Khi đăng nhập thành công, script `post-response` sẽ lưu token vào 2 phạm vi:
+  1. `bru.setVar('token', json.token)`: Dành cho phiên chạy runner hiện tại của Bruno.
+  2. `bru.setEnvVar('token', json.token)`: Lưu vào bộ nhớ của môi trường active để bạn có thể chạy lẻ tẻ từng request thủ công sau đó mà không bị mất token.
+
+  ## Credentials:
+  - Mặc định sử dụng email `admin@medusa.com` theo đúng hướng dẫn tại `ONBOARDING.md`.
+  - Mật khẩu được lấy an toàn từ biến môi trường `{{adminPassword}}` (đọc từ file `bruno/.env`).
+}

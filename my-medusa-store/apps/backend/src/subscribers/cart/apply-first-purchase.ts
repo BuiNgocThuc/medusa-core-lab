@@ -1,5 +1,5 @@
 import { SubscriberArgs, SubscriberConfig } from "@medusajs/framework"
-import { applyFirstPurchasePromoWorkflow } from "@/src/workflows"
+import { applyFirstPurchasePromoWorkflow } from "@/workflows"
 
 export default async function applyFirstPurchaseHandler({
     event: { data },

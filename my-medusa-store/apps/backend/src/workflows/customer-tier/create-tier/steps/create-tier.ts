@@ -1,5 +1,5 @@
 import { createStep, StepResponse } from "@medusajs/framework/workflows-sdk";
-import { TIER_MODULE, TierModuleService } from "@/src/modules/tier";
+import { TIER_MODULE, TierModuleService } from "../../../../modules/tier";
 
 const CREATE_TIER_STEP_ID = "create-tier";
 type CreateTierStepInput = {

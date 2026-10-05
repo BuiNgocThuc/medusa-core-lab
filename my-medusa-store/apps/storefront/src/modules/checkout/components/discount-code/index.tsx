@@ -20,14 +20,59 @@ type DiscountCodeProps = {
     cart: HttpTypes.StoreCart
 }
 
+const AUTOMATIC_WORKFLOW_PROMOTION_CODES = new Set([
+    'FIRST_PURCHASE',
+    'VIP_BUNDLE_15',
+])
+const CONDITIONAL_PROMOTION_CODES = new Set([
+    'RACKET_SUMMER_GET_SOCK',
+])
+const PROMOTION_CODE_ERROR_MESSAGE = 'This promotion code is invalid or cannot be applied.'
+
 const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
     const [isOpen, setIsOpen] = React.useState(false)
     const { showToast } = useToast()
 
     const { promotions = [] } = cart
+    const tierPromotionIds = new Set(
+        Array.isArray(cart.metadata?.tier_promotion_ids)
+            ? cart.metadata.tier_promotion_ids.filter(
+                  (id): id is string => typeof id === 'string'
+              )
+            : []
+    )
+    const conditionalPromotionIds = new Set(
+        Array.isArray(cart.metadata?.conditional_promotion_ids)
+            ? cart.metadata.conditional_promotion_ids.filter(
+                  (id): id is string => typeof id === 'string'
+              )
+            : []
+    )
+    const isLoyaltyPromotion = (promotion: (typeof promotions)[number]) =>
+        promotion.id === cart.metadata?.loyalty_promo_id
+    const isTierPromotion = (promotion: (typeof promotions)[number]) =>
+        tierPromotionIds.has(promotion.id)
+    const isConditionalPromotion = (promotion: (typeof promotions)[number]) =>
+        conditionalPromotionIds.has(promotion.id) ||
+        (promotion.code !== undefined &&
+            CONDITIONAL_PROMOTION_CODES.has(promotion.code))
+    const isWorkflowAutomaticPromotion = (
+        promotion: (typeof promotions)[number]
+    ) =>
+        Boolean(
+            promotion.code &&
+                (AUTOMATIC_WORKFLOW_PROMOTION_CODES.has(promotion.code) ||
+                    promotion.code.startsWith('FLASH20-'))
+        )
+    const orderedPromotions = [...promotions].sort((left, right) => {
+        if (isLoyaltyPromotion(left)) return 1
+        if (isLoyaltyPromotion(right)) return -1
+        if (left.is_automatic === right.is_automatic) return 0
+        return left.is_automatic ? -1 : 1
+    })
     const removePromotionCode = async (code: string) => {
         const validPromotions = promotions.filter(
-            (promotion) => promotion.code !== code
+            (promotion) => promotion.code !== code && !isLoyaltyPromotion(promotion)
         )
 
         await applyPromotions(
@@ -49,21 +94,33 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
         )
 
         if (alreadyApplied) {
-            showToast({ content: 'Mã ưu đãi đã được áp dụng', type: 'warning' })
+            showToast({ content: 'This promotion code is already applied.', type: 'warning' })
+            return
+        }
+        if (CONDITIONAL_PROMOTION_CODES.has(normalizedCode)) {
+            showToast({ content: 'This promotion is applied automatically.', type: 'warning' })
             return
         }
         const input = document.getElementById(
             'promotion-input'
         ) as HTMLInputElement
         const codes = promotions
-            .filter((p) => p.code !== undefined)
+            .filter((p) => p.code !== undefined && !isLoyaltyPromotion(p))
             .map((p) => p.code!)
         codes.push(normalizedCode)
 
         try {
-            await applyPromotions(codes)
-        } catch (e) {
-            showToast({ content: e instanceof Error ? e.message : String(e), type: 'error' })
+            const updatedCart = await applyPromotions(codes)
+            const wasApplied = updatedCart.promotions?.some(
+                (promotion) =>
+                    promotion.code?.toUpperCase() === normalizedCode
+            )
+            if (!wasApplied) {
+                showToast({ content: PROMOTION_CODE_ERROR_MESSAGE, type: 'error' })
+                return
+            }
+        } catch {
+            showToast({ content: PROMOTION_CODE_ERROR_MESSAGE, type: 'error' })
         }
 
         if (input) {
@@ -123,7 +180,26 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
                                 Promotion(s) applied:
                             </Heading>
 
-                            {promotions.map((promotion) => {
+                            {orderedPromotions.map((promotion) => {
+                                const isLoyalty = isLoyaltyPromotion(promotion)
+                                const isTier = isTierPromotion(promotion)
+                                const isConditional = isConditionalPromotion(promotion)
+                                const isWorkflowAutomatic =
+                                    isWorkflowAutomaticPromotion(promotion)
+                                const applicationMethod = promotion.application_method
+                                const promotionValue = applicationMethod?.value
+                                const promotionValueLabel =
+                                    promotionValue === undefined
+                                        ? null
+                                        : applicationMethod?.type === 'percentage'
+                                        ? `${promotionValue}%`
+                                        : convertToLocale({
+                                              amount: Number(promotionValue),
+                                              currency_code:
+                                                  applicationMethod?.currency_code ||
+                                                  cart.currency_code,
+                                          })
+
                                 return (
                                     <div
                                         key={promotion.id}
@@ -137,6 +213,10 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
                                             >
                                                 <Badge
                                                     color={
+                                                        isLoyalty ||
+                                                        isTier ||
+                                                        isConditional ||
+                                                        isWorkflowAutomatic ||
                                                         promotion.is_automatic
                                                             ? 'green'
                                                             : 'grey'
@@ -144,32 +224,24 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
                                                 >
                                                     {promotion.code}
                                                 </Badge>{' '}
-                                                (
-                                                {promotion.application_method
-                                                    ?.value !== undefined &&
-                                                    promotion.application_method
-                                                        .currency_code !==
-                                                        undefined && (
-                                                        <>
-                                                            {promotion
-                                                                .application_method
-                                                                .type ===
-                                                            'percentage'
-                                                                ? `${promotion.application_method.value}%`
-                                                                : convertToLocale(
-                                                                      {
-                                                                          amount: +promotion
-                                                                              .application_method
-                                                                              .value,
-                                                                          currency_code:
-                                                                              promotion
-                                                                                  .application_method
-                                                                                  .currency_code,
-                                                                      }
-                                                                  )}
-                                                        </>
-                                                    )}
-                                                )
+                                                {promotionValueLabel && (
+                                                    <>({promotionValueLabel})</>
+                                                )}
+                                                {isLoyalty && (
+                                                    <span className="ml-1 text-ui-fg-subtle">
+                                                        Loyalty points
+                                                    </span>
+                                                )}
+                                                {isTier && (
+                                                    <span className="ml-1 text-ui-fg-subtle">
+                                                        Tier benefit
+                                                    </span>
+                                                )}
+                                                {isConditional && (
+                                                    <span className="ml-1 text-ui-fg-subtle">
+                                                        Automatic promotion
+                                                    </span>
+                                                )}
                                                 {/* {promotion.is_automatic && (
                           <Tooltip content="This promotion is automatically applied">
                             <InformationCircleSolid className="inline text-zinc-400" />
@@ -177,7 +249,11 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
                         )} */}
                                             </span>
                                         </Text>
-                                        {!promotion.is_automatic && (
+                                        {!promotion.is_automatic &&
+                                            !isLoyalty &&
+                                            !isTier &&
+                                            !isConditional &&
+                                            !isWorkflowAutomatic && (
                                             <button
                                                 className="flex items-center"
                                                 onClick={() => {

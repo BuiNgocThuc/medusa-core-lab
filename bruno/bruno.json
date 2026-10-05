@@ -1,0 +1,6 @@
+{
+  "version": "1",
+  "name": "Medusa Core Lab — Customer Module",
+  "type": "collection",
+  "ignore": ["node_modules", ".git"]
+}

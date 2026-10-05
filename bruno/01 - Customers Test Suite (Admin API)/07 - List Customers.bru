@@ -1,0 +1,35 @@
+meta {
+  name: 07 - List Customers
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/admin/customers?limit=10&offset=0
+  body: none
+  auth: inherit
+}
+
+params:query {
+  limit: 10
+  offset: 0
+}
+
+tests {
+  test("200 OK", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("returns customers array", function () {
+    expect(Array.isArray(res.getBody().customers)).to.be.true;
+    expect(res.getBody().count).to.be.at.least(1);
+  });
+}
+
+docs {
+  # 07 - List Customers
+
+  Truy vấn danh sách khách hàng trong trang quản trị Medusa qua endpoint `GET /admin/customers` có hỗ trợ phân trang (`limit`, `offset`).
+
+  ## Mục đích kiểm thử:
+  - Xác nhận API trả về danh sách khách hàng thành công và số lượng khách hàng (`count`) ít nhất là 1 sau khi đã tạo ở các bước trước.
+}

@@ -10,7 +10,8 @@ import {
     releaseLockStep,
     useQueryGraphStep,
 } from "@medusajs/medusa/core-flows";
-import { FIRST_PURCHASE_PROMOTION_CODE } from "@/src/constant";
+import { FIRST_PURCHASE_PROMOTION_CODE } from "@/constant";
+import { earnLoyaltyOnOrderWorkflow } from "@/workflows/loyalty/earn-loyalty-on-order";
 
 type CompleteCustomerPromotionCartInput = {
     cart_id: string;
@@ -67,11 +68,14 @@ export const completeCustomerPromotionCartWorkflow = createWorkflow(
             { existingOrderId, completedOrder },
             ({ existingOrderId, completedOrder }) => existingOrderId ?? completedOrder?.id,
         );
+        const loyalty = earnLoyaltyOnOrderWorkflow.runAsStep({
+            input: { order_id: orderId },
+        });
 
         releaseLockStep({
             key: lockKeys,
         });
 
-        return new WorkflowResponse({ id: orderId });
+        return new WorkflowResponse({ id: orderId, loyalty });
     },
 );

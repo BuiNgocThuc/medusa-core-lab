@@ -1,0 +1,55 @@
+meta {
+  name: 08 - Reject Invalid Zalo ID (Validation Error)
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/admin/customers
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "placeholder@example.com",
+    "first_name": "Invalid",
+    "last_name": "Zalo",
+    "additional_data": {
+      "zalo_id": "123"
+    }
+  }
+}
+
+script:pre-request {
+  const validEmail = `valid_email_bad_zalo_${Date.now()}_${Math.random().toString(36).substring(2, 8)}@example.com`;
+  const body = req.getBody();
+  body.email = validEmail;
+  req.setBody(body);
+}
+
+tests {
+  test("400 Bad Request", function () {
+    expect(res.getStatus()).to.equal(400);
+  });
+  test("error message refers to zalo_id", function () {
+    const body = res.getBody();
+    const msg = typeof body === "string" ? body : JSON.stringify(body);
+    expect(msg.toLowerCase()).to.include("zalo id");
+  });
+}
+
+docs {
+  # 08 - Reject Invalid Zalo ID (Validation Error)
+  
+  Kiểm chứng cơ chế chặn dữ liệu sai định dạng của **Route Middleware (Task 2)** tại cửa ngõ HTTP trước khi dữ liệu đi vào Workflow.
+  
+  ## Kịch bản kiểm thử:
+  - `script:pre-request` sinh một email hợp lệ ngẫu nhiên và dùng `req.setBody()` gán vào payload để bảo đảm request không bao giờ bị lỗi do thiếu hoặc sai định dạng email.
+  - Trường `additional_data.zalo_id` được cố tình gửi lên giá trị `"123"` (vi phạm quy tắc regex của Zod: chuỗi số từ 8 đến 20 chữ số `^\d{8,20}$`).
+  - Assert xác nhận API trả về đúng mã lỗi `400 Bad Request` và nội dung thông báo lỗi chứa thông tin liên quan đến trường `zalo_id`.
+}

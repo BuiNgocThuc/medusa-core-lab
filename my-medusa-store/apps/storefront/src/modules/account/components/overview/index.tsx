@@ -5,15 +5,22 @@ import LocalizedClientLink from '@modules/common/components/localized-client-lin
 import { convertToLocale } from '@lib/util/money'
 import { HttpTypes } from '@medusajs/types'
 import CustomerTier from '@modules/common/customer-tier'
+import LoyaltyPointsBalance from '@modules/account/components/loyalty-points-balance'
 import { CustomerNextTier } from 'types/tier'
 
 type OverviewProps = {
     customer: HttpTypes.StoreCustomer | null
     orders: HttpTypes.StoreOrder[] | null
     tierData: CustomerNextTier | null
+    loyaltyPoints: number | null
 }
 
-const Overview = ({ customer, orders, tierData }: OverviewProps) => {
+const Overview = ({
+    customer,
+    orders,
+    tierData,
+    loyaltyPoints,
+}: OverviewProps) => {
     return (
         <div data-testid="overview-page-wrapper">
             <div className="hidden small:block">
@@ -80,6 +87,10 @@ const Overview = ({ customer, orders, tierData }: OverviewProps) => {
                                 <CustomerTier tierData={tierData} />
                             </div>
                         )}
+
+                        <div className="mb-6 max-w-md">
+                            <LoyaltyPointsBalance points={loyaltyPoints} />
+                        </div>
 
                         <div className="flex flex-col gap-y-4">
                             <div className="flex items-center gap-x-2">

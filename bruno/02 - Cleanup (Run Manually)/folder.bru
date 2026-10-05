@@ -1,0 +1,32 @@
+meta {
+  name: 02 - Cleanup (Run Manually)
+  seq: 2
+}
+
+docs {
+  # 02 - Cleanup (Run Manually)
+
+  Thu muc nay chua cac request DELETE don dep doc lap cho cac khach hang duoc tao trong chuoi kiem thu 01 - Customers Test Suite (Admin API).
+
+  ## Co che bao ve tu dong (Skip in Runner):
+  - Toan bo cac request trong thu muc nay duoc cai dat co che kiem tra:
+    ```javascript
+    if (req.getExecutionMode() === "runner") {
+      bru.runner.skipRequest();
+    }
+    ```
+  - Khi nguoi dung chay Runner cho toan bo Collection ("Run Collection"), Bruno se tu dong nhan dien va bo qua (hien thi trang thai SKIPPED) cho ca 3 request DELETE nay, ngan chan viec vo tinh xoa du lieu truoc khi nguoi dung kip quan sat va kiem tra.
+  - Cac request nay chi thuc su duoc gui di khi nguoi dung mo tung request va bam nut Send thu cong.
+
+  ## Huong dan don dep:
+  1. Sau khi chay xong chuoi kiem thu tu dong 01 - Customers Test Suite (Admin API) trong cung phien lam viec, mo tung request trong thu muc nay:
+     - 01 - Delete Customer 1 (Full Data)
+     - 02 - Delete Customer 2 (Minimal Zalo)
+     - 03 - Delete Customer 3 (Safe No-Op)
+  2. Bam nut Send cho tung request.
+  3. Kiem tra phan hoi: HTTP 200 OK, deleted: true, va id tuong ung voi ID da tao.
+
+  ## Luu y quan trong ve vong doi bien in-memory:
+  - Cac bien customerId1, customerId2, customerId3 duoc luu trong bo nho tam thoi cua phien chay Bruno (bru.setVar() / bru.setEnvVar()).
+  - Neu phien lam viec hoac ung dung Bruno bi dong/khoi dong lai truoc khi thuc hien don dep, cac bien ID nay se bi mat. Khi do, viec dang nhap lai se KHONG khoi phuc duoc cac ID nay. Nguoi dung can tra cuu ID truc tiep tu Medusa Admin UI hoac co so du lieu PostgreSQL, roi gan thu cong vao moi truong local truoc khi bam Send.
+}

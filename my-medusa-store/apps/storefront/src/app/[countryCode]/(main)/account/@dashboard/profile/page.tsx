@@ -4,9 +4,10 @@ import ProfilePhone from '@modules/account//components/profile-phone'
 import ProfileBillingAddress from '@modules/account/components/profile-billing-address'
 import ProfileEmail from '@modules/account/components/profile-email'
 import ProfileName from '@modules/account/components/profile-name'
+import LoyaltyPointsBalance from '@modules/account/components/loyalty-points-balance'
 import { notFound } from 'next/navigation'
 import { listRegions } from '@lib/data/regions'
-import { retrieveCustomer } from '@lib/data/customer'
+import { getLoyaltyPoints, retrieveCustomer } from '@lib/data/customer'
 
 export const metadata: Metadata = {
     title: 'Profile',
@@ -16,6 +17,7 @@ export const metadata: Metadata = {
 export default async function Profile() {
     const customer = await retrieveCustomer()
     const regions = await listRegions()
+    const loyaltyPoints = await getLoyaltyPoints().catch(() => null)
 
     if (!customer || !regions) {
         notFound()
@@ -32,6 +34,8 @@ export default async function Profile() {
                 </p>
             </div>
             <div className="flex flex-col gap-y-8 w-full">
+                <LoyaltyPointsBalance points={loyaltyPoints} />
+                <Divider />
                 <ProfileName customer={customer} />
                 <Divider />
                 <ProfileEmail customer={customer} />

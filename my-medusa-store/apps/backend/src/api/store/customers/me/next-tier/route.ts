@@ -1,5 +1,5 @@
 import { AuthenticatedMedusaRequest, MedusaResponse } from "@medusajs/framework/http";
-import { TIER_MODULE } from "@/src/modules/tier";
+import { TIER_MODULE } from "@/modules/tier";
 import { MedusaError, ContainerRegistrationKeys } from "@medusajs/framework/utils";
 import { OrderStatus } from "@medusajs/framework/utils";
 import { NextTierInput } from "./validators";

@@ -1,4 +1,4 @@
-const { loadEnv } = require("@medusajs/utils");
+const { loadEnv } = require("@medusajs/framework/utils");
 loadEnv("test", process.cwd());
 
 module.exports = {
@@ -16,7 +16,7 @@ module.exports = {
     moduleFileExtensions: ["js", "ts", "json"],
     modulePathIgnorePatterns: ["dist/", "<rootDir>/.medusa/"],
     moduleNameMapper: {
-        "^@/(.*)$": "<rootDir>/$1",
+        "^@/(.*)$": "<rootDir>/src/$1",
     },
     setupFiles: ["./integration-tests/setup.js"],
 };

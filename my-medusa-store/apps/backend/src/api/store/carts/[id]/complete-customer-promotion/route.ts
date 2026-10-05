@@ -1,6 +1,6 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
-import { completeCustomerPromotionCartWorkflow } from "@/src/workflows"
+import { completeCustomerPromotionCartWorkflow } from "@/workflows"
 
 export async function POST(req: MedusaRequest, res: MedusaResponse) {
     const { result } = await completeCustomerPromotionCartWorkflow(req.scope).run({
@@ -13,5 +13,5 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         filters: { id: result.id },
     })
 
-    res.status(200).json({ type: "order", order: orders[0] })
+    res.status(200).json({ type: "order", order: orders[0], loyalty: result.loyalty })
 }

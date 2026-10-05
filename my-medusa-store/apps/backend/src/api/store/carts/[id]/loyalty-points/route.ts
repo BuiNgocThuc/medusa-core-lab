@@ -1,6 +1,6 @@
 import { AuthenticatedMedusaRequest, MedusaResponse } from "@medusajs/framework/http";
 import { MedusaError, Modules } from "@medusajs/framework/utils";
-import { applyLoyaltyOnCartWorkflow, removeLoyaltyFromCartWorkflow } from "@/src/workflows";
+import { applyLoyaltyOnCartWorkflow, removeLoyaltyFromCartWorkflow } from "@/workflows";
 import { RedeemLoyaltyPointsInput } from "./validators";
 
 async function assertCartOwnership(req: AuthenticatedMedusaRequest) {

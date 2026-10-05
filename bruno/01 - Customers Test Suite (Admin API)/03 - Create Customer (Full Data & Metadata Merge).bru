@@ -1,0 +1,81 @@
+meta {
+  name: 03 - Create Customer (Full Data & Metadata Merge)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/admin/customers
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "placeholder@example.com",
+    "first_name": "Nguyen",
+    "last_name": "Van A",
+    "metadata": {
+      "source": "pos",
+      "vip": true
+    },
+    "additional_data": {
+      "zalo_id": "0987654321",
+      "avatar_url": "https://example.com/avatar.jpg"
+    }
+  }
+}
+
+script:pre-request {
+  const uniqueEmail = `cust_full_${Date.now()}_${Math.random().toString(36).substring(2, 8)}@example.com`;
+  bru.setVar('firstCustomerEmail', uniqueEmail);
+  bru.setEnvVar('firstCustomerEmail', uniqueEmail);
+  const body = req.getBody();
+  body.email = uniqueEmail;
+  req.setBody(body);
+}
+
+script:post-response {
+  const json = res.getBody();
+  if (json && json.customer && json.customer.id) {
+    bru.setVar('customerId1', json.customer.id);
+    bru.setEnvVar('customerId1', json.customer.id);
+  }
+}
+
+tests {
+  test("200 OK", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("persisted initial metadata: source", function () {
+    expect(res.getBody().customer.metadata.source).to.equal("pos");
+  });
+  test("persisted initial metadata: vip", function () {
+    expect(res.getBody().customer.metadata.vip).to.equal(true);
+  });
+  test("persisted Task 3 metadata: zalo_id", function () {
+    expect(res.getBody().customer.metadata.zalo_id).to.equal("0987654321");
+  });
+  test("persisted Task 3 metadata: avatar_url", function () {
+    expect(res.getBody().customer.metadata.avatar_url).to.equal("https://example.com/avatar.jpg");
+  });
+}
+
+docs {
+  # 03 - Create Customer (Full Data & Metadata Merge)
+
+  Kiểm thử luồng thành công trọn vẹn (Happy Path) và kiểm chứng tính năng **Gộp Metadata (Metadata Merging)** của Task 3.
+
+  ## Luồng hoạt động:
+  1. `script:pre-request` sinh một địa chỉ email duy nhất (kết hợp timestamp và random string) và gán động vào body để giảm thiểu tối đa nguy cơ trùng lặp email. Đồng thời lưu email này vào biến `{{firstCustomerEmail}}` để phục vụ bài test Duplicate Email phía sau.
+  2. Request gửi lên đồng thời cả trường `metadata` có sẵn (`source: "pos"`, `vip: true`) và `additional_data` (`zalo_id`, `avatar_url`).
+  3. Route Middleware (Task 2) xác thực `additional_data` hợp lệ qua `customerAdditionalDataSchema`.
+  4. Core Workflow `createCustomersWorkflow` tạo bản ghi khách hàng trong database.
+  5. Workflow Hook `handleCustomersCreated` (Task 3) trích xuất `zalo_id` và `avatar_url`, gọi `customerModuleService.updateCustomers` để gộp vào trường `metadata`.
+  6. Response trả về được assert chứa đầy đủ cả 4 trường: `source`, `vip`, `zalo_id`, và `avatar_url`.
+  7. ID của khách hàng mới được lưu vào `{{customerId1}}`.
+}

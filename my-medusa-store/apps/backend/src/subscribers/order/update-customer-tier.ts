@@ -1,6 +1,6 @@
 import { SubscriberArgs, SubscriberConfig } from "@medusajs/framework"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
-import { updateCustomerTierOnOrderWorkflow } from "@/src/workflows"
+import { updateCustomerTierOnOrderWorkflow } from "@/workflows"
 
 export default async function updateCustomerTierHandler({
     event: { data },

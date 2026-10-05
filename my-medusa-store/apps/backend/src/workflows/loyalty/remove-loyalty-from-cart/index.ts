@@ -10,7 +10,7 @@ import {
 import { getCartLoyaltyPromoStep } from "../apply-loyalty-on-cart/steps";
 import { releaseLoyaltyReservationStep } from "./steps";
 import { PromotionActions } from "@medusajs/framework/utils";
-import { CartData } from "@/src/utils";
+import { CartData } from "@/utils";
 
 type WorkflowInput = {
     cart_id: string;
@@ -55,12 +55,17 @@ export const removeLoyaltyFromCartWorkflow = createWorkflow(
 
         releaseLoyaltyReservationStep({ cart_id: input.cart_id });
 
-        updateCartPromotionsWorkflow.runAsStep({
-            input: {
+        const removePromotionInput = transform(
+            { input, loyaltyPromo },
+            ({ input, loyaltyPromo }) => ({
                 cart_id: input.cart_id,
-                promo_codes: [loyaltyPromo.code!],
+                promo_codes: [loyaltyPromo!.code!],
                 action: PromotionActions.REMOVE,
-            },
+            }),
+        );
+
+        updateCartPromotionsWorkflow.runAsStep({
+            input: removePromotionInput,
         });
 
         const newMetadata = transform(
@@ -84,12 +89,14 @@ export const removeLoyaltyFromCartWorkflow = createWorkflow(
             },
         ]);
 
-        updatePromotionsStep([
+        const deactivatePromotionInput = transform({ loyaltyPromo }, ({ loyaltyPromo }) => [
             {
-                id: loyaltyPromo.id,
-                status: "inactive",
+                id: loyaltyPromo!.id,
+                status: "inactive" as const,
             },
         ]);
+
+        updatePromotionsStep(deactivatePromotionInput);
 
         // retrieve cart with updated promotions
         const { data: updatedCarts } = useQueryGraphStep({

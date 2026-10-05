@@ -11,7 +11,7 @@ import {
 } from "@medusajs/medusa/core-flows";
 import { Modules, OrderStatus } from "@medusajs/framework/utils";
 import { validateCustomerStep, determineTierStep } from "./steps";
-import { TIER_MODULE } from "@/src/modules/tier";
+import { TIER_MODULE } from "../../../modules/tier";
 
 const UPDATE_CUSTOMER_TIER_ON_ORDER_ID = "updateCustomerTierOnOrder";
 

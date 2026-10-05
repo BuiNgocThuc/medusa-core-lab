@@ -10,6 +10,7 @@ import {
     seedCustomers,
     seedOrders,
 } from "./seed";
+import { seedPromotions } from "@/scripts";
 
 /**
  * Badminton catalog seed (VND). Orchestrates each domain from
@@ -21,9 +22,9 @@ import {
  *   npx medusa exec ./src/migration-scripts/initial-data-seed.ts
  *
  * Scope note: VoucherEngine and SuggestiveSelling modules are not built yet in
- * this project, so voucher/promotion fixtures and their downstream seeds are
- * intentionally left out. Free-shipping threshold rules are also deferred
- * pending SRS clarification — shipping uses flat pricing only for now.
+ * this project. Core and conditional promotion fixtures are seeded below.
+ * Free-shipping threshold rules are deferred pending SRS clarification —
+ * shipping uses flat pricing only for now.
  *
  * Idempotent guard: skips entirely if a Default Sales Channel already exists.
  * All money is VND (integer, no minor units).
@@ -32,13 +33,13 @@ export default async function initial_data_seed({ container }: { container: Medu
     const logger = container.resolve(ContainerRegistrationKeys.LOGGER);
     const salesChannelModule = container.resolve(Modules.SALES_CHANNEL);
 
-    const already = await salesChannelModule.listSalesChannels({
-        name: "Default Sales Channel",
-    });
-    if (already.length) {
-        logger.warn("[seed] Default Sales Channel already exists — DB looks seeded. Skipping.");
-        return;
-    }
+    // const already = await salesChannelModule.listSalesChannels({
+    //     name: "Default Sales Channel",
+    // });
+    // if (already.length) {
+    //     logger.warn("[seed] Default Sales Channel already exists — DB looks seeded. Skipping.");
+    //     return;
+    // }
 
     logger.info("[seed] store + sales channel + region...");
     const { defaultSalesChannel, region } = await seedStoreAndRegion(container);
@@ -69,6 +70,14 @@ export default async function initial_data_seed({ container }: { container: Medu
 
     logger.info("[seed] demo orders...");
     await seedOrders(execArgs);
+
+    logger.info("[seed] promotions and Flash campaign...");
+    await seedPromotions({
+        ...execArgs,
+        category_ids: Object.fromEntries(
+            categoryResult.map((category) => [category.name, category.id]),
+        ),
+    });
 
     logger.info("[seed] Catalog done.");
 }

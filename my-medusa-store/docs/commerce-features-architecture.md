@@ -12,7 +12,7 @@ Backend hiện có sáu tính năng:
 | First-Purchase Discounts | Tự giảm giá đơn đầu cho customer có account. | cart, customer, customer-scoped checkout lock |
 | Loyalty System | Tích điểm từ order và đổi điểm lấy giảm giá. | `loyalty_point`, `loyalty_transaction` |
 | VIP Bundle | Giảm 15% bundle Rackets + Shoes cho VIP tại Việt Nam. | tier, cart, category, region/address |
-| Buy Racket Get Sock | Mua Racket theo điều kiện SUMMER để tặng Socks. | cart, product category, collection |
+| Condition 2 — Summer Racket + Socks | Mua 2 Rackets (có 1 thuộc SUMMER) cùng Socks để tặng một Socks. | `conditional_promotion`, cart, category, collection |
 | Flash Promotion | Giảm 20%, tối đa 300.000 VND, trong giờ Flash. | cart, campaign, `flash_redemption` |
 
 ```text
@@ -147,7 +147,7 @@ order.placed                            --> handleOrderPointsWorkflow
 
 **Steps và service:** `validateCustomerExistsStep` yêu cầu login; `getCartLoyaltyPromoStep` chống hai loyalty promotion; `getCartLoyaltyPromoAmountStep` đổi point sang VND; `consumeLoyaltyPointsForCheckoutStep` trừ point trong customer lock; `processOrderLoyaltyStep` finalize audit và earn; `LoyaltyModuleService.recordTransaction` là lớp idempotency cho earn theo `type + reference_id`.
 
-### VIP Bundle, Buy Racket Get Sock và Flash Promotion
+### VIP Bundle, Condition 2 và Flash Promotion
 
 Ba feature này dùng **một workflow orchestration chung**, không phải ba route riêng. Lý do: chúng cần so giá trị discount để chỉ giữ một promotion trên cart.
 
@@ -156,7 +156,7 @@ cart.updated
   --> refreshConditionalPromotionsWorkflow
   --> refreshConditionalPromotionsStep
         --> evaluate VIP Bundle
-        --> evaluate Buy Racket Get Sock
+        --> evaluate Condition 2 từ rule-tree cấu hình
         --> evaluate Flash
         --> chọn candidate tốt nhất
         --> REPLACE promotions trên cart
@@ -168,8 +168,8 @@ order.placed   --> consumeFlashRedemption (chỉ Flash)
 | Feature | Workflow / API | Vai trò |
 | --- | --- | --- |
 | VIP Bundle | `refreshConditionalPromotionsWorkflow` | Đủ VIP, VN, subtotal, 2 Rackets + 1 Shoes thì candidate `VIP_BUNDLE_15`. Không có public API riêng. |
-| Buy Racket Get Sock | `refreshConditionalPromotionsWorkflow` | Đủ 2 Rackets, 1 Racket collection `summer`, có Socks thì candidate `RACKET_SUMMER_GET_SOCK`. Không có public API riêng. |
-| Flash | `refreshConditionalPromotionsWorkflow` | Customer đã login trong khung giờ Flash nhận promotion fixed `FLASH20-<cart_id>`. Không có public API riêng. |
+| Condition 2 — Summer Racket + Socks | `refreshConditionalPromotionsWorkflow` + `conditional-promotion` module | Đủ 2 Rackets, trong đó 1 thuộc collection `summer`, và có Socks thì candidate `RACKET_SUMMER_GET_SOCK`. Admin CRUD quản lý rule/copy/placement; Store endpoint chỉ trả copy và placement đã lọc. |
+| Flash | `claimFlashSaleWorkflow` | Customer chủ động claim source code public trong schedule; không auto-apply từ `cart.updated`. |
 | Flash quota | `PromotionEntitlementModuleService.reserveFlashRedemption` | Reserve lượt 1/2 cho cart; từ chối lượt thứ ba. |
 | Flash consume | `orderPlacedHandler` | Khi cart có code Flash, gọi `consumeFlashRedemption(cart_id, order_id)`. |
 | Checkout gate | `validateConditionalPromotions` | Re-evaluate mọi condition và chặn code stale/manually attached. |
@@ -313,15 +313,19 @@ order.placed
 
 Promotion `VIP_BUNDLE_15` là standard promotion 15%, target `Rackets` và `Shoes`, `allocation: once`, `max_quantity: 3`. Engine chọn ba đơn vị rẻ nhất trong target.
 
-### Buy Racket Get Sock
+### Condition 2 — Buy Racket Get Sock
 
-Điều kiện: ít nhất 2 `Rackets`, trong đó một sản phẩm thuộc product collection handle `summer`, và cart có `Socks`.
+**Mô tả:** Cart có ít nhất 2 `Rackets`, trong đó ít nhất 1 Racket thuộc collection `summer`, và có ít nhất 1 `Socks`. `RACKET_SUMMER_GET_SOCK` giảm 100% tối đa một Socks; khách không cần đăng nhập.
 
-Promotion `RACKET_SUMMER_GET_SOCK` là buy-get promotion: buy-rule Rackets với minimum quantity 2, target Socks, 100%, tối đa một sản phẩm. Engine chọn Socks có giá cao nhất.
+**Quyết định kiến trúc:** Đây là `standard` promotion carrier, không dùng native `buyget`. Eligibility là rule-tree do module `conditional-promotion` lưu và workflow evaluate; carrier chỉ thể hiện target Socks, `allocation: once` và `max_quantity: 1`. Rule v1 dùng `AND` giữa Quantity Condition, với matcher `ALL`/`ANY` cho Product, Category, Collection, Tag và Type. Subset requirement luôn evaluate trong tập item match điều kiện cha.
+
+**Lifecycle và cạnh tranh:** `cart.updated` chạy `refreshConditionalPromotionsWorkflow`; workflow tính giá trị benefit của tất cả candidate và chỉ giữ candidate lớn nhất. Nếu bằng nhau, Condition 2 ưu tiên hơn VIP Bundle và Flash. `completeCartWorkflow.hooks.validate` đánh giá lại rule của promotion đã gắn và từ chối cart stale hoặc promotion được gắn thủ công. Condition 2 không stack với VIP Bundle hoặc Flash.
+
+**Tiến độ:** module/model/migration, seed idempotent, workflow refresh, checkout validation, Admin CRUD/UI, Store catalogue endpoint và metadata hiển thị storefront đã được thêm. Chưa có bằng chứng kiểm thử tự động đã chạy cho evaluator, refresh và checkout revalidation; đây là hạng mục còn lại trước khi phát hành.
 
 ### Flash Promotion
 
-Flash là promotion fixed động có code `FLASH20-<cart_id>`, giá trị `min(subtotal × 20%, 300.000)`. Campaign `FLASH20_DAILY` dùng Medusa `spend` budget 20.000.000 VND.
+Flash dùng một source code public, ví dụ `FLASH20_DAILY`, và custom line-item adjustment có giá trị `min(subtotal × 20%, 300.000)`. Admin chọn một native Campaign budget: `spend` hoặc `usage`; Promotion Module consume qua `registerUsageStep`. Reservation giữ quota/customer, expiry/audit. Mã đã add vào cart vẫn checkout được nếu Campaign budget đạt giới hạn sau đó.
 
 Flash cần customer đăng nhập vì rule quota cần `customer_id`. Mỗi lượt reservation/consumption được lưu riêng; tổng reservation hoặc consumption của customer không vượt 2.
 
@@ -329,13 +333,15 @@ Flash cần customer đăng nhập vì rule quota cần `customer_id`. Mỗi lư
 | --- | --- |
 | `migration-scripts/seed/categories.ts` | Định nghĩa catalog categories và handle `summer`. |
 | `migration-scripts/seed/products.ts` | Tạo SUMMER collection, gán ba Racket Yonex. |
-| `scripts/seed-promotions.ts` | Seed VIP Bundle, Buy-get và campaign placeholder Flash idempotently. |
+| `modules/conditional-promotion/**` | Lưu rule-tree, target, copy, placement và trạng thái của Condition 2. |
+| `scripts/seed-promotions.ts` | Seed VIP Bundle, Condition 2 và campaign placeholder Flash idempotently. |
 | `workflows/promotions/refresh-conditional-promotions/index.ts` — `refreshConditionalPromotionsWorkflow` | Entry point workflow khi cart thay đổi. |
 | `refreshConditionalPromotionsStep` | Query cart, tính eligibility/discount, chọn code và thay promotions. |
+| `workflows/conditional-promotions/{rules,candidates}.ts` | Evaluate matcher/rule-tree Condition 2 và tính benefit để cạnh tranh với các candidate khác. |
 | `quantityFor` / `eligibleItems` | Đếm và lọc line item theo product category. |
 | `isFlashWindow` | Kiểm tra 18:00–22:00 trong `Asia/Ho_Chi_Minh`. |
 | `calculateVipDiscount` | Tính 15% cho ba target unit rẻ nhất. |
-| `calculateBuyGetDiscount` | Tính giá Socks cao nhất, dùng để so candidate. |
+| `customCandidate` | Evaluate rule-tree và tính benefit Socks của Condition 2 để so candidate. |
 | `FlashRedemption` | Lưu reservation/consumption Flash, amount, cart/order/customer. |
 | `reserveFlashRedemption` | Reserve quota của customer cho cart; chặn lượt thứ ba. |
 | `consumeFlashRedemption` | Consume quota khi order đã đặt. |

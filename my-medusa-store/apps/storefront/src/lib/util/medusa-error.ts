@@ -6,6 +6,8 @@ type MedusaError = {
     }
     request?: unknown
     message?: string
+    status?: number
+    statusText?: string
     config?: { url: string; baseURL: string }
 }
 
@@ -29,7 +31,15 @@ export default function medusaError(error: unknown): never {
         )
     } else if (err.request) {
         throw new Error('No response received: ' + String(err.request))
-    } else {
-        throw new Error(err.message)
     }
+
+    // The Medusa JS SDK throws FetchError, which exposes `message`, `status`,
+    // and `statusText` directly rather than Axios' `response` shape.
+    const message = err.message || 'Could not update cart.'
+    if (err.status) {
+        console.error(`[Medusa] Request failed (${err.status} ${err.statusText ?? ''}): ${message}`)
+    } else {
+        console.error('[Medusa] Request failed:', error)
+    }
+    throw new Error(message)
 }

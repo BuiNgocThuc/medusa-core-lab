@@ -1,4 +1,4 @@
-import { FIRST_PURCHASE_PROMOTION_CODE } from "@/src/constant"
+import { FIRST_PURCHASE_PROMOTION_CODE } from "@/constant"
 import { throwInvalidPromotion } from "./errors"
 import { Promotion } from "./types"
 

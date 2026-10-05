@@ -1,7 +1,7 @@
 // src/api/store/carts/[id]/merge-customer/route.ts
-import { mergeGuestCartIntoCustomerCartWorkflow } from "@/src/workflows/merge-cart/merge-guest-cart-into-customer-cart"
+import { mergeGuestCartIntoCustomerCartWorkflow } from "@/workflows/merge-cart/merge-guest-cart-into-customer-cart"
 import type { AuthenticatedMedusaRequest, MedusaResponse } from "@medusajs/framework/http"
-import { MergeGuestCartOutput } from "@/src/workflows/merge-cart/types"
+import { MergeGuestCartOutput } from "@/workflows/merge-cart/types"
 
 
 

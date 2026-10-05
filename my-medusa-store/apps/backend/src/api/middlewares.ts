@@ -1,18 +1,22 @@
 import {
-    allowFields,
     authenticate,
     defineMiddlewares,
     validateAndTransformBody,
     validateAndTransformQuery,
 } from "@medusajs/framework/http";
 import { createFindParams, createSelectParams } from "@medusajs/medusa/api/utils/validators";
-import { NextTierSchema } from "@/src/api/store/customers";
-import { CreateTierSchema, UpdateTierSchema } from "@/src/api/admin/tiers";
-import { RedeemLoyaltyPointsSchema } from "@/src/api/store/carts/[id]/loyalty-points/validators.ts";
+import { NextTierSchema } from "@/api/store/customers";
 import { authAuditMiddleware } from "./middlewares/auth-audit";
+import { CreateTierSchema, UpdateTierSchema } from "@/api/admin/tiers";
+import { ConditionalPromotionSchema } from "@/api/admin/conditional-promotions/validators";
+import { FlashSaleSchema } from "@/api/admin/flash-sales/validators";
+import { ClaimFlashSaleSchema } from "@/api/store/carts/[id]/flash-sales/validators";
+import { RedeemLoyaltyPointsSchema } from "@/api/store/carts/[id]/loyalty-points/validators.ts";
+import { customerAdditionalDataSchema } from "../utils/customer-additional-data";
+
+export const adminCreateCustomerAdditionalDataValidator = customerAdditionalDataSchema.shape;
 
 export default defineMiddlewares({
-
     routes: [
         // Ghi log toàn bộ sự kiện xác thực / đăng nhập vào hệ thống (Admin & Customer)
         {
@@ -34,6 +38,11 @@ export default defineMiddlewares({
             matcher: "/auth/session",
             methods: ["POST", "DELETE"],
             middlewares: [authAuditMiddleware],
+        },
+        {
+            methods: ["POST"],
+            matcher: "/admin/customers",
+            additionalDataValidator: adminCreateCustomerAdditionalDataValidator,
         },
         // create tier
         {
@@ -62,6 +71,34 @@ export default defineMiddlewares({
                     defaults: ["id", "name", "promotion.id", "promotion.code", "tier_rules.*"],
                 }),
             ],
+        },
+        {
+            matcher: "/admin/conditional-promotions",
+            methods: ["POST"],
+            middlewares: [validateAndTransformBody(ConditionalPromotionSchema)],
+        },
+        {
+            matcher: "/admin/conditional-promotions/:id",
+            methods: ["POST"],
+            middlewares: [validateAndTransformBody(ConditionalPromotionSchema)],
+        },
+        {
+            matcher: "/admin/flash-sales",
+            methods: ["POST"],
+            middlewares: [validateAndTransformBody(FlashSaleSchema)],
+        },
+        {
+            matcher: "/store/carts/:id/flash-sales/claim",
+            methods: ["POST"],
+            middlewares: [
+                authenticate("customer", ["session", "bearer"]),
+                validateAndTransformBody(ClaimFlashSaleSchema),
+            ],
+        },
+        {
+            matcher: "/store/carts/:id/flash-sales/claim",
+            methods: ["DELETE"],
+            middlewares: [authenticate("customer", ["session", "bearer"])],
         },
         // update tier
         {
@@ -139,8 +176,13 @@ export default defineMiddlewares({
         },
         {
             matcher: "/store/carts",
-            middlewares: [allowFields("custom", "custom.custom_name"),],
-
+            middlewares: [
+                (req: any, _res: any, next: any) => {
+                    req.allowed = req.allowed || [];
+                    req.allowed.push("custom", "custom.custom_name");
+                    next();
+                },
+            ],
         },
         //..
     ],

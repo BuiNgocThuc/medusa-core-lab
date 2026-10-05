@@ -65,6 +65,12 @@ module.exports = defineConfig({
             resolve: "./src/modules/promotion-entitlement",
         },
         {
+            resolve: "./src/modules/conditional-promotion",
+        },
+        {
+            resolve: "./src/modules/flash-sale-schedule",
+        },
+        {
             resolve: "./src/modules/hello",
         },
         {

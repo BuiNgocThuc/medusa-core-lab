@@ -1,10 +1,5 @@
 import { MedusaError, MedusaService } from "@medusajs/framework/utils";
 import { Tier, TierRule } from "./models";
-import {
-    LOYALTY_EARN_VND_PER_POINT,
-    LOYALTY_REDEEM_POINTS_PER_BLOCK,
-    LOYALTY_REDEEM_VND_PER_BLOCK,
-} from "@/src/constant.ts";
 
 class TierModuleService extends MedusaService({
     Tier,

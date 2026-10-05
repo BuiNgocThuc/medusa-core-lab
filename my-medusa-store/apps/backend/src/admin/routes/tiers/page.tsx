@@ -11,8 +11,8 @@ import {
 import { useNavigate, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
-import { sdk } from "../../lib/sdk";
-import { CreateTierModal } from "../../components/";
+import { sdk } from "../../lib/sdk.ts";
+import { CreateTierModal } from "../../components";
 
 const UserGroupIcon = () => (
     <svg
