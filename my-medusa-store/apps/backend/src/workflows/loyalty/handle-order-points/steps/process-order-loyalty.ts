@@ -70,8 +70,7 @@ export const processOrderLoyaltyStep = createStep(
             return new StepResponse({ skipped: true, redeemed_points: 0 });
         }
 
-        await orderModule.updateOrders({
-            id: order.id,
+        await orderModule.updateOrders(order.id, {
             metadata: { ...(order.metadata ?? {}), loyalty_redemption_processed: true },
         });
 

@@ -16,8 +16,7 @@ export const markOrderLoyaltyProcessedStep = createStep(
             [key]: true,
         };
 
-        await orderModule.updateOrders({
-            id: order_id,
+        await orderModule.updateOrders(order_id, {
             metadata: nextMetadata,
         });
 
@@ -27,8 +26,7 @@ export const markOrderLoyaltyProcessedStep = createStep(
         if (!data) return;
 
         const orderModule = container.resolve(Modules.ORDER) as any;
-        await orderModule.updateOrders({
-            id: data.order_id,
+        await orderModule.updateOrders(data.order_id, {
             metadata: data.metadata ?? {},
         });
     },

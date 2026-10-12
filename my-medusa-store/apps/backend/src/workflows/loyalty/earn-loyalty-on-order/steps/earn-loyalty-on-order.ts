@@ -30,6 +30,10 @@ export const earnLoyaltyOnOrderStep = createStep(
             { throwIfKeyNotFound: true },
         );
 
+        if (!order.customer?.id) {
+            return new StepResponse({ skipped: true, earned_points: 0 });
+        }
+
         const [existingTransaction] = await loyalty.listLoyaltyTransactions({
             type: "add",
             reference_id: order.id,
@@ -59,8 +63,7 @@ export const earnLoyaltyOnOrderStep = createStep(
             points: earnedPoints,
             order_id: order.id,
         });
-        await orderModule.updateOrders({
-            id: order.id,
+        await orderModule.updateOrders(order.id, {
             metadata: { ...(order.metadata ?? {}), loyalty_earned_processed: true },
         });
 

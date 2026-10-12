@@ -17,7 +17,10 @@ export const earnLoyaltyOnOrderWorkflow = createWorkflow(
         });
         const lockKey = transform(
             { orders },
-            ({ orders }) => `loyalty-customer-${orders[0].customer!.id}`,
+            ({ orders }) =>
+                orders[0]?.customer?.id
+                    ? `loyalty-customer-${orders[0].customer.id}`
+                    : `loyalty-order-${orders[0]?.id ?? "default"}`,
         );
 
         acquireLockStep({ key: lockKey, timeout: 5, ttl: 30 });
