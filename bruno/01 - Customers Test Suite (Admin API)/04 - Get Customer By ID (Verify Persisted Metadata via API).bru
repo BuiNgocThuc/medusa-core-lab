@@ -1,0 +1,42 @@
+meta {
+  name: 04 - Get Customer By ID (Verify Persisted Metadata via API)
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/admin/customers/{{customerId1}}
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("200 OK", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("matches customerId1", function () {
+    const expectedId = bru.getVar('customerId1') || bru.getEnvVar('customerId1');
+    expect(res.getBody().customer.id).to.equal(expectedId);
+  });
+  test("persisted initial metadata: source", function () {
+    expect(res.getBody().customer.metadata.source).to.equal("pos");
+  });
+  test("persisted initial metadata: vip", function () {
+    expect(res.getBody().customer.metadata.vip).to.equal(true);
+  });
+  test("persisted Task 3 metadata: zalo_id", function () {
+    expect(res.getBody().customer.metadata.zalo_id).to.equal("0987654321");
+  });
+  test("persisted Task 3 metadata: avatar_url", function () {
+    expect(res.getBody().customer.metadata.avatar_url).to.equal("https://example.com/avatar.jpg");
+  });
+}
+
+docs {
+  # 04 - Get Customer By ID (Verify Persisted Metadata via API)
+
+  Truy vấn trực tiếp thông tin khách hàng vừa được tạo ở request 03 theo `{{customerId1}}` qua endpoint `GET /admin/customers/:id`.
+
+  ## Mục đích kiểm thử:
+  - Đảm bảo rằng dữ liệu `metadata` (bao gồm cả trường gốc `source`, `vip` và trường mới `zalo_id`, `avatar_url`) đã thực sự được lưu bền vững (persisted) vào cơ sở dữ liệu PostgreSQL và được truy vấn ra trọn vẹn trong một vòng đời request độc lập mới.
+}

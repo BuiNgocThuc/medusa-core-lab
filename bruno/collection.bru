@@ -1,0 +1,24 @@
+auth {
+  mode: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  # Medusa Core Lab — Customer Module (Bruno Collection)
+
+  Bộ sưu tập kiểm thử API cho Medusa v2 Customer Module (Task 1, 2, 3) trên dự án `medusa-core-lab`.
+
+  ## Cấu trúc Collection:
+  - **01 - Customers Test Suite (Admin API):** Chuỗi 10 bài kiểm thử liên hoàn từ Login đến Bắt lỗi nghiệp vụ.
+  - **02 - Cleanup (Run Manually):** 3 request xóa khách hàng kiểm thử, được bảo vệ tự động bằng `skipRequest()` trong chế độ Runner và chỉ chạy khi bấm Send thủ công từng request.
+
+  ## Hướng dẫn sử dụng:
+  1. **Thiết lập mật khẩu:** Copy `.env.sample` thành `.env` trong thư mục `bruno/` và điền mật khẩu admin thực tế của bạn.
+  2. **Tắt Cookie tự động:** Trong cài đặt của Bruno (Preferences / Settings), tắt tùy chọn tự động gửi cookie phiên (Clear / Disable Cookie Jar) để bảo đảm tính khách quan cho test 401.
+  3. **Chọn Environment:** Chọn môi trường **local** ở góc trên bên phải giao diện Bruno.
+  4. **Chạy Test Suite:** Nhấp chuột phải vào thư mục `01 - Customers Test Suite (Admin API)` chọn **Run Folder** (hoặc chọn **Run Collection** ở root). Tất cả 10 bài kiểm thử sẽ chạy tuần tự và hiển thị màu xanh (PASS). Cả 3 request DELETE ở thư mục Cleanup sẽ hiển thị trạng thái SKIPPED.
+  5. **Dọn dẹp (Tùy chọn):** Khi muốn xóa các bản ghi test trong database, mở thư mục `02 - Cleanup (Run Manually)` và bấm nút Send thủ công cho từng request xóa.
+}

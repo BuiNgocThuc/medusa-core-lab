@@ -1,176 +1,288 @@
-"use client"
+'use client'
 
-import { Badge, Heading, Input, Label, Text } from "@modules/common/components/ui"
-import React from "react"
+import {
+    Badge,
+    Heading,
+    Input,
+    Label,
+    Text,
+} from '@modules/common/components/ui'
+import React from 'react'
 
-import { applyPromotions } from "@lib/data/cart"
-import { convertToLocale } from "@lib/util/money"
-import { HttpTypes } from "@medusajs/types"
-import Trash from "@modules/common/icons/trash"
-import ErrorMessage from "../error-message"
-import { SubmitButton } from "../submit-button"
+import { applyPromotions } from '@lib/data/cart'
+import { convertToLocale } from '@lib/util/money'
+import { HttpTypes } from '@medusajs/types'
+import Trash from '@modules/common/icons/trash'
+import { SubmitButton } from '../submit-button'
+import { useToast } from '@modules/common/components/toast'
 
 type DiscountCodeProps = {
-  cart: HttpTypes.StoreCart
+    cart: HttpTypes.StoreCart
 }
 
+const AUTOMATIC_WORKFLOW_PROMOTION_CODES = new Set([
+    'FIRST_PURCHASE',
+    'VIP_BUNDLE_15',
+])
+const CONDITIONAL_PROMOTION_CODES = new Set([
+    'RACKET_SUMMER_GET_SOCK',
+])
+const PROMOTION_CODE_ERROR_MESSAGE = 'This promotion code is invalid or cannot be applied.'
+
 const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
-  const [isOpen, setIsOpen] = React.useState(false)
-  const [errorMessage, setErrorMessage] = React.useState("")
+    const [isOpen, setIsOpen] = React.useState(false)
+    const { showToast } = useToast()
 
-  const { promotions = [] } = cart
-  const removePromotionCode = async (code: string) => {
-    const validPromotions = promotions.filter(
-      (promotion) => promotion.code !== code
+    const { promotions = [] } = cart
+    const tierPromotionIds = new Set(
+        Array.isArray(cart.metadata?.tier_promotion_ids)
+            ? cart.metadata.tier_promotion_ids.filter(
+                  (id): id is string => typeof id === 'string'
+              )
+            : []
     )
-
-    await applyPromotions(
-      validPromotions.filter((p) => p.code !== undefined).map((p) => p.code!)
+    const conditionalPromotionIds = new Set(
+        Array.isArray(cart.metadata?.conditional_promotion_ids)
+            ? cart.metadata.conditional_promotion_ids.filter(
+                  (id): id is string => typeof id === 'string'
+              )
+            : []
     )
-  }
+    const isLoyaltyPromotion = (promotion: (typeof promotions)[number]) =>
+        promotion.id === cart.metadata?.loyalty_promo_id
+    const isTierPromotion = (promotion: (typeof promotions)[number]) =>
+        tierPromotionIds.has(promotion.id)
+    const isConditionalPromotion = (promotion: (typeof promotions)[number]) =>
+        conditionalPromotionIds.has(promotion.id) ||
+        (promotion.code !== undefined &&
+            CONDITIONAL_PROMOTION_CODES.has(promotion.code))
+    const isWorkflowAutomaticPromotion = (
+        promotion: (typeof promotions)[number]
+    ) =>
+        Boolean(
+            promotion.code &&
+                (AUTOMATIC_WORKFLOW_PROMOTION_CODES.has(promotion.code) ||
+                    promotion.code.startsWith('FLASH20-'))
+        )
+    const orderedPromotions = [...promotions].sort((left, right) => {
+        if (isLoyaltyPromotion(left)) return 1
+        if (isLoyaltyPromotion(right)) return -1
+        if (left.is_automatic === right.is_automatic) return 0
+        return left.is_automatic ? -1 : 1
+    })
+    const removePromotionCode = async (code: string) => {
+        const validPromotions = promotions.filter(
+            (promotion) => promotion.code !== code && !isLoyaltyPromotion(promotion)
+        )
 
-  const addPromotionCode = async (formData: FormData) => {
-    setErrorMessage("")
-
-    const code = formData.get("code")
-    if (!code) {
-      return
+        await applyPromotions(
+            validPromotions
+                .filter((p) => p.code !== undefined)
+                .map((p) => p.code!)
+        )
     }
-    const input = document.getElementById("promotion-input") as HTMLInputElement
-    const codes = promotions
-      .filter((p) => p.code !== undefined)
-      .map((p) => p.code!)
-    codes.push(code.toString())
 
-    try {
-      await applyPromotions(codes)
-    } catch (e) {
-      setErrorMessage(e instanceof Error ? e.message : String(e))
+    const addPromotionCode = async (formData: FormData) => {
+
+        const code = formData.get('code')
+        if (!code) {
+            return
+        }
+        const normalizedCode = code.toString().trim().toUpperCase()
+        const alreadyApplied = promotions.some(
+            (promotion) => promotion.code?.toUpperCase() === normalizedCode
+        )
+
+        if (alreadyApplied) {
+            showToast({ content: 'This promotion code is already applied.', type: 'warning' })
+            return
+        }
+        if (CONDITIONAL_PROMOTION_CODES.has(normalizedCode)) {
+            showToast({ content: 'This promotion is applied automatically.', type: 'warning' })
+            return
+        }
+        const input = document.getElementById(
+            'promotion-input'
+        ) as HTMLInputElement
+        const codes = promotions
+            .filter((p) => p.code !== undefined && !isLoyaltyPromotion(p))
+            .map((p) => p.code!)
+        codes.push(normalizedCode)
+
+        try {
+            const updatedCart = await applyPromotions(codes)
+            const wasApplied = updatedCart.promotions?.some(
+                (promotion) =>
+                    promotion.code?.toUpperCase() === normalizedCode
+            )
+            if (!wasApplied) {
+                showToast({ content: PROMOTION_CODE_ERROR_MESSAGE, type: 'error' })
+                return
+            }
+        } catch {
+            showToast({ content: PROMOTION_CODE_ERROR_MESSAGE, type: 'error' })
+        }
+
+        if (input) {
+            input.value = ''
+        }
     }
 
-    if (input) {
-      input.value = ""
-    }
-  }
+    return (
+        <div className="w-full bg-white flex flex-col">
+            <div className="txt-medium">
+                <form
+                    action={(a) => addPromotionCode(a)}
+                    className="w-full mb-5"
+                >
+                    <Label className="flex gap-x-1 my-2 items-center">
+                        <button
+                            onClick={() => setIsOpen(!isOpen)}
+                            type="button"
+                            className="txt-medium text-ui-fg-interactive hover:text-ui-fg-interactive-hover"
+                            data-testid="add-discount-button"
+                        >
+                            Add Promotion Code(s)
+                        </button>
 
-  return (
-    <div className="w-full bg-white flex flex-col">
-      <div className="txt-medium">
-        <form action={(a) => addPromotionCode(a)} className="w-full mb-5">
-          <Label className="flex gap-x-1 my-2 items-center">
-            <button
-              onClick={() => setIsOpen(!isOpen)}
-              type="button"
-              className="txt-medium text-ui-fg-interactive hover:text-ui-fg-interactive-hover"
-              data-testid="add-discount-button"
-            >
-              Add Promotion Code(s)
-            </button>
-
-            {/* <Tooltip content="You can add multiple promotion codes">
+                        {/* <Tooltip content="You can add multiple promotion codes">
               <InformationCircleSolid color="var(--fg-muted)" />
             </Tooltip> */}
-          </Label>
+                    </Label>
 
-          {isOpen && (
-            <>
-              <div className="flex w-full gap-x-2">
-                <Input
-                  className="size-full"
-                  id="promotion-input"
-                  name="code"
-                  type="text"
-                  autoFocus={false}
-                  data-testid="discount-input"
-                />
-                <SubmitButton
-                  variant="secondary"
-                  data-testid="discount-apply-button"
-                >
-                  Apply
-                </SubmitButton>
-              </div>
+                    {isOpen && (
+                        <>
+                            <div className="flex w-full gap-x-2">
+                                <Input
+                                    className="size-full"
+                                    id="promotion-input"
+                                    name="code"
+                                    type="text"
+                                    autoFocus={false}
+                                    data-testid="discount-input"
+                                />
+                                <SubmitButton
+                                    variant="secondary"
+                                    data-testid="discount-apply-button"
+                                >
+                                    Apply
+                                </SubmitButton>
+                            </div>
 
-              <ErrorMessage
-                error={errorMessage}
-                data-testid="discount-error-message"
-              />
-            </>
-          )}
-        </form>
+                        </>
+                    )}
+                </form>
 
-        {promotions.length > 0 && (
-          <div className="w-full flex items-center">
-            <div className="flex flex-col w-full">
-              <Heading className="txt-medium mb-2">
-                Promotion(s) applied:
-              </Heading>
+                {promotions.length > 0 && (
+                    <div className="w-full flex items-center">
+                        <div className="flex flex-col w-full">
+                            <Heading className="txt-medium mb-2">
+                                Promotion(s) applied:
+                            </Heading>
 
-              {promotions.map((promotion) => {
-                return (
-                  <div
-                    key={promotion.id}
-                    className="flex items-center justify-between w-full max-w-full mb-2"
-                    data-testid="discount-row"
-                  >
-                    <Text className="flex gap-x-1 items-baseline txt-small-plus w-4/5 pr-1">
-                      <span className="truncate" data-testid="discount-code">
-                        <Badge
-                          color={promotion.is_automatic ? "green" : "grey"}
-                        >
-                          {promotion.code}
-                        </Badge>{" "}
-                        (
-                        {promotion.application_method?.value !== undefined &&
-                          promotion.application_method.currency_code !==
-                            undefined && (
-                            <>
-                              {promotion.application_method.type ===
-                              "percentage"
-                                ? `${promotion.application_method.value}%`
-                                : convertToLocale({
-                                    amount: +promotion.application_method.value,
-                                    currency_code:
-                                      promotion.application_method
-                                        .currency_code,
-                                  })}
-                            </>
-                          )}
-                        )
-                        {/* {promotion.is_automatic && (
+                            {orderedPromotions.map((promotion) => {
+                                const isLoyalty = isLoyaltyPromotion(promotion)
+                                const isTier = isTierPromotion(promotion)
+                                const isConditional = isConditionalPromotion(promotion)
+                                const isWorkflowAutomatic =
+                                    isWorkflowAutomaticPromotion(promotion)
+                                const applicationMethod = promotion.application_method
+                                const promotionValue = applicationMethod?.value
+                                const promotionValueLabel =
+                                    promotionValue === undefined
+                                        ? null
+                                        : applicationMethod?.type === 'percentage'
+                                        ? `${promotionValue}%`
+                                        : convertToLocale({
+                                              amount: Number(promotionValue),
+                                              currency_code:
+                                                  applicationMethod?.currency_code ||
+                                                  cart.currency_code,
+                                          })
+
+                                return (
+                                    <div
+                                        key={promotion.id}
+                                        className="flex items-center justify-between w-full max-w-full mb-2"
+                                        data-testid="discount-row"
+                                    >
+                                        <Text className="flex gap-x-1 items-baseline txt-small-plus w-4/5 pr-1">
+                                            <span
+                                                className="truncate"
+                                                data-testid="discount-code"
+                                            >
+                                                <Badge
+                                                    color={
+                                                        isLoyalty ||
+                                                        isTier ||
+                                                        isConditional ||
+                                                        isWorkflowAutomatic ||
+                                                        promotion.is_automatic
+                                                            ? 'green'
+                                                            : 'grey'
+                                                    }
+                                                >
+                                                    {promotion.code}
+                                                </Badge>{' '}
+                                                {promotionValueLabel && (
+                                                    <>({promotionValueLabel})</>
+                                                )}
+                                                {isLoyalty && (
+                                                    <span className="ml-1 text-ui-fg-subtle">
+                                                        Loyalty points
+                                                    </span>
+                                                )}
+                                                {isTier && (
+                                                    <span className="ml-1 text-ui-fg-subtle">
+                                                        Tier benefit
+                                                    </span>
+                                                )}
+                                                {isConditional && (
+                                                    <span className="ml-1 text-ui-fg-subtle">
+                                                        Automatic promotion
+                                                    </span>
+                                                )}
+                                                {/* {promotion.is_automatic && (
                           <Tooltip content="This promotion is automatically applied">
                             <InformationCircleSolid className="inline text-zinc-400" />
                           </Tooltip>
                         )} */}
-                      </span>
-                    </Text>
-                    {!promotion.is_automatic && (
-                      <button
-                        className="flex items-center"
-                        onClick={() => {
-                          if (!promotion.code) {
-                            return
-                          }
+                                            </span>
+                                        </Text>
+                                        {!promotion.is_automatic &&
+                                            !isLoyalty &&
+                                            !isTier &&
+                                            !isConditional &&
+                                            !isWorkflowAutomatic && (
+                                            <button
+                                                className="flex items-center"
+                                                onClick={() => {
+                                                    if (!promotion.code) {
+                                                        return
+                                                    }
 
-                          removePromotionCode(promotion.code)
-                        }}
-                        data-testid="remove-discount-button"
-                      >
-                        <Trash size={14} />
-                        <span className="sr-only">
-                          Remove discount code from order
-                        </span>
-                      </button>
-                    )}
-                  </div>
-                )
-              })}
+                                                    removePromotionCode(
+                                                        promotion.code
+                                                    )
+                                                }}
+                                                data-testid="remove-discount-button"
+                                            >
+                                                <Trash size={14} />
+                                                <span className="sr-only">
+                                                    Remove discount code from
+                                                    order
+                                                </span>
+                                            </button>
+                                        )}
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                )}
             </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
+        </div>
+    )
 }
 
 export default DiscountCode

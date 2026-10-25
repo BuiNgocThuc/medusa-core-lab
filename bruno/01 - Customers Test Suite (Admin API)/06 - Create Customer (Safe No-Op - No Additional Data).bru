@@ -1,0 +1,59 @@
+meta {
+  name: 06 - Create Customer (Safe No-Op - No Additional Data)
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/admin/customers
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "placeholder@example.com",
+    "first_name": "Standard",
+    "last_name": "User"
+  }
+}
+
+script:pre-request {
+  const uniqueEmail = `cust_noop_${Date.now()}_${Math.random().toString(36).substring(2, 8)}@example.com`;
+  const body = req.getBody();
+  body.email = uniqueEmail;
+  req.setBody(body);
+}
+
+script:post-response {
+  const json = res.getBody();
+  if (json && json.customer && json.customer.id) {
+    bru.setVar('customerId3', json.customer.id);
+    bru.setEnvVar('customerId3', json.customer.id);
+  }
+}
+
+tests {
+  test("200 OK", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Task 3 fields are undefined (safe no-op)", function () {
+    expect(res.getBody().customer.metadata?.zalo_id).to.be.undefined;
+    expect(res.getBody().customer.metadata?.avatar_url).to.be.undefined;
+  });
+}
+
+docs {
+  # 06 - Create Customer (Safe No-Op - No Additional Data)
+
+  Kiểm chứng cơ chế **Safe No-Op (Bỏ qua an toàn)**: Khi khách hàng được tạo theo luồng chuẩn của Medusa mà hoàn toàn không có `additional_data`.
+
+  ## Mục đích kiểm thử:
+  - Xác nhận rằng hook không gây lỗi và không can thiệp vào các luồng tạo khách hàng thông thường.
+  - Assert xác nhận response trả về thành công với mã 200, và trường `metadata` không chứa `zalo_id` hay `avatar_url`.
+  - ID của khách hàng này được lưu vào biến `{{customerId3}}`.
+}

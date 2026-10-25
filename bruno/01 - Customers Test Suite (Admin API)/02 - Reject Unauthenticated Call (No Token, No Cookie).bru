@@ -1,0 +1,29 @@
+meta {
+  name: 02 - Reject Unauthenticated Call (No Token, No Cookie)
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/admin/customers
+  body: none
+  auth: none
+}
+
+tests {
+  test("401 Unauthorized", function () {
+    expect(res.getStatus()).to.equal(401);
+  });
+}
+
+docs {
+  # 02 - Reject Unauthenticated Call (No Token, No Cookie)
+
+  Kiểm chứng cơ chế bảo vệ ranh giới của Admin API khi hoàn toàn không có thông tin xác thực (`auth: none`).
+
+  ## Mục đích kiểm thử:
+  - Xác nhận Medusa Admin API chặn đứng các cuộc gọi nặc danh và trả về đúng mã HTTP `401 Unauthorized`.
+
+  ## Xác minh trên Bruno:
+  - Hãy kiểm tra tab **Timeline** (hoặc Headers) của request trong Bruno để bảo đảm request gửi đi hoàn toàn không có header `Authorization` và không chứa Cookie phiên nào (sau khi bạn đã tắt tính năng Cookie Jar trong cài đặt Bruno).
+}

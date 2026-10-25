@@ -1,0 +1,75 @@
+import {
+    createWorkflow,
+    transform,
+    when,
+    WorkflowResponse,
+} from "@medusajs/framework/workflows-sdk";
+import { updateCartPromotionsWorkflow, useQueryGraphStep } from "@medusajs/medusa/core-flows";
+import { FIRST_PURCHASE_PROMOTION_CODE } from "@/constant";
+import { PromotionActions } from "@medusajs/framework/utils";
+import { isEligibleForFirstPurchasePromotion } from "../eligibility";
+
+const APPLY_FIRST_PURCHASE_PROMO_WORKFLOW_ID = "apply-first-purchase-promo";
+
+type ApplyFirstPurchasePromoWorkflowInput = {
+    cart_id: string;
+};
+
+export const applyFirstPurchasePromoWorkflow = createWorkflow(
+    APPLY_FIRST_PURCHASE_PROMO_WORKFLOW_ID,
+
+    ({ cart_id }: ApplyFirstPurchasePromoWorkflowInput) => {
+        const { data: carts } = useQueryGraphStep({
+            entity: "cart",
+            fields: ["promotions.*", "customer.*", "customer.orders.id"],
+            filters: {
+                id: cart_id,
+            },
+        });
+
+        const { data: promotions } = useQueryGraphStep({
+            entity: "promotion",
+            fields: ["id", "code", "status"],
+            filters: {
+                code: FIRST_PURCHASE_PROMOTION_CODE,
+            },
+        }).config({ name: "retrieve-promotions" });
+
+        when(
+            {
+                carts,
+                promotions,
+            },
+            (data) => {
+                return isEligibleForFirstPurchasePromotion(
+                    data.carts[0].customer,
+                    data.promotions[0],
+                    data.carts[0].promotions?.some(
+                        (promo) => promo?.id === data.promotions[0].id,
+                    ) ?? false,
+                );
+            },
+        ).then(() => {
+            const promotionInput = transform({ carts, promotions }, ({ carts, promotions }) => ({
+                cart_id: carts[0].id,
+                promo_codes: [promotions[0].code!],
+                action: PromotionActions.ADD,
+            }));
+
+            updateCartPromotionsWorkflow.runAsStep({
+                input: promotionInput,
+            });
+        });
+
+        // retrieve updated cart
+        const { data: updatedCarts } = useQueryGraphStep({
+            entity: "cart",
+            fields: ["*", "promotions.*"],
+            filters: {
+                id: cart_id,
+            },
+        }).config({ name: "retrieve-updated-cart" });
+
+        return new WorkflowResponse(updatedCarts[0]);
+    },
+);
